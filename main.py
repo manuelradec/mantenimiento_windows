@@ -11,6 +11,8 @@ import time
 
 
 
+
+
 LOGFILE = os.path.join(os.environ["USERPROFILE"], "Desktop", f"Optimizacion_Log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
 
 def is_admin():
