@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Windows Update - Mantenimiento Windows{% endblock %}
+{% block page_title %}Windows Update{% endblock %}
+{% block page_desc %}Update management, service control, and repair{% endblock %}
+
+{% block content %}
+<div class="grid grid-2" style="margin-bottom: 16px;">
+    <div class="card">
+        <div class="card-header">
+            <h3>Update Operations</h3>
+        </div>
+        <div class="card-body">
+            <div class="action-list">
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Scan for Updates</div>
+                        <div class="action-desc">Trigger Windows Update scan</div>
+                    </div>
+                    <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/update/api/scan', this)">Scan</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Download Updates</div>
+                        <div class="action-desc">Download pending updates</div>
+                    </div>
+                    <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/update/api/download', this)">Download</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Install Updates</div>
+                        <div class="action-desc">Install downloaded updates (may require reboot)</div>
+                    </div>
+                    <div class="action-badges">
+                        <span class="badge badge-admin">Admin</span>
+                        <span class="badge badge-warning">Reboot</span>
+                    </div>
+                    <button class="btn btn-sm btn-warning" onclick="executeAction('/update/api/install', this, {confirm: true, confirmTitle: 'Install Updates', confirmMessage: 'Installing updates may require a system reboot. Make sure to save your work. Proceed?', dangerLevel: 'warning'})">Install</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Open Windows Update Settings</div>
+                        <div class="action-desc">Opens the Windows Update page in Settings</div>
+                    </div>
+                    <button class="btn btn-sm btn-outline" onclick="executeAction('/update/api/open-settings', this)">Open</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Service Status & Time</h3>
+        </div>
+        <div class="card-body">
+            <div class="action-list">
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Update Services Status</div>
+                        <div class="action-desc">Check wuauserv, BITS, cryptsvc, msiserver</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/update/api/services', 'output-area')">Check</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Resync System Time</div>
+                        <div class="action-desc">Configure and resync W32Time service</div>
+                    </div>
+                    <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/update/api/resync-time', this)">Sync</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 16px;">
+    <div class="card-header">
+        <h3>Hard Reset Windows Update</h3>
+        <span class="badge badge-danger">Advanced</span>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-danger">
+            This is a nuclear option for when Windows Update is completely broken.
+            It stops update services, renames SoftwareDistribution and catroot2 folders,
+            restarts services, and triggers a new scan. Only use as a last resort.
+        </div>
+        <button class="btn btn-lg btn-danger" onclick="executeAction('/update/api/hard-reset', this, {confirm: true, confirmTitle: 'Hard Reset Windows Update', confirmMessage: 'WARNING: This will stop Windows Update services, rename SoftwareDistribution and catroot2 folders, and restart services. This is a drastic action. Only proceed if Windows Update is broken and other methods have failed.', dangerLevel: 'danger'})">
+            Hard Reset Windows Update
+        </button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>Output</h3>
+        <button class="btn btn-sm btn-outline" onclick="document.getElementById('output-area').innerHTML = ''; document.getElementById('output-console').innerHTML = ''">Clear</button>
+    </div>
+    <div class="card-body">
+        <div id="output-area"></div>
+        <div id="output-console" class="console" style="min-height: 150px;">Ready.</div>
+    </div>
+</div>
+{% endblock %}

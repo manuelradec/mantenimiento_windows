@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Drivers - Mantenimiento Windows{% endblock %}
+{% block page_title %}Driver Diagnostics{% endblock %}
+{% block page_desc %}View installed drivers, detect problems, and inspect GPU drivers{% endblock %}
+
+{% block content %}
+<div class="alert alert-info">
+    All driver diagnostics are read-only. Driver deletion is NOT automated due to the extreme risk of bricking devices.
+</div>
+
+<div class="card" style="margin-bottom: 16px;">
+    <div class="card-header">
+        <h3>Driver Information</h3>
+    </div>
+    <div class="card-body">
+        <div class="action-list">
+            <div class="action-item">
+                <div class="action-info">
+                    <div class="action-name">All Installed Drivers</div>
+                    <div class="action-desc">pnputil /enum-drivers - list all third-party drivers</div>
+                </div>
+                <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/drivers/api/all', 'output-area')">View</button>
+            </div>
+            <div class="action-item">
+                <div class="action-info">
+                    <div class="action-name">Problem Devices</div>
+                    <div class="action-desc">Devices with errors or driver issues</div>
+                </div>
+                <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/drivers/api/problems', 'output-area')">View</button>
+            </div>
+            <div class="action-item">
+                <div class="action-info">
+                    <div class="action-name">Third-Party Drivers</div>
+                    <div class="action-desc">Non-Microsoft drivers with version and signature info</div>
+                </div>
+                <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/drivers/api/third-party', 'output-area')">View</button>
+            </div>
+            <div class="action-item">
+                <div class="action-info">
+                    <div class="action-name">Display/GPU Drivers</div>
+                    <div class="action-desc">Video controller and GPU driver details</div>
+                </div>
+                <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/drivers/api/display', 'output-area')">View</button>
+            </div>
+            <div class="action-item">
+                <div class="action-info">
+                    <div class="action-name">Driver Errors (Event Log)</div>
+                    <div class="action-desc">Recent driver-related errors from System event log</div>
+                </div>
+                <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
+                <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/drivers/api/errors', 'output-area')">View</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>Output</h3>
+        <button class="btn btn-sm btn-outline" onclick="document.getElementById('output-area').innerHTML = ''">Clear</button>
+    </div>
+    <div class="card-body">
+        <div id="output-area" class="console" style="min-height: 200px;">Click a diagnostic button above to see results here.</div>
+    </div>
+</div>
+{% endblock %}

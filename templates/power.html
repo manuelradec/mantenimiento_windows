@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Power - Mantenimiento Windows{% endblock %}
+{% block page_title %}Power & Performance{% endblock %}
+{% block page_desc %}Power plan management, hibernation, and performance settings{% endblock %}
+
+{% block content %}
+<div class="grid grid-2" style="margin-bottom: 16px;">
+    <div class="card">
+        <div class="card-header">
+            <h3>Power Plans</h3>
+        </div>
+        <div class="card-body">
+            <div class="action-list">
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Active Power Plan</div>
+                        <div class="action-desc">Show currently active power plan</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/power/api/active-plan', 'output-area')">View</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">List All Plans</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/power/api/list-plans', 'output-area')">View</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Plan Details</div>
+                        <div class="action-desc">Detailed power settings (verbose)</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/power/api/plan-details', 'output-area')">View</button>
+                </div>
+            </div>
+            <div style="margin-top: 16px; display: flex; gap: 8px;">
+                <button class="btn btn-primary" onclick="executeAction('/power/api/set-balanced', this)">Set Balanced</button>
+                <button class="btn btn-warning" onclick="executeAction('/power/api/set-high-performance', this, {confirm: true, confirmTitle: 'High Performance', confirmMessage: 'Switch to High Performance power plan? This increases energy consumption.', dangerLevel: 'warning'})">Set High Performance</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Other Settings</h3>
+        </div>
+        <div class="card-body">
+            <div class="action-list">
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Battery Report</div>
+                        <div class="action-desc">Generate detailed battery report (laptops only)</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/power/api/battery-report', this)">Generate</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Processor Counters</div>
+                        <div class="action-desc">View current processor power metrics</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/power/api/processor-info', 'output-area')">View</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Disable Hibernation</div>
+                        <div class="action-desc">Disable hibernate and free disk space (~RAM size)</div>
+                    </div>
+                    <div class="action-badges">
+                        <span class="badge badge-admin">Admin</span>
+                        <span class="badge badge-warning">Caution</span>
+                    </div>
+                    <button class="btn btn-sm btn-warning" onclick="executeAction('/power/api/disable-hibernation', this, {confirm: true, confirmTitle: 'Disable Hibernation', confirmMessage: 'This removes the ability to hibernate and deletes hiberfil.sys, freeing disk space equal to your RAM size. Proceed?', dangerLevel: 'warning'})">Disable</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Enable Hibernation</div>
+                        <div class="action-desc">Re-enable hibernate mode</div>
+                    </div>
+                    <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/power/api/enable-hibernation', this)">Enable</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>Output</h3>
+        <button class="btn btn-sm btn-outline" onclick="document.getElementById('output-area').innerHTML = ''">Clear</button>
+    </div>
+    <div class="card-body">
+        <div id="output-area" class="console" style="min-height: 150px;">Ready.</div>
+        <div id="output-console" class="console" style="min-height: 50px; margin-top: 8px; display: none;"></div>
+    </div>
+</div>
+{% endblock %}

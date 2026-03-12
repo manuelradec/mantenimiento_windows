@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}Diagnostics - Mantenimiento Windows{% endblock %}
+{% block page_title %}System Diagnostics{% endblock %}
+{% block page_desc %}Read-only system information and health checks{% endblock %}
+
+{% block content %}
+<div class="alert alert-info">
+    All diagnostics are read-only and safe to run. No changes will be made to your system.
+</div>
+
+<div class="grid grid-2" style="margin-bottom: 16px;">
+    <div class="card">
+        <div class="card-header">
+            <h3>Hardware</h3>
+        </div>
+        <div class="card-body">
+            <div class="action-list">
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">RAM Details</div>
+                        <div class="action-desc">Physical memory modules and configuration</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/diagnostics/api/ram', 'output-area')">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Disk Details</div>
+                        <div class="action-desc">Physical disks, type (SSD/HDD), health</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/diagnostics/api/disks', 'output-area')">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">SMART Status</div>
+                        <div class="action-desc">Disk health monitoring</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/diagnostics/api/smart', 'output-area')">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">TRIM Status</div>
+                        <div class="action-desc">SSD TRIM configuration</div>
+                    </div>
+                    <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/diagnostics/api/trim', 'output-area')">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Temperature</div>
+                        <div class="action-desc">CPU/system temperature (may not be available)</div>
+                    </div>
+                    <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/diagnostics/api/temperature', 'output-area')">Run</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>System</h3>
+        </div>
+        <div class="card-body">
+            <div class="action-list">
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Windows Version</div>
+                        <div class="action-desc">Detailed OS version information</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/diagnostics/api/windows-version', 'output-area')">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Top Processes</div>
+                        <div class="action-desc">CPU and RAM consuming processes</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/diagnostics/api/top-processes', 'output-area')">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Important Services</div>
+                        <div class="action-desc">Status of key Windows services</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/diagnostics/api/services', 'output-area')">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Startup Programs</div>
+                        <div class="action-desc">Programs that run at Windows startup</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/diagnostics/api/startup', 'output-area')">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Remote Access Detection</div>
+                        <div class="action-desc">AnyDesk, TeamViewer, VNC, etc.</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/diagnostics/api/remote-access', 'output-area')">Run</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-2" style="margin-bottom: 16px;">
+    <div class="card">
+        <div class="card-header">
+            <h3>Network</h3>
+        </div>
+        <div class="card-body">
+            <div class="action-list">
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Network Adapters</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/diagnostics/api/network', 'output-area')">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Route Table</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/diagnostics/api/routes', 'output-area')">Run</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <h3>Other</h3>
+        </div>
+        <div class="card-body">
+            <div class="action-list">
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">License Status</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/diagnostics/api/license', 'output-area')">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Time Sync</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/diagnostics/api/time-sync', 'output-area')">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Display Events</div>
+                    </div>
+                    <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/diagnostics/api/display-events', 'output-area')">Run</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>Output</h3>
+        <button class="btn btn-sm btn-outline" onclick="document.getElementById('output-area').innerHTML = ''">Clear</button>
+    </div>
+    <div class="card-body">
+        <div id="output-area" class="console" style="min-height: 150px;">Click a diagnostic button above to see results here.</div>
+    </div>
+</div>
+{% endblock %}

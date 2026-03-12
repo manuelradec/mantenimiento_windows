@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Mantenimiento Windows{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h1>MANTENIMIENTO WINDOWS</h1>
+            <div class="version">v{{ config.get('APP_VERSION', '2.0.0') }} | Local</div>
+        </div>
+        <div class="sidebar-nav">
+            <a href="/"><span class="icon">&#9881;</span> <span>Dashboard</span></a>
+
+            <div class="section-title">Diagnostics</div>
+            <a href="/diagnostics"><span class="icon">&#128269;</span> <span>Diagnostics</span></a>
+            <a href="/drivers"><span class="icon">&#128190;</span> <span>Drivers</span></a>
+
+            <div class="section-title">Maintenance</div>
+            <a href="/cleanup"><span class="icon">&#128465;</span> <span>Cleanup</span></a>
+            <a href="/repair"><span class="icon">&#128295;</span> <span>Repair</span></a>
+            <a href="/network"><span class="icon">&#127760;</span> <span>Network</span></a>
+            <a href="/update"><span class="icon">&#128259;</span> <span>Windows Update</span></a>
+
+            <div class="section-title">System</div>
+            <a href="/power"><span class="icon">&#9889;</span> <span>Power</span></a>
+            <a href="/security"><span class="icon">&#128737;</span> <span>Security</span></a>
+
+            <div class="section-title">Tools</div>
+            <a href="/reports"><span class="icon">&#128196;</span> <span>Reports</span></a>
+            <a href="/advanced"><span class="icon">&#128736;</span> <span>Advanced</span></a>
+        </div>
+        <div class="sidebar-footer">
+            <span class="admin-badge {{ 'yes' if elevation.is_admin else 'no' }}">
+                {{ 'ADMIN' if elevation.is_admin else 'NO ADMIN' }}
+            </span>
+        </div>
+    </nav>
+
+    <!-- Main content -->
+    <div class="main-content">
+        <div class="page-header">
+            <h2>{% block page_title %}Dashboard{% endblock %}</h2>
+            <p>{% block page_desc %}{% endblock %}</p>
+        </div>
+        <div class="page-body">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+
+    <!-- Confirmation modal -->
+    <div class="modal-overlay" id="confirm-modal">
+        <div class="modal-box">
+            <h3 class="modal-title">Confirm</h3>
+            <p class="modal-message">Are you sure?</p>
+            <div class="modal-actions">
+                <button class="btn btn-outline modal-cancel">Cancel</button>
+                <button class="btn btn-primary modal-confirm">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

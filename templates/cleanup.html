@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}Cleanup - Mantenimiento Windows{% endblock %}
+{% block page_title %}Cleanup & Optimization{% endblock %}
+{% block page_desc %}Clean temporary files, caches, and optimize storage{% endblock %}
+
+{% block content %}
+<div class="grid grid-2" style="margin-bottom: 16px;">
+    <div class="card">
+        <div class="card-header">
+            <h3>Safe Cleanup</h3>
+            <span class="badge badge-safe">Safe</span>
+        </div>
+        <div class="card-body">
+            <div class="action-list">
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Clean User Temp</div>
+                        <div class="action-desc">Delete user temporary files (%TEMP%)</div>
+                    </div>
+                    <button class="btn btn-sm btn-success" onclick="executeAction('/cleanup/api/user-temp', this)">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Clean Windows Temp</div>
+                        <div class="action-desc">Delete system temporary files</div>
+                    </div>
+                    <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
+                    <button class="btn btn-sm btn-success" onclick="executeAction('/cleanup/api/windows-temp', this)">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Clean WU Download Cache</div>
+                        <div class="action-desc">SoftwareDistribution\Download</div>
+                    </div>
+                    <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
+                    <button class="btn btn-sm btn-success" onclick="executeAction('/cleanup/api/software-distribution', this)">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Clean Internet Cache</div>
+                        <div class="action-desc">INetCache files</div>
+                    </div>
+                    <button class="btn btn-sm btn-success" onclick="executeAction('/cleanup/api/inet-cache', this)">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Empty Recycle Bin</div>
+                        <div class="action-desc">Permanently delete recycle bin contents</div>
+                    </div>
+                    <button class="btn btn-sm btn-success" onclick="executeAction('/cleanup/api/recycle-bin', this)">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Flush DNS Cache</div>
+                        <div class="action-desc">Clear DNS resolver cache</div>
+                    </div>
+                    <button class="btn btn-sm btn-success" onclick="executeAction('/cleanup/api/dns-cache', this)">Run</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Storage Optimization</h3>
+        </div>
+        <div class="card-body">
+            <div class="action-list">
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Disk Cleanup (cleanmgr)</div>
+                        <div class="action-desc">Run Windows Disk Cleanup utility</div>
+                    </div>
+                    <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/cleanup/api/cleanmgr', this)">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">DISM Component Cleanup</div>
+                        <div class="action-desc">Remove superseded Windows components</div>
+                    </div>
+                    <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/cleanup/api/component-cleanup', this)">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">ReTrim SSD</div>
+                        <div class="action-desc">Optimize SSD (only if SSD detected)</div>
+                    </div>
+                    <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/cleanup/api/retrim', this)">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Defragment HDD</div>
+                        <div class="action-desc">Only runs on HDD, never on SSD</div>
+                    </div>
+                    <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/cleanup/api/defrag', this, {confirm: true, confirmTitle: 'Defragment HDD', confirmMessage: 'This will only run if an HDD is detected. Continue?'})">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Scan Duplicate Files</div>
+                        <div class="action-desc">Find duplicates in Downloads folder</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/cleanup/api/scan-duplicates', this)">Scan</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Restart Explorer</div>
+                        <div class="action-desc">Restart Windows Explorer (taskbar refresh)</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/cleanup/api/restart-explorer', this, {confirm: true, confirmTitle: 'Restart Explorer', confirmMessage: 'The taskbar will briefly disappear. Continue?'})">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Reset Store Cache</div>
+                        <div class="action-desc">Reset Microsoft Store cache (wsreset)</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/cleanup/api/store-cache', this)">Run</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 16px;">
+    <div class="card-header">
+        <h3>Advanced Optimization</h3>
+        <span class="badge badge-warning">Use with caution</span>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-warning">
+            These actions can affect system functionality. Only use if you understand the implications.
+        </div>
+        <div class="action-list">
+            <div class="action-item">
+                <div class="action-info">
+                    <div class="action-name">Disable SysMain (Superfetch)</div>
+                    <div class="action-desc">May degrade performance on HDD systems. Recommended only for SSD-only machines with low RAM.</div>
+                </div>
+                <div class="action-badges">
+                    <span class="badge badge-admin">Admin</span>
+                    <span class="badge badge-warning">Caution</span>
+                </div>
+                <button class="btn btn-sm btn-warning" onclick="executeAction('/cleanup/api/disable-sysmain', this, {confirm: true, confirmTitle: 'Disable SysMain', confirmMessage: 'WARNING: Disabling SysMain may degrade performance on systems with HDD. Only recommended for SSD-only systems. Proceed?', dangerLevel: 'warning'})">Disable</button>
+            </div>
+            <div class="action-item">
+                <div class="action-info">
+                    <div class="action-name">Disable Windows Search</div>
+                    <div class="action-desc">WARNING: Breaks Windows file search and indexing functionality.</div>
+                </div>
+                <div class="action-badges">
+                    <span class="badge badge-admin">Admin</span>
+                    <span class="badge badge-danger">Risk</span>
+                </div>
+                <button class="btn btn-sm btn-danger" onclick="executeAction('/cleanup/api/disable-wsearch', this, {confirm: true, confirmTitle: 'Disable Windows Search', confirmMessage: 'WARNING: This will completely disable Windows Search and file indexing. File search in Explorer will stop working. Are you sure?', dangerLevel: 'danger'})">Disable</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>Output</h3>
+        <button class="btn btn-sm btn-outline" onclick="document.getElementById('output-console').innerHTML = ''">Clear</button>
+    </div>
+    <div class="card-body">
+        <div id="output-console" class="console" style="min-height: 150px;">Ready. Click an action above to see output here.</div>
+    </div>
+</div>
+{% endblock %}

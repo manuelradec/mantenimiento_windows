@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Reports - Mantenimiento Windows{% endblock %}
+{% block page_title %}Reports & Logs{% endblock %}
+{% block page_desc %}Session log, export options, and maintenance summary{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom: 16px;">
+    <div class="card-header">
+        <h3>Session Summary</h3>
+        <div style="display: flex; gap: 8px;">
+            <button class="btn btn-sm btn-primary" onclick="downloadReport('html')">Export HTML</button>
+            <button class="btn btn-sm btn-outline" onclick="downloadReport('txt')">Export TXT</button>
+            <button class="btn btn-sm btn-outline" onclick="downloadReport('json')">Export JSON</button>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="grid grid-4" style="margin-bottom: 16px;">
+            <div class="stat-box">
+                <div class="label">Total Actions</div>
+                <div class="value">{{ summary.total_actions }}</div>
+            </div>
+            <div class="stat-box">
+                <div class="label">Successful</div>
+                <div class="value" style="color: var(--success);">{{ summary.by_status.get('success', 0) }}</div>
+            </div>
+            <div class="stat-box">
+                <div class="label">Warnings</div>
+                <div class="value" style="color: var(--warning);">{{ summary.by_status.get('warning', 0) }}</div>
+            </div>
+            <div class="stat-box">
+                <div class="label">Errors</div>
+                <div class="value" style="color: var(--danger);">{{ summary.by_status.get('error', 0) }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>Activity Log</h3>
+        <button class="btn btn-sm btn-outline" onclick="refreshLog()">Refresh</button>
+    </div>
+    <div class="card-body">
+        {% if entries %}
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Module</th>
+                        <th>Action</th>
+                        <th>Status</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody id="log-tbody">
+                    {% for entry in entries %}
+                    <tr>
+                        <td style="white-space: nowrap; font-family: monospace; font-size: 11px;">{{ entry.timestamp[:19] }}</td>
+                        <td><span class="badge badge-info">{{ entry.module }}</span></td>
+                        <td>{{ entry.action }}</td>
+                        <td>
+                            {% if entry.status == 'success' %}
+                            <span class="status"><span class="status-dot green"></span> Success</span>
+                            {% elif entry.status == 'warning' %}
+                            <span class="status"><span class="status-dot yellow"></span> Warning</span>
+                            {% elif entry.status == 'error' %}
+                            <span class="status"><span class="status-dot red"></span> Error</span>
+                            {% else %}
+                            <span class="status"><span class="status-dot gray"></span> {{ entry.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            {{ entry.result[:100] if entry.result else entry.error[:100] if entry.error else '-' }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            No actions have been logged yet. Run maintenance operations from other sections to see them here.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function refreshLog() {
+    try {
+        const response = await fetch('/reports/api/entries');
+        const data = await response.json();
+        // Reload the page to show updated entries
+        window.location.reload();
+    } catch (e) {
+        alert('Failed to refresh log');
+    }
+}
+</script>
+{% endblock %}
