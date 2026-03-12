@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Security - Mantenimiento Windows{% endblock %}
+{% block page_title %}Security & Antivirus{% endblock %}
+{% block page_desc %}Microsoft Defender management and security diagnostics{% endblock %}
+
+{% block content %}
+<div class="grid grid-2" style="margin-bottom: 16px;">
+    <div class="card">
+        <div class="card-header">
+            <h3>Microsoft Defender</h3>
+            <span class="badge badge-info">Native</span>
+        </div>
+        <div class="card-body">
+            <div class="action-list">
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Defender Status</div>
+                        <div class="action-desc">Real-time protection, signature age, etc.</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/security/api/defender-status', 'output-area')">Check</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Defender Configuration</div>
+                        <div class="action-desc">Exclusions, CPU load factor, etc.</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/security/api/defender-config', 'output-area')">View</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Quick Scan</div>
+                        <div class="action-desc">Run a quick Defender scan (5-15 min)</div>
+                    </div>
+                    <button class="btn btn-sm btn-success" onclick="executeAction('/security/api/quick-scan', this)">Scan</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Full Scan</div>
+                        <div class="action-desc">Run a full system scan (can take hours)</div>
+                    </div>
+                    <button class="btn btn-sm btn-warning" onclick="executeAction('/security/api/full-scan', this, {confirm: true, confirmTitle: 'Full Scan', confirmMessage: 'A full scan checks every file on your system and can take 1-3 hours. Proceed?', dangerLevel: 'warning'})">Scan</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Update Signatures</div>
+                        <div class="action-desc">Update virus definition database</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/security/api/update-signatures', this)">Update</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Set Scan CPU Load</div>
+                        <div class="action-desc">Reduce Defender scan CPU impact (default: 50%)</div>
+                    </div>
+                    <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/security/api/set-cpu-load', this, {body: {factor: 30}, confirm: true, confirmTitle: 'Reduce Defender CPU Load', confirmMessage: 'Set Defender scan CPU load factor to 30%? This makes scans slower but less impactful on system performance.'})">Set 30%</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Third-Party Security</h3>
+            <span class="badge badge-optional">Optional</span>
+        </div>
+        <div class="card-body">
+            <div class="action-list">
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Detect Installed AV</div>
+                        <div class="action-desc">Check for third-party antivirus products</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/security/api/third-party', 'output-area')">Detect</button>
+                </div>
+            </div>
+            <div class="alert alert-info" style="margin-top: 16px;">
+                Third-party tools like Malwarebytes, Norton, Kaspersky, etc. must be managed
+                through their own interfaces. This tool only detects their presence.
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>Output</h3>
+        <button class="btn btn-sm btn-outline" onclick="document.getElementById('output-area').innerHTML = ''; document.getElementById('output-console').innerHTML = ''">Clear</button>
+    </div>
+    <div class="card-body">
+        <div id="output-area"></div>
+        <div id="output-console" class="console" style="min-height: 150px;">Ready.</div>
+    </div>
+</div>
+{% endblock %}

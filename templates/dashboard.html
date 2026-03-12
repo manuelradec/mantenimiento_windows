@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Mantenimiento Windows{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_desc %}System overview and quick status{% endblock %}
+
+{% block content %}
+{% if not elevation.is_admin %}
+<div class="alert alert-warning">
+    Running without administrator privileges. Some features will be unavailable.
+    Restart the application as administrator for full functionality.
+</div>
+{% endif %}
+
+<div class="grid grid-4" style="margin-bottom: 24px;">
+    <div class="stat-box">
+        <div class="label">CPU Usage</div>
+        <div class="value" id="cpu-percent">{{ system_info.get('cpu_percent', '--') }}%</div>
+        <div class="sub">{{ system_info.get('cpu_count_logical', '--') }} logical cores</div>
+    </div>
+    <div class="stat-box">
+        <div class="label">RAM Usage</div>
+        <div class="value" id="ram-percent">{{ system_info.get('ram_percent', '--') }}%</div>
+        <div class="sub" id="ram-used">{{ system_info.get('ram_used_gb', '--') }} / {{ system_info.get('ram_total_gb', '--') }} GB</div>
+    </div>
+    <div class="stat-box">
+        <div class="label">Disk Usage</div>
+        <div class="value" id="disk-percent">{{ system_info.get('disk_percent', '--') }}%</div>
+        <div class="sub" id="disk-free">{{ system_info.get('disk_free_gb', '--') }} GB free</div>
+    </div>
+    <div class="stat-box">
+        <div class="label">Uptime</div>
+        <div class="value" style="font-size: 18px;" id="uptime">{{ system_info.get('uptime_str', '--') }}</div>
+        <div class="sub">Since {{ system_info.get('boot_time', '--') }}</div>
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <div class="card-header">
+            <h3>System Information</h3>
+            <button class="btn btn-sm btn-outline" onclick="refreshDashboard()">Refresh</button>
+        </div>
+        <div class="card-body">
+            <table class="data-table">
+                <tr><td style="width:40%; color: var(--text-light);">Computer Name</td><td>{{ system_info.get('computer_name', '--') }}</td></tr>
+                <tr><td style="color: var(--text-light);">User</td><td>{{ system_info.get('username', '--') }}</td></tr>
+                <tr><td style="color: var(--text-light);">OS</td><td>{{ system_info.get('os_name', '--') }} {{ system_info.get('os_release', '') }}</td></tr>
+                <tr><td style="color: var(--text-light);">Version</td><td>{{ system_info.get('os_version', '--') }}</td></tr>
+                <tr><td style="color: var(--text-light);">Architecture</td><td>{{ system_info.get('architecture', '--') }}</td></tr>
+                <tr><td style="color: var(--text-light);">Processor</td><td>{{ system_info.get('processor', '--') }}</td></tr>
+                <tr><td style="color: var(--text-light);">RAM Total</td><td>{{ system_info.get('ram_total_gb', '--') }} GB</td></tr>
+                <tr><td style="color: var(--text-light);">Disk Total</td><td>{{ system_info.get('disk_total_gb', '--') }} GB</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Quick Actions</h3>
+        </div>
+        <div class="card-body">
+            <div class="action-list">
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Run Diagnostics</div>
+                        <div class="action-desc">Full system diagnostic scan</div>
+                    </div>
+                    <a href="/diagnostics" class="btn btn-sm btn-primary">Go</a>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Safe Cleanup</div>
+                        <div class="action-desc">Clean temp files, DNS cache, recycle bin</div>
+                    </div>
+                    <a href="/cleanup" class="btn btn-sm btn-primary">Go</a>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">System Repair</div>
+                        <div class="action-desc">SFC, DISM, and component repair</div>
+                    </div>
+                    <a href="/repair" class="btn btn-sm btn-primary">Go</a>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Network Tools</div>
+                        <div class="action-desc">DNS flush, IP renewal, connectivity tests</div>
+                    </div>
+                    <a href="/network" class="btn btn-sm btn-primary">Go</a>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">View Reports</div>
+                        <div class="action-desc">Session log and export</div>
+                    </div>
+                    <a href="/reports" class="btn btn-sm btn-outline">Go</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Auto-refresh dashboard every 30 seconds
+    setInterval(refreshDashboard, 30000);
+</script>
+{% endblock %}
