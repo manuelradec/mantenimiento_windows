@@ -4,9 +4,13 @@ REM  Build script for Mantenimiento Windows
 REM  Generates: dist\MantenimientoWindows.exe
 REM ============================================================
 
+REM Always work from the directory where this .bat file lives
+cd /d "%~dp0"
+
 echo.
 echo ============================================================
 echo   MANTENIMIENTO WINDOWS - Build Process
+echo   Directorio: %cd%
 echo ============================================================
 echo.
 
