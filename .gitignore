@@ -1,1 +1,16 @@
 /mantenimiento_windows.py
+
+# PyInstaller build artifacts
+build/
+dist/
+*.exe
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Logs (generated at runtime)
+logs/
+*.log
