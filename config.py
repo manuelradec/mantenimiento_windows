@@ -1,5 +1,5 @@
 """
-Configuration for Windows Maintenance Tool.
+Configuration for CleanCPU - Professional Windows Maintenance Tool.
 """
 import os
 import sys
@@ -16,7 +16,7 @@ def get_log_dir():
     """Get the log directory. Uses ProgramData on Windows, else a local 'logs' folder."""
     if sys.platform == 'win32':
         base = os.environ.get('PROGRAMDATA', 'C:\\ProgramData')
-        log_dir = os.path.join(base, 'MantenimientoWindows', 'logs')
+        log_dir = os.path.join(base, 'CleanCPU', 'logs')
     else:
         log_dir = os.path.join(get_base_path(), 'logs')
     os.makedirs(log_dir, exist_ok=True)
@@ -27,7 +27,7 @@ def get_report_dir():
     """Get the report output directory."""
     if sys.platform == 'win32':
         base = os.environ.get('PROGRAMDATA', 'C:\\ProgramData')
-        report_dir = os.path.join(base, 'MantenimientoWindows', 'reports')
+        report_dir = os.path.join(base, 'CleanCPU', 'reports')
     else:
         report_dir = os.path.join(get_base_path(), 'reports')
     os.makedirs(report_dir, exist_ok=True)
@@ -36,7 +36,7 @@ def get_report_dir():
 
 class Config:
     """Flask application configuration."""
-    SECRET_KEY = os.environ.get('FLASK_SECRET_KEY', 'mantenimiento-windows-local-key')
+    SECRET_KEY = os.environ.get('FLASK_SECRET_KEY', 'cleancpu-local-key')
     DEBUG = False
     HOST = '127.0.0.1'
     PORT = 5000
@@ -52,6 +52,6 @@ class Config:
     COMMAND_TIMEOUT_VERY_LONG = 1800   # for full scans
 
     # App metadata
-    APP_NAME = 'Mantenimiento Windows'
-    APP_VERSION = '2.0.0'
-    APP_DESCRIPTION = 'Herramienta profesional de mantenimiento logico para Windows 10/11'
+    APP_NAME = 'CleanCPU'
+    APP_VERSION = '2.1.0'
+    APP_DESCRIPTION = 'Professional logical maintenance tool for Windows 10/11'

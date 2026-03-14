@@ -1,109 +1,706 @@
 {% extends "base.html" %}
-{% block title %}Dashboard - Mantenimiento Windows{% endblock %}
-{% block page_title %}Dashboard{% endblock %}
-{% block page_desc %}System overview and quick status{% endblock %}
+{% block title %}CleanCPU - Dashboard{% endblock %}
+{% block page_title %}CleanCPU{% endblock %}
+{% block page_desc %}Professional Windows maintenance dashboard - all tools in one place{% endblock %}
 
 {% block content %}
 {% if not elevation.is_admin %}
 <div class="alert alert-warning">
-    Running without administrator privileges. Some features will be unavailable.
-    Restart the application as administrator for full functionality.
+    Running without administrator privileges. Some functions will not be available.
+    Restart the application as Administrator for full functionality.
 </div>
 {% endif %}
 
-<div class="grid grid-4" style="margin-bottom: 24px;">
+<!-- System Stats -->
+<div class="grid grid-4" style="margin-bottom: 20px;">
     <div class="stat-box">
-        <div class="label">CPU Usage</div>
+        <div class="label">CPU</div>
         <div class="value" id="cpu-percent">{{ system_info.get('cpu_percent', '--') }}%</div>
         <div class="sub">{{ system_info.get('cpu_count_logical', '--') }} logical cores</div>
     </div>
     <div class="stat-box">
-        <div class="label">RAM Usage</div>
+        <div class="label">RAM</div>
         <div class="value" id="ram-percent">{{ system_info.get('ram_percent', '--') }}%</div>
         <div class="sub" id="ram-used">{{ system_info.get('ram_used_gb', '--') }} / {{ system_info.get('ram_total_gb', '--') }} GB</div>
     </div>
     <div class="stat-box">
-        <div class="label">Disk Usage</div>
+        <div class="label">Disk</div>
         <div class="value" id="disk-percent">{{ system_info.get('disk_percent', '--') }}%</div>
         <div class="sub" id="disk-free">{{ system_info.get('disk_free_gb', '--') }} GB free</div>
     </div>
     <div class="stat-box">
         <div class="label">Uptime</div>
         <div class="value" style="font-size: 18px;" id="uptime">{{ system_info.get('uptime_str', '--') }}</div>
-        <div class="sub">Since {{ system_info.get('boot_time', '--') }}</div>
+        <div class="sub">{{ system_info.get('computer_name', '--') }} | {{ system_info.get('os_name', '') }} {{ system_info.get('os_release', '') }}</div>
     </div>
 </div>
 
-<div class="grid grid-2">
-    <div class="card">
-        <div class="card-header">
-            <h3>System Information</h3>
-            <button class="btn btn-sm btn-outline" onclick="refreshDashboard()">Refresh</button>
-        </div>
-        <div class="card-body">
-            <table class="data-table">
-                <tr><td style="width:40%; color: var(--text-light);">Computer Name</td><td>{{ system_info.get('computer_name', '--') }}</td></tr>
-                <tr><td style="color: var(--text-light);">User</td><td>{{ system_info.get('username', '--') }}</td></tr>
-                <tr><td style="color: var(--text-light);">OS</td><td>{{ system_info.get('os_name', '--') }} {{ system_info.get('os_release', '') }}</td></tr>
-                <tr><td style="color: var(--text-light);">Version</td><td>{{ system_info.get('os_version', '--') }}</td></tr>
-                <tr><td style="color: var(--text-light);">Architecture</td><td>{{ system_info.get('architecture', '--') }}</td></tr>
-                <tr><td style="color: var(--text-light);">Processor</td><td>{{ system_info.get('processor', '--') }}</td></tr>
-                <tr><td style="color: var(--text-light);">RAM Total</td><td>{{ system_info.get('ram_total_gb', '--') }} GB</td></tr>
-                <tr><td style="color: var(--text-light);">Disk Total</td><td>{{ system_info.get('disk_total_gb', '--') }} GB</td></tr>
-            </table>
+<!-- ============================================================ -->
+<!-- SECTION 1: Quick Safe Actions -->
+<!-- ============================================================ -->
+<div class="card" style="margin-bottom: 16px;">
+    <div class="card-header">
+        <h3>Quick Safe Actions</h3>
+        <span class="badge badge-safe">No risk</span>
+    </div>
+    <div class="card-body">
+        <div class="grid grid-4">
+            <button class="btn btn-success btn-lg" style="width:100%; padding: 16px;" onclick="executeAction('/cleanup/api/user-temp', this)">
+                Clean User Temp
+            </button>
+            <button class="btn btn-success btn-lg" style="width:100%; padding: 16px;" onclick="executeAction('/cleanup/api/windows-temp', this)">
+                Clean System Temp
+            </button>
+            <button class="btn btn-success btn-lg" style="width:100%; padding: 16px;" onclick="executeAction('/cleanup/api/recycle-bin', this)">
+                Empty Recycle Bin
+            </button>
+            <button class="btn btn-success btn-lg" style="width:100%; padding: 16px;" onclick="executeAction('/cleanup/api/dns-cache', this)">
+                Flush DNS Cache
+            </button>
+            <button class="btn btn-success btn-lg" style="width:100%; padding: 16px;" onclick="executeAction('/cleanup/api/inet-cache', this)">
+                Clean Internet Cache
+            </button>
+            <button class="btn btn-success btn-lg" style="width:100%; padding: 16px;" onclick="executeAction('/cleanup/api/software-distribution', this)">
+                Clean WU Cache
+            </button>
+            <button class="btn btn-primary btn-lg" style="width:100%; padding: 16px;" onclick="executeAction('/network/api/flush-dns', this)">
+                Flush DNS
+            </button>
+            <button class="btn btn-primary btn-lg" style="width:100%; padding: 16px;" onclick="executeAction('/network/api/renew-ip', this)">
+                Renew IP
+            </button>
         </div>
     </div>
+</div>
 
+<!-- ============================================================ -->
+<!-- SECTION 2: System Diagnostics (Read-Only) -->
+<!-- ============================================================ -->
+<div class="grid grid-2" style="margin-bottom: 16px;">
     <div class="card">
         <div class="card-header">
-            <h3>Quick Actions</h3>
+            <h3>System Diagnostics</h3>
+            <span class="badge badge-safe">Read-only</span>
         </div>
         <div class="card-body">
             <div class="action-list">
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Run Diagnostics</div>
-                        <div class="action-desc">Full system diagnostic scan</div>
+                        <div class="action-name">RAM Info</div>
+                        <div class="action-desc">Physical modules, capacity, speed</div>
                     </div>
-                    <a href="/diagnostics" class="btn btn-sm btn-primary">Go</a>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/diagnostics/api/ram', 'output-console')">View</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Safe Cleanup</div>
-                        <div class="action-desc">Clean temp files, DNS cache, recycle bin</div>
+                        <div class="action-name">Physical Disks</div>
+                        <div class="action-desc">SSD/HDD, health, SMART status</div>
                     </div>
-                    <a href="/cleanup" class="btn btn-sm btn-primary">Go</a>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/diagnostics/api/disks', 'output-console')">View</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">System Repair</div>
-                        <div class="action-desc">SFC, DISM, and component repair</div>
+                        <div class="action-name">TRIM Status</div>
+                        <div class="action-desc">SSD TRIM configuration</div>
                     </div>
-                    <a href="/repair" class="btn btn-sm btn-primary">Go</a>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/diagnostics/api/trim', 'output-console')">View</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Network Tools</div>
-                        <div class="action-desc">DNS flush, IP renewal, connectivity tests</div>
+                        <div class="action-name">Top Processes (CPU/RAM)</div>
+                        <div class="action-desc">Most resource-consuming processes</div>
                     </div>
-                    <a href="/network" class="btn btn-sm btn-primary">Go</a>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/diagnostics/api/top-processes', 'output-console')">View</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">View Reports</div>
-                        <div class="action-desc">Session log and export</div>
+                        <div class="action-name">Critical Services</div>
+                        <div class="action-desc">Status of key Windows services</div>
                     </div>
-                    <a href="/reports" class="btn btn-sm btn-outline">Go</a>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/diagnostics/api/services', 'output-console')">View</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Startup Programs</div>
+                        <div class="action-desc">Apps that run on Windows boot</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/diagnostics/api/startup', 'output-console')">View</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Remote Access Detection</div>
+                        <div class="action-desc">AnyDesk, TeamViewer, VNC, etc.</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/diagnostics/api/remote-access', 'output-console')">View</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Windows Version</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/diagnostics/api/windows-version', 'output-console')">View</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Windows License</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/diagnostics/api/license', 'output-console')">View</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Time Sync Status</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/diagnostics/api/time-sync', 'output-console')">View</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Routing Table</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/diagnostics/api/routes', 'output-console')">View</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Disk Fragmentation Analysis</div>
+                        <div class="action-desc">Analyze without defragmenting</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/cleanup/api/analyze-fragmentation', 'output-console')">Analyze</button>
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Drivers & Network Diagnostics -->
+    <div class="card">
+        <div class="card-header">
+            <h3>Drivers &amp; Network</h3>
+            <span class="badge badge-safe">Read-only</span>
+        </div>
+        <div class="card-body">
+            <div class="action-list">
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Installed Drivers</div>
+                        <div class="action-desc">Full third-party driver list</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/drivers/api/all', 'output-console')">View</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Problem Devices</div>
+                        <div class="action-desc">Devices with driver errors</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/drivers/api/problems', 'output-console')">View</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Video/GPU Drivers</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/drivers/api/display', 'output-console')">View</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Driver Errors (Event Log)</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/drivers/api/errors', 'output-console')">View</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Network Adapters</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/network/api/adapters', 'output-console')">View</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Full IP Configuration</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/network/api/ip-config', 'output-console')">View</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">TCP Global Settings</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/network/api/tcp-global', 'output-console')">View</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">WinHTTP Proxy</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/network/api/proxy', 'output-console')">View</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Shared Folders</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/network/api/shared-folders', 'output-console')">View</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">SMB Sessions</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/network/api/smb-sessions', 'output-console')">View</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Network Services Status</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/network/api/services', 'output-console')">View</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Processor Power Info</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/power/api/processor-info', 'output-console')">View</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 3: System Repair -->
+<!-- ============================================================ -->
+<div class="grid grid-2" style="margin-bottom: 16px;">
+    <div class="card">
+        <div class="card-header">
+            <h3>System Repair</h3>
+            <span class="badge badge-admin">Admin</span>
+        </div>
+        <div class="card-body">
+            <div class="action-list">
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">SFC /scannow</div>
+                        <div class="action-desc">Verify and repair system files (5-15 min)</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/repair/api/sfc', this)">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">DISM CheckHealth</div>
+                        <div class="action-desc">Quick integrity check</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/repair/api/dism-check', this)">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">DISM ScanHealth</div>
+                        <div class="action-desc">Deep component scan</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/repair/api/dism-scan', this)">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">DISM RestoreHealth</div>
+                        <div class="action-desc">Repair component store</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/repair/api/dism-restore', this)">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">DISM ComponentCleanup</div>
+                        <div class="action-desc">Remove obsolete components</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/repair/api/component-cleanup', this)">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">CHKDSK Online Scan</div>
+                        <div class="action-desc">Check disk without reboot</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/repair/api/chkdsk-scan', this)">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">WinSAT Disk Benchmark</div>
+                        <div class="action-desc">Disk performance score</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/repair/api/winsat', this)">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Full Repair Sequence</div>
+                        <div class="action-desc">SFC + DISM complete (30+ min)</div>
+                    </div>
+                    <button class="btn btn-sm btn-warning" onclick="executeAction('/repair/api/full-sequence', this, {confirm: true, confirmTitle: 'Full Repair Sequence', confirmMessage: 'This runs SFC, DISM CheckHealth, ScanHealth, RestoreHealth and ComponentCleanup. It may take 30+ minutes. Continue?'})">Run All</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Disk Optimization -->
+    <div class="card">
+        <div class="card-header">
+            <h3>Disk Optimization</h3>
+        </div>
+        <div class="card-body">
+            <div class="action-list">
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Disk Cleanup (cleanmgr)</div>
+                        <div class="action-desc">Native Windows cleanup tool</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/cleanup/api/cleanmgr', this)">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">ReTrim SSD</div>
+                        <div class="action-desc">Optimize SSD (only if SSD detected)</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/cleanup/api/retrim', this)">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Defragment HDD</div>
+                        <div class="action-desc">Only on HDD, never on SSD</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/cleanup/api/defrag', this, {confirm: true, confirmTitle: 'Defragment', confirmMessage: 'This only runs if an HDD is detected. Continue?'})">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Scan Duplicates</div>
+                        <div class="action-desc">Scan Downloads folder for duplicate files (read-only)</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/cleanup/api/scan-duplicates', this)">Scan</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Reset Store Cache</div>
+                        <div class="action-desc">Clear Microsoft Store cache (wsreset)</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/cleanup/api/store-cache', this)">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Restart Explorer</div>
+                        <div class="action-desc">Refresh taskbar and shell</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/cleanup/api/restart-explorer', this, {confirm: true, confirmTitle: 'Restart Explorer', confirmMessage: 'The taskbar will briefly disappear. Continue?'})">Run</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Clean Prefetch</div>
+                        <div class="action-desc">Clear Prefetch folder (minimal benefit)</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/cleanup/api/prefetch', this, {confirm: true, confirmTitle: 'Clean Prefetch', confirmMessage: 'This has minimal performance benefit. Windows will rebuild the cache. Continue?'})">Run</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 4: Network & Connectivity -->
+<!-- ============================================================ -->
+<div class="grid grid-2" style="margin-bottom: 16px;">
+    <div class="card">
+        <div class="card-header">
+            <h3>Network &amp; Connectivity</h3>
+        </div>
+        <div class="card-body">
+            <div class="action-list">
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Connectivity Test</div>
+                        <div class="action-desc">Test internet connection (8.8.8.8:443)</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/network/api/test-connectivity', this, {body: {host: '8.8.8.8', port: 443}})">Test</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Release IP</div>
+                        <div class="action-desc">Release current DHCP address</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/network/api/release-ip', this)">Release</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">TCP Autotuning Normal</div>
+                        <div class="action-desc">Restore recommended default</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/network/api/set-autotuning', this)">Apply</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Clear SMB Sessions</div>
+                        <div class="action-desc">Remove mapped drives and NetBIOS cache</div>
+                    </div>
+                    <button class="btn btn-sm btn-warning" onclick="executeAction('/network/api/clear-smb', this, {confirm: true, confirmTitle: 'Clear SMB Sessions', confirmMessage: 'This will disconnect all mapped network drives. Continue?'})">Clear</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Network Repair</div>
+                        <div class="action-desc">Flush DNS + Release/Renew IP + Autotuning</div>
+                    </div>
+                    <button class="btn btn-sm btn-warning" onclick="executeAction('/network/api/repair', this, {confirm: true, confirmTitle: 'Network Repair', confirmMessage: 'This flushes DNS, renews IP and restores autotuning. Brief disconnection possible. Continue?'})">Repair</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Sync Time (NTP)</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/update/api/resync-time', this)">Sync</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Windows Update -->
+    <div class="card">
+        <div class="card-header">
+            <h3>Windows Update</h3>
+        </div>
+        <div class="card-body">
+            <div class="action-list">
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Scan for Updates</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/update/api/scan', this)">Scan</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Download Updates</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/update/api/download', this)">Download</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Install Updates</div>
+                        <div class="action-desc">May require reboot</div>
+                    </div>
+                    <button class="btn btn-sm btn-warning" onclick="executeAction('/update/api/install', this, {confirm: true, confirmTitle: 'Install Updates', confirmMessage: 'This may require a reboot. Save all your work first. Continue?', dangerLevel: 'warning'})">Install</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">WU Services Status</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/update/api/services', 'output-console')">View</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Open Windows Update</div>
+                    </div>
+                    <button class="btn btn-sm btn-outline" onclick="executeAction('/update/api/open-settings', this)">Open</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 5: Security & Power -->
+<!-- ============================================================ -->
+<div class="grid grid-2" style="margin-bottom: 16px;">
+    <div class="card">
+        <div class="card-header">
+            <h3>Security (Defender)</h3>
+        </div>
+        <div class="card-body">
+            <div class="action-list">
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Defender Status</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/security/api/defender-status', 'output-console')">View</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Defender Configuration</div>
+                        <div class="action-desc">Real-time protection, CPU load, exclusions</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/security/api/defender-config', 'output-console')">View</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Quick Scan</div>
+                        <div class="action-desc">5-15 minutes</div>
+                    </div>
+                    <button class="btn btn-sm btn-success" onclick="executeAction('/security/api/quick-scan', this)">Scan</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Full Scan</div>
+                        <div class="action-desc">Comprehensive scan (2+ hours)</div>
+                    </div>
+                    <button class="btn btn-sm btn-warning" onclick="executeAction('/security/api/full-scan', this, {confirm: true, confirmTitle: 'Full Scan', confirmMessage: 'A full scan can take 2+ hours and will use significant CPU. Continue?', dangerLevel: 'warning'})">Full Scan</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Update Virus Signatures</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/security/api/update-signatures', this)">Update</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Third-Party Antivirus</div>
+                        <div class="action-desc">Detect other antivirus installed</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/security/api/third-party', 'output-console')">Detect</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Security Overview</div>
+                        <div class="action-desc">Complete security status report</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/security/api/overview', 'output-console')">View</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Power &amp; Performance</h3>
+        </div>
+        <div class="card-body">
+            <div class="action-list">
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Active Power Plan</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/power/api/active-plan', 'output-console')">View</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">All Power Plans</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/power/api/list-plans', 'output-console')">View</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Power Plan Details</div>
+                        <div class="action-desc">Full settings for current plan</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/power/api/plan-details', 'output-console')">View</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Set Balanced Mode</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/power/api/set-balanced', this)">Apply</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Set High Performance</div>
+                    </div>
+                    <button class="btn btn-sm btn-warning" onclick="executeAction('/power/api/set-high-performance', this, {confirm: true, confirmTitle: 'High Performance', confirmMessage: 'This increases power consumption and fan speed. Continue?', dangerLevel: 'warning'})">Apply</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Battery Report</div>
+                        <div class="action-desc">Laptops only - generates HTML report</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/power/api/battery-report', this)">Generate</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info">
+                        <div class="action-name">Enable Hibernation</div>
+                        <div class="action-desc">Re-enable hibernate option</div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/power/api/enable-hibernation', this)">Enable</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 6: Restore Points & GPU/Display -->
+<!-- ============================================================ -->
+<div class="card" style="margin-bottom: 16px;">
+    <div class="card-header">
+        <h3>Restore Points &amp; Display</h3>
+    </div>
+    <div class="card-body">
+        <div class="grid grid-4">
+            <button class="btn btn-success btn-lg" style="width:100%; padding: 14px;" onclick="executeAction('/advanced/api/create-restore-point', this)">
+                Create Restore Point
+            </button>
+            <button class="btn btn-primary btn-lg" style="width:100%; padding: 14px;" onclick="fetchDiagnostic('/advanced/api/list-restore-points', 'output-console')">
+                View Restore Points
+            </button>
+            <button class="btn btn-primary btn-lg" style="width:100%; padding: 14px;" onclick="fetchDiagnostic('/advanced/api/gpu-drivers', 'output-console')">
+                GPU / Display Info
+            </button>
+            <button class="btn btn-primary btn-lg" style="width:100%; padding: 14px;" onclick="fetchDiagnostic('/advanced/api/display-events', 'output-console')">
+                Display Events
+            </button>
+            <button class="btn btn-primary btn-lg" style="width:100%; padding: 14px;" onclick="fetchDiagnostic('/advanced/api/display-diagnostics', 'output-console')">
+                Display Diagnostics
+            </button>
+            <button class="btn btn-primary btn-lg" style="width:100%; padding: 14px;" onclick="fetchDiagnostic('/advanced/api/psr-check', 'output-console')">
+                Panel Self-Refresh Check
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 7: Advanced Operations (Caution Required) -->
+<!-- ============================================================ -->
+<div class="card" style="margin-bottom: 16px;">
+    <div class="card-header">
+        <h3>Advanced Operations (Caution Required)</h3>
+        <span class="badge badge-danger">Caution</span>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-danger" style="margin-bottom: 12px;">
+            These actions may affect system stability. A restore point will be recommended before executing. Only use if you understand the implications.
+        </div>
+        <div class="grid grid-3">
+            <button class="btn btn-danger" style="width:100%;" onclick="executeAction('/update/api/hard-reset', this, {confirm: true, confirmTitle: 'Hard Reset Windows Update', confirmMessage: 'WARNING: This stops WU services and renames SoftwareDistribution and catroot2 folders. Only use if Windows Update is completely broken. Continue?', dangerLevel: 'danger'})">
+                Hard Reset Windows Update
+            </button>
+            <button class="btn btn-danger" style="width:100%;" onclick="executeAction('/network/api/reset-ip-stack', this, {confirm: true, confirmTitle: 'Reset TCP/IP Stack', confirmMessage: 'WARNING: This resets the entire TCP/IP stack. You may lose connectivity. A reboot is recommended afterward. Continue?', dangerLevel: 'danger'})">
+                Reset TCP/IP Stack
+            </button>
+            <button class="btn btn-danger" style="width:100%;" onclick="executeAction('/network/api/reset-winsock', this, {confirm: true, confirmTitle: 'Reset Winsock', confirmMessage: 'WARNING: This resets the Winsock catalog. A reboot is REQUIRED afterward. Continue?', dangerLevel: 'danger'})">
+                Reset Winsock
+            </button>
+            <button class="btn btn-warning" style="width:100%;" onclick="executeAction('/repair/api/chkdsk-schedule', this, {confirm: true, confirmTitle: 'Schedule CHKDSK', confirmMessage: 'This schedules a full CHKDSK on next reboot (1-3 hours). It does NOT reboot now. Continue?', dangerLevel: 'warning'})">
+                Schedule Full CHKDSK
+            </button>
+            <button class="btn btn-warning" style="width:100%;" onclick="executeAction('/repair/api/memory-diagnostic', this, {confirm: true, confirmTitle: 'Memory Diagnostic', confirmMessage: 'Opens Windows Memory Diagnostic. The test runs on next reboot. Continue?', dangerLevel: 'warning'})">
+                Memory Diagnostic
+            </button>
+            <button class="btn btn-warning" style="width:100%;" onclick="executeAction('/power/api/disable-hibernation', this, {confirm: true, confirmTitle: 'Disable Hibernation', confirmMessage: 'This deletes hiberfil.sys and frees space equal to your RAM. You will no longer be able to hibernate. Continue?', dangerLevel: 'warning'})">
+                Disable Hibernation
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 8: Reports -->
+<!-- ============================================================ -->
+<div class="card" style="margin-bottom: 16px;">
+    <div class="card-header">
+        <h3>Reports &amp; Export</h3>
+    </div>
+    <div class="card-body">
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn btn-primary" onclick="downloadReport('html')">Export HTML</button>
+            <button class="btn btn-outline" onclick="downloadReport('txt')">Export TXT</button>
+            <button class="btn btn-outline" onclick="downloadReport('json')">Export JSON</button>
+            <a href="/reports" class="btn btn-outline">View Full Log</a>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- OUTPUT CONSOLE -->
+<!-- ============================================================ -->
+<div class="card">
+    <div class="card-header">
+        <h3>Output Terminal</h3>
+        <button class="btn btn-sm btn-outline" onclick="document.getElementById('output-console').innerHTML = '> Ready.\n'">Clear</button>
+    </div>
+    <div class="card-body">
+        <div id="output-console" class="console" style="min-height: 200px;">> CleanCPU initialized. Select an action to see results here.</div>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    // Auto-refresh dashboard every 30 seconds
     setInterval(refreshDashboard, 30000);
 </script>
 {% endblock %}

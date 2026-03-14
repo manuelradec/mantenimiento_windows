@@ -66,6 +66,19 @@ def set_autotuning_normal():
 
 def test_connectivity(host='8.8.8.8', port=443):
     """Test network connectivity to a specific host and port."""
+    import re
+    # Sanitize host to prevent command injection
+    if not re.match(r'^[a-zA-Z0-9.\-:]+$', str(host)):
+        return CommandResult(
+            status=CommandStatus.ERROR,
+            error='Invalid host format. Only alphanumeric characters, dots, hyphens, and colons are allowed.',
+        )
+    port = int(port)
+    if not (1 <= port <= 65535):
+        return CommandResult(
+            status=CommandStatus.ERROR,
+            error='Invalid port. Must be between 1 and 65535.',
+        )
     return run_powershell(
         f'Test-NetConnection -ComputerName {host} -Port {port}',
         timeout=30,

@@ -1,11 +1,11 @@
 # -*- mode: python ; coding: utf-8 -*-
-# PyInstaller spec for Mantenimiento Windows v2.0
+# PyInstaller spec for CleanCPU v2.1
 #
 # Build:
 #   pip install flask psutil pyinstaller
 #   pyinstaller mantenimiento_windows.spec
 #
-# Output: dist/MantenimientoWindows.exe
+# Output: dist\CleanCPU.exe
 
 import os
 
@@ -83,7 +83,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='MantenimientoWindows',
+    name='CleanCPU',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

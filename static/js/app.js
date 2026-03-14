@@ -1,5 +1,6 @@
 /**
- * Windows Maintenance Tool - Frontend JavaScript
+ * CleanCPU - Professional Windows Maintenance Tool
+ * Frontend JavaScript
  */
 
 // Execute an action with confirmation and loading state

@@ -1,7 +1,7 @@
 @echo off
 REM ============================================================
-REM  Build script for Mantenimiento Windows
-REM  Generates: dist\MantenimientoWindows.exe
+REM  Build script for CleanCPU
+REM  Generates: dist\CleanCPU.exe
 REM ============================================================
 
 REM Always work from the directory where this .bat file lives
@@ -9,7 +9,7 @@ cd /d "%~dp0"
 
 echo.
 echo ============================================================
-echo   MANTENIMIENTO WINDOWS - Build Process
+echo   CLEANCPU - Build Process
 echo   Directorio: %cd%
 echo ============================================================
 echo.
@@ -77,17 +77,17 @@ echo ============================================================
 echo   BUILD EXITOSO
 echo ============================================================
 echo.
-echo   Archivo generado: dist\MantenimientoWindows.exe
+echo   Archivo generado: dist\CleanCPU.exe
 echo.
 echo   Para distribuir:
-echo   1. Copia dist\MantenimientoWindows.exe al equipo destino
+echo   1. Copia dist\CleanCPU.exe al equipo destino
 echo   2. Ejecuta como administrador (doble clic, acepta UAC)
 echo   3. El navegador se abre automaticamente
 echo.
 echo ============================================================
 
 REM Show file size
-for %%I in (dist\MantenimientoWindows.exe) do echo   Tamano: %%~zI bytes (~%%~zI bytes)
+for %%I in (dist\CleanCPU.exe) do echo   Tamano: %%~zI bytes
 
 echo.
 pause

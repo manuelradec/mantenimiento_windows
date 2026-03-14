@@ -1,17 +1,21 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Mantenimiento Windows{% endblock %}</title>
+    <meta name="description" content="CleanCPU - Professional Windows Maintenance Tool">
+    <meta name="robots" content="noindex, nofollow">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <title>{% block title %}CleanCPU{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <!-- Sidebar -->
     <nav class="sidebar">
         <div class="sidebar-header">
-            <h1>MANTENIMIENTO WINDOWS</h1>
-            <div class="version">v{{ config.get('APP_VERSION', '2.0.0') }} | Local</div>
+            <h1>CLEANCPU</h1>
+            <div class="version">v{{ config.get('APP_VERSION', '2.1.0') }} | Local</div>
         </div>
         <div class="sidebar-nav">
             <a href="/"><span class="icon">&#9881;</span> <span>Dashboard</span></a>
@@ -49,6 +53,9 @@
         </div>
         <div class="page-body">
             {% block content %}{% endblock %}
+        </div>
+        <div class="page-footer" style="padding: 12px 28px; font-size: 11px; color: #a0aec0; border-top: 1px solid #e2e8f0; text-align: center;">
+            CleanCPU v{{ config.get('APP_VERSION', '2.1.0') }} &mdash; This tool only runs locally (127.0.0.1). No data is transmitted externally. Use at your own risk.
         </div>
     </div>
 

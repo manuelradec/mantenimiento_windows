@@ -26,7 +26,7 @@ def create_restore_point(description=None):
     Should be called before any potentially destructive operation.
     """
     if description is None:
-        description = f'MantenimientoWindows - {datetime.now().strftime("%Y-%m-%d %H:%M")}'
+        description = f'CleanCPU - {datetime.now().strftime("%Y-%m-%d %H:%M")}'
 
     # First ensure System Restore is enabled
     enable_result = enable_system_restore()
