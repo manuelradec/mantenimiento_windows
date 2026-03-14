@@ -1,5 +1,5 @@
 """
-Mantenimiento Windows - Professional Windows Maintenance Tool
+CleanCPU - Professional Windows Maintenance Tool
 Flask-based local web application for Windows 10/11 logical maintenance.
 
 This is the main entrypoint. It initializes Flask, registers blueprints,

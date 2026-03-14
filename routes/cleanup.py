@@ -115,18 +115,10 @@ def api_scan_duplicates():
     return jsonify(result.to_dict())
 
 
-@cleanup_bp.route('/api/disable-sysmain', methods=['POST'])
-def api_disable_sysmain():
-    result = cleanup_svc.disable_sysmain()
-    get_log().add_entry('cleanup', 'Disable SysMain', result.status.value,
-                        result=result.output, error=result.error)
-    return jsonify(result.to_dict())
-
-
-@cleanup_bp.route('/api/disable-wsearch', methods=['POST'])
-def api_disable_wsearch():
-    result = cleanup_svc.disable_windows_search()
-    get_log().add_entry('cleanup', 'Disable Windows Search', result.status.value,
+@cleanup_bp.route('/api/prefetch', methods=['POST'])
+def api_clean_prefetch():
+    result = cleanup_svc.clean_prefetch()
+    get_log().add_entry('cleanup', 'Clean Prefetch', result.status.value,
                         result=result.output, error=result.error)
     return jsonify(result.to_dict())
 

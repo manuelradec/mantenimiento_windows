@@ -1,24 +1,38 @@
 # -*- mode: python ; coding: utf-8 -*-
-# PyInstaller spec for Mantenimiento Windows v2.0
-# Build command: pyinstaller mantenimiento_windows.spec
+# PyInstaller spec for CleanCPU v2.1
+#
+# Build:
+#   pip install flask psutil pyinstaller
+#   pyinstaller mantenimiento_windows.spec
+#
+# Output: dist\CleanCPU.exe
 
+import os
+
+# Collect all template and static files (non-Python data files Flask needs at runtime)
+templates_dir = 'templates'
+static_dir = 'static'
 
 a = Analysis(
     ['app.py'],
-    pathex=[],
+    pathex=[os.getcwd()],
     binaries=[],
     datas=[
-        ('templates', 'templates'),
-        ('static', 'static'),
-        ('services', 'services'),
-        ('routes', 'routes'),
-        ('config.py', '.'),
+        # Only non-Python files go here. Flask reads these at runtime from disk.
+        (templates_dir, 'templates'),
+        (static_dir, 'static'),
     ],
     hiddenimports=[
+        # Flask and dependencies
         'flask',
         'jinja2',
+        'jinja2.ext',
         'markupsafe',
         'psutil',
+        # Our config (imported by app.py, but explicit for safety)
+        'config',
+        # Service modules (Python code - PyInstaller bundles these as compiled .pyc)
+        'services',
         'services.command_runner',
         'services.permissions',
         'services.system_info',
@@ -32,6 +46,8 @@ a = Analysis(
         'services.restore_tools',
         'services.drivers',
         'services.reports',
+        # Route modules
+        'routes',
         'routes.dashboard',
         'routes.diagnostics',
         'routes.cleanup',
@@ -52,6 +68,9 @@ a = Analysis(
         'unittest',
         'pydoc',
         'doctest',
+        'test',
+        'xmlrpc',
+        'pdb',
     ],
     noarchive=False,
     optimize=0,
@@ -64,18 +83,18 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='MantenimientoWindows',
+    name='CleanCPU',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=True,
+    console=True,           # True = muestra consola con la URL del servidor
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    uac_admin=True,
+    uac_admin=True,         # Pide elevacion UAC al ejecutar
 )

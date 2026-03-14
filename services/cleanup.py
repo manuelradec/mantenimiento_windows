@@ -275,31 +275,33 @@ def scan_duplicate_files(directory=None):
     )
 
 
-def disable_sysmain():
+def restart_sysmain():
     """
-    Disable SysMain (Superfetch) service.
-    WARNING: Only recommended on SSD-only systems. Can degrade HDD performance.
+    Restart SysMain (Superfetch) service to clear its cache.
+    Safe operation - does not permanently disable the service.
     """
     result = run_powershell(
-        'Stop-Service SysMain -Force -ErrorAction SilentlyContinue; '
-        'Set-Service SysMain -StartupType Disabled',
+        'Restart-Service SysMain -Force -ErrorAction SilentlyContinue',
         requires_admin=True,
-        description='Disable SysMain service',
+        description='Restart SysMain service (clear cache)',
     )
+    if result.status == CommandStatus.SUCCESS:
+        result.output = 'SysMain service restarted. Cache cleared safely.'
     return result
 
 
-def disable_windows_search():
+def restart_windows_search():
     """
-    Disable Windows Search service.
-    WARNING: This breaks Windows file search functionality.
+    Restart Windows Search service to clear its cache and rebuild index.
+    Safe operation - does not permanently disable the service.
     """
     result = run_powershell(
-        'Stop-Service WSearch -Force -ErrorAction SilentlyContinue; '
-        'Set-Service WSearch -StartupType Disabled',
+        'Restart-Service WSearch -Force -ErrorAction SilentlyContinue',
         requires_admin=True,
-        description='Disable Windows Search service',
+        description='Restart Windows Search service (rebuild index)',
     )
+    if result.status == CommandStatus.SUCCESS:
+        result.output = 'Windows Search service restarted. Index will rebuild automatically.'
     return result
 
 

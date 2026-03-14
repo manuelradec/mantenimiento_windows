@@ -62,7 +62,7 @@ def get_battery_report():
 
     report_path = os.path.join(
         os.environ.get('PROGRAMDATA', 'C:\\ProgramData'),
-        'MantenimientoWindows', 'reports', 'battery-report.html'
+        'CleanCPU', 'reports', 'battery-report.html'
     )
     os.makedirs(os.path.dirname(report_path), exist_ok=True)
 
