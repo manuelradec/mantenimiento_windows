@@ -5,17 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="CleanCPU - Professional Windows Maintenance Tool">
     <meta name="robots" content="noindex, nofollow">
-    <meta http-equiv="X-Content-Type-Options" content="nosniff">
-    <meta http-equiv="X-Frame-Options" content="DENY">
     <title>{% block title %}CleanCPU{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
+    <!-- CSRF Token (for JavaScript) -->
+    <meta name="csrf-token" content="{{ csrf_token }}">
+
     <!-- Sidebar -->
     <nav class="sidebar">
         <div class="sidebar-header">
             <h1>CLEANCPU</h1>
-            <div class="version">v{{ config.get('APP_VERSION', '2.1.0') }} | Local</div>
+            <div class="version">v{{ config.get('APP_VERSION', '2.1.0') }}</div>
         </div>
         <div class="sidebar-nav">
             <a href="/"><span class="icon">&#9881;</span> <span>Dashboard</span></a>
@@ -39,6 +40,9 @@
             <a href="/advanced"><span class="icon">&#128736;</span> <span>Advanced</span></a>
         </div>
         <div class="sidebar-footer">
+            <div class="mode-indicator" id="mode-badge" title="Operation Mode">
+                {{ policy_mode | upper }}
+            </div>
             <span class="admin-badge {{ 'yes' if elevation.is_admin else 'no' }}">
                 {{ 'ADMIN' if elevation.is_admin else 'NO ADMIN' }}
             </span>
@@ -55,7 +59,16 @@
             {% block content %}{% endblock %}
         </div>
         <div class="page-footer" style="padding: 12px 28px; font-size: 11px; color: #a0aec0; border-top: 1px solid #e2e8f0; text-align: center;">
-            CleanCPU v{{ config.get('APP_VERSION', '2.1.0') }} &mdash; This tool only runs locally (127.0.0.1). No data is transmitted externally. Use at your own risk.
+            CleanCPU v{{ config.get('APP_VERSION', '2.1.0') }} &mdash; Local only (127.0.0.1). No data is transmitted externally.
+        </div>
+    </div>
+
+    <!-- Job Status Bar (for background jobs) -->
+    <div id="job-status-bar" class="job-status-bar" style="display:none;">
+        <div class="job-status-content">
+            <span class="spinner"></span>
+            <span id="job-status-text">Running...</span>
+            <span id="job-status-name"></span>
         </div>
     </div>
 
@@ -64,6 +77,7 @@
         <div class="modal-box">
             <h3 class="modal-title">Confirm</h3>
             <p class="modal-message">Are you sure?</p>
+            <div class="modal-warnings" id="modal-warnings" style="display:none;"></div>
             <div class="modal-actions">
                 <button class="btn btn-outline modal-cancel">Cancel</button>
                 <button class="btn btn-primary modal-confirm">Confirm</button>

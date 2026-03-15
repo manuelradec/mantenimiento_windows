@@ -2,7 +2,7 @@
 # PyInstaller spec for CleanCPU v2.1
 #
 # Build:
-#   pip install flask psutil pyinstaller
+#   pip install -r requirements-build.txt
 #   pyinstaller mantenimiento_windows.spec
 #
 # Output: dist\CleanCPU.exe
@@ -14,7 +14,7 @@ templates_dir = 'templates'
 static_dir = 'static'
 
 a = Analysis(
-    ['app.py'],
+    ['server.py'],
     pathex=[os.getcwd()],
     binaries=[],
     datas=[
@@ -23,15 +23,27 @@ a = Analysis(
         (static_dir, 'static'),
     ],
     hiddenimports=[
-        # Flask and dependencies
+        # Flask and WSGI server
         'flask',
         'jinja2',
         'jinja2.ext',
         'markupsafe',
         'psutil',
-        # Our config (imported by app.py, but explicit for safety)
+        'waitress',
+        'waitress.task',
+        'waitress.channel',
+        'waitress.server',
+        # Config and app factory
         'config',
-        # Service modules (Python code - PyInstaller bundles these as compiled .pyc)
+        'app',
+        # Core infrastructure
+        'core',
+        'core.action_registry',
+        'core.policy_engine',
+        'core.job_runner',
+        'core.persistence',
+        'core.security',
+        # Service modules
         'services',
         'services.command_runner',
         'services.permissions',
@@ -90,11 +102,11 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=True,           # True = muestra consola con la URL del servidor
+    console=True,           # Show console with server URL
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    uac_admin=True,         # Pide elevacion UAC al ejecutar
+    uac_admin=True,         # Request UAC elevation on launch
 )

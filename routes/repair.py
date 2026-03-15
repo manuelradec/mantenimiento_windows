@@ -87,6 +87,12 @@ def api_memory_diag():
 @repair_bp.route('/api/full-sequence', methods=['POST'])
 def api_full_sequence():
     results = repair_svc.run_repair_sequence()
-    get_log().add_entry('repair', 'Full repair sequence', 'success',
-                        result='Sequence completed')
+    # Determine composite status from sub-step results
+    has_error = any(
+        v.get('status') in ('error', 'timeout')
+        for v in results.values() if isinstance(v, dict)
+    )
+    status = 'partial_success' if has_error else 'success'
+    get_log().add_entry('repair', 'Full repair sequence', status,
+                        result=f'Sequence completed ({status})')
     return jsonify(results)

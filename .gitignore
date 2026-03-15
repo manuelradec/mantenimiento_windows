@@ -4,13 +4,39 @@
 build/
 dist/
 *.exe
+*.spec.bak
 
 # Python
 venv/
+.venv/
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
+*.egg-info/
+*.egg
 
-# Logs (generated at runtime)
+# Logs and runtime data (generated at runtime)
 logs/
 *.log
+*.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Environment
+.env
+.env.local

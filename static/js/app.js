@@ -1,9 +1,28 @@
 /**
  * CleanCPU - Professional Windows Maintenance Tool
- * Frontend JavaScript
+ * Frontend JavaScript with CSRF protection and background job polling.
  */
 
-// Execute an action with confirmation and loading state
+// ============================================================
+// CSRF Token Management
+// ============================================================
+
+function getCsrfToken() {
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    return meta ? meta.getAttribute('content') : '';
+}
+
+function getDefaultHeaders() {
+    return {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': getCsrfToken(),
+    };
+}
+
+// ============================================================
+// Action Execution (with CSRF and Job Support)
+// ============================================================
+
 async function executeAction(url, buttonEl, options = {}) {
     const {
         method = 'POST',
@@ -27,18 +46,70 @@ async function executeAction(url, buttonEl, options = {}) {
     buttonEl.innerHTML = '<span class="spinner"></span> Running...';
 
     try {
-        const fetchOptions = { method };
+        const fetchOptions = {
+            method,
+            headers: getDefaultHeaders(),
+        };
         if (body) {
-            fetchOptions.headers = { 'Content-Type': 'application/json' };
             fetchOptions.body = JSON.stringify(body);
         }
 
         const response = await fetch(url, fetchOptions);
+
+        if (response.status === 403) {
+            const errorData = await response.json().catch(() => ({}));
+            displayResult({
+                status: 'error',
+                error: errorData.description || errorData.error || 'Request forbidden (CSRF or policy violation)',
+            });
+            return null;
+        }
+
         const data = await response.json();
 
-        // Show result in output console
-        displayResult(data);
+        // Check if this is a background job
+        if (data.status === 'submitted' && data.job_id) {
+            // Start polling for job completion
+            displayResult({
+                status: 'info',
+                output: `Background job started: ${data.action_name} (ID: ${data.job_id})`,
+            });
+            pollJobStatus(data.job_id, data.action_name);
+            return data;
+        }
 
+        // Check if confirmation is needed (server-side policy)
+        if (data.status === 'needs_confirmation') {
+            buttonEl.disabled = false;
+            buttonEl.innerHTML = originalText;
+            const confirmed = await showConfirm(
+                data.action_id || 'Confirm',
+                data.confirm_message || 'This action requires confirmation.',
+                data.risk_class === 'destructive' ? 'danger' : 'warning',
+                data.warnings || []
+            );
+            if (confirmed) {
+                // Re-submit with confirmation token
+                return executeAction(url, buttonEl, {
+                    ...options,
+                    confirm: false,
+                    body: { ...(body || {}), confirmation_token: data.action_id },
+                });
+            }
+            return null;
+        }
+
+        // Check if rejected by policy
+        if (data.status === 'rejected') {
+            displayResult({
+                status: 'error',
+                error: data.reason || 'Action rejected by policy engine.',
+            });
+            return null;
+        }
+
+        // Normal result
+        displayResult(data);
         if (onSuccess) onSuccess(data);
         return data;
     } catch (error) {
@@ -53,7 +124,87 @@ async function executeAction(url, buttonEl, options = {}) {
     }
 }
 
-// Display result in the page output console
+// ============================================================
+// Background Job Polling
+// ============================================================
+
+async function pollJobStatus(jobId, actionName) {
+    const statusBar = document.getElementById('job-status-bar');
+    const statusText = document.getElementById('job-status-text');
+    const statusName = document.getElementById('job-status-name');
+
+    if (statusBar) {
+        statusBar.style.display = 'flex';
+        statusName.textContent = actionName;
+    }
+
+    const maxPolls = 720; // 1 hour at 5-second intervals
+    let pollCount = 0;
+
+    const poll = async () => {
+        try {
+            const response = await fetch(`/api/jobs/${jobId}`);
+            const job = await response.json();
+
+            if (job.error && response.status === 404) {
+                if (statusBar) statusBar.style.display = 'none';
+                displayResult({ status: 'error', error: 'Job not found.' });
+                return;
+            }
+
+            if (statusText) {
+                statusText.textContent = `${job.status}...`;
+            }
+
+            if (['completed', 'failed', 'cancelled', 'partial_success'].includes(job.status)) {
+                // Job finished
+                if (statusBar) statusBar.style.display = 'none';
+
+                displayResult({
+                    status: job.status === 'completed' ? 'success' :
+                            job.status === 'partial_success' ? 'warning' : 'error',
+                    output: job.stdout || job.output || `Job ${job.status}`,
+                    error: job.stderr || job.error_message || job.error || '',
+                    duration: job.duration_ms ? (job.duration_ms / 1000) : undefined,
+                    command: job.command || '',
+                });
+
+                if (job.needs_reboot) {
+                    displayResult({
+                        status: 'warning',
+                        output: 'A system reboot is recommended to complete this operation.',
+                    });
+                }
+                return;
+            }
+
+            // Still running, poll again
+            pollCount++;
+            if (pollCount < maxPolls) {
+                setTimeout(poll, 5000);
+            } else {
+                if (statusBar) statusBar.style.display = 'none';
+                displayResult({
+                    status: 'warning',
+                    output: `Job ${jobId} is still running. Check back later.`,
+                });
+            }
+        } catch (error) {
+            pollCount++;
+            if (pollCount < maxPolls) {
+                setTimeout(poll, 5000);
+            }
+        }
+    };
+
+    // Start polling after a short delay
+    setTimeout(poll, 2000);
+}
+
+// ============================================================
+// Display Results
+// ============================================================
+
 function displayResult(data) {
     const console = document.getElementById('output-console');
     if (!console) return;
@@ -62,13 +213,13 @@ function displayResult(data) {
     let statusClass = 'line-info';
     let statusIcon = 'i';
 
-    if (data.status === 'success') {
+    if (data.status === 'success' || data.status === 'completed') {
         statusClass = 'line-success';
         statusIcon = '+';
-    } else if (data.status === 'warning') {
+    } else if (data.status === 'warning' || data.status === 'partial_success') {
         statusClass = 'line-warning';
         statusIcon = '!';
-    } else if (data.status === 'error' || data.status === 'timeout') {
+    } else if (data.status === 'error' || data.status === 'timeout' || data.status === 'failed') {
         statusClass = 'line-error';
         statusIcon = 'x';
     }
@@ -87,13 +238,19 @@ function displayResult(data) {
     if (data.duration !== undefined) {
         lines += `<span class="line-info">  Duration: ${data.duration}s</span>\n`;
     }
+    if (data.operation_id) {
+        lines += `<span class="line-info">  Op ID: ${escapeHtml(data.operation_id)}</span>\n`;
+    }
     lines += '\n';
 
     console.innerHTML += lines;
     console.scrollTop = console.scrollHeight;
 }
 
-// Fetch and display diagnostic data
+// ============================================================
+// Diagnostic Fetch (Read-Only)
+// ============================================================
+
 async function fetchDiagnostic(url, targetId) {
     const target = document.getElementById(targetId);
     if (!target) return;
@@ -118,8 +275,11 @@ async function fetchDiagnostic(url, targetId) {
     }
 }
 
-// Confirmation modal
-function showConfirm(title, message, dangerLevel = 'safe') {
+// ============================================================
+// Confirmation Modal
+// ============================================================
+
+function showConfirm(title, message, dangerLevel = 'safe', warnings = []) {
     return new Promise((resolve) => {
         const overlay = document.getElementById('confirm-modal');
         if (!overlay) {
@@ -131,9 +291,22 @@ function showConfirm(title, message, dangerLevel = 'safe') {
         const msgEl = overlay.querySelector('.modal-message');
         const confirmBtn = overlay.querySelector('.modal-confirm');
         const cancelBtn = overlay.querySelector('.modal-cancel');
+        const warningsEl = document.getElementById('modal-warnings');
 
         titleEl.textContent = title;
         msgEl.textContent = message;
+
+        // Show warnings if any
+        if (warningsEl) {
+            if (warnings.length > 0) {
+                warningsEl.innerHTML = warnings.map(w =>
+                    `<div class="alert alert-warning" style="margin:4px 0;padding:6px 10px;font-size:12px;">${escapeHtml(w)}</div>`
+                ).join('');
+                warningsEl.style.display = 'block';
+            } else {
+                warningsEl.style.display = 'none';
+            }
+        }
 
         if (dangerLevel === 'danger') {
             confirmBtn.className = 'btn btn-danger';
@@ -159,7 +332,10 @@ function showConfirm(title, message, dangerLevel = 'safe') {
     });
 }
 
-// Utility: escape HTML
+// ============================================================
+// Utility Functions
+// ============================================================
+
 function escapeHtml(text) {
     if (!text) return '';
     const div = document.createElement('div');
@@ -167,7 +343,10 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Refresh system overview on dashboard
+// ============================================================
+// Dashboard Auto-Refresh
+// ============================================================
+
 async function refreshDashboard() {
     try {
         const response = await fetch('/api/system-overview');
@@ -191,10 +370,16 @@ async function refreshDashboard() {
     }
 }
 
-// Export report
+// ============================================================
+// Report Export
+// ============================================================
+
 async function exportReport(format) {
     try {
-        const response = await fetch(`/reports/api/export/${format}`, { method: 'POST' });
+        const response = await fetch(`/reports/api/export/${format}`, {
+            method: 'POST',
+            headers: getDefaultHeaders(),
+        });
         const data = await response.json();
         if (data.status === 'success') {
             alert(`Report exported to:\n${data.path}`);
@@ -204,13 +389,42 @@ async function exportReport(format) {
     }
 }
 
-// Download report
 function downloadReport(format) {
     window.open(`/reports/api/download/${format}`, '_blank');
 }
 
-// Highlight active sidebar link
+// ============================================================
+// Operation Mode Switcher
+// ============================================================
+
+async function setOperationMode(mode) {
+    try {
+        const response = await fetch('/api/policy/mode', {
+            method: 'POST',
+            headers: getDefaultHeaders(),
+            body: JSON.stringify({ mode }),
+        });
+        const data = await response.json();
+        const badge = document.getElementById('mode-badge');
+        if (badge) badge.textContent = data.mode.toUpperCase();
+        displayResult({
+            status: 'success',
+            output: `Operation mode changed to: ${data.mode}`,
+        });
+    } catch (error) {
+        displayResult({
+            status: 'error',
+            error: `Failed to change mode: ${error.message}`,
+        });
+    }
+}
+
+// ============================================================
+// Initialization
+// ============================================================
+
 document.addEventListener('DOMContentLoaded', () => {
+    // Highlight active sidebar link
     const path = window.location.pathname;
     document.querySelectorAll('.sidebar-nav a').forEach(link => {
         const href = link.getAttribute('href');

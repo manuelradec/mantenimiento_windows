@@ -2,26 +2,36 @@
 Logging and reporting module.
 
 Handles: log management, report generation, export functionality.
+
+Thread-safe implementation with proper HTML escaping for report output.
 """
 import os
 import json
 import logging
+import threading
 from datetime import datetime
+from html import escape as html_escape
 
 from config import Config
 
-logger = logging.getLogger('maintenance.reports')
+logger = logging.getLogger('cleancpu.reports')
 
 
 class MaintenanceLog:
-    """Centralized maintenance log manager."""
+    """
+    Thread-safe centralized maintenance log manager.
+
+    Stores entries in-memory and syncs to the persistence layer (SQLite)
+    when available.
+    """
 
     def __init__(self):
         self.session_id = datetime.now().strftime('%Y%m%d_%H%M%S')
         self.log_file = os.path.join(
             Config.LOG_DIR, f'maintenance_{self.session_id}.log'
         )
-        self.entries = []
+        self._entries = []
+        self._lock = threading.Lock()
         self._setup_file_logger()
 
     def _setup_file_logger(self):
@@ -31,12 +41,23 @@ class MaintenanceLog:
         handler.setFormatter(logging.Formatter(
             '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
         ))
-        root_logger = logging.getLogger('maintenance')
-        root_logger.addHandler(handler)
-        root_logger.setLevel(logging.INFO)
+        maint_logger = logging.getLogger('cleancpu')
+        # Prevent duplicate handlers
+        for existing in maint_logger.handlers[:]:
+            if isinstance(existing, logging.FileHandler):
+                if hasattr(existing, 'baseFilename') and 'maintenance_' in existing.baseFilename:
+                    maint_logger.removeHandler(existing)
+        maint_logger.addHandler(handler)
+        maint_logger.setLevel(logging.INFO)
+
+    @property
+    def entries(self):
+        """Thread-safe access to entries."""
+        with self._lock:
+            return list(self._entries)
 
     def add_entry(self, module, action, status, result='', error='', details=None):
-        """Add an entry to the maintenance log."""
+        """Add an entry to the maintenance log (thread-safe)."""
         entry = {
             'timestamp': datetime.now().isoformat(),
             'module': module,
@@ -46,13 +67,15 @@ class MaintenanceLog:
             'error': error,
             'details': details or {},
         }
-        self.entries.append(entry)
+        with self._lock:
+            self._entries.append(entry)
         logger.info(f"[{module}] {action}: {status} - {result or error}")
         return entry
 
     def get_entries(self, module=None, status=None):
-        """Get log entries, optionally filtered."""
-        entries = self.entries
+        """Get log entries, optionally filtered (thread-safe)."""
+        with self._lock:
+            entries = list(self._entries)
         if module:
             entries = [e for e in entries if e['module'] == module]
         if status:
@@ -60,11 +83,14 @@ class MaintenanceLog:
         return entries
 
     def get_summary(self):
-        """Get a summary of all maintenance actions."""
-        total = len(self.entries)
+        """Get a summary of all maintenance actions (thread-safe)."""
+        with self._lock:
+            entries = list(self._entries)
+
+        total = len(entries)
         by_status = {}
         by_module = {}
-        for entry in self.entries:
+        for entry in entries:
             s = entry['status']
             m = entry['module']
             by_status[s] = by_status.get(s, 0) + 1
@@ -89,6 +115,8 @@ class MaintenanceLog:
         data = {
             'session_id': self.session_id,
             'generated': datetime.now().isoformat(),
+            'app_name': Config.APP_NAME,
+            'app_version': Config.APP_VERSION,
             'summary': self.get_summary(),
             'entries': self.entries,
         }
@@ -139,7 +167,7 @@ class MaintenanceLog:
         return filepath
 
     def export_html(self, filepath=None):
-        """Export the log as an HTML report."""
+        """Export the log as an HTML report with proper escaping."""
         if filepath is None:
             filepath = os.path.join(
                 Config.REPORT_DIR,
@@ -154,22 +182,36 @@ class MaintenanceLog:
                 'success': 'status-success',
                 'warning': 'status-warning',
                 'error': 'status-error',
+                'partial_success': 'status-warning',
                 'not_applicable': 'status-na',
             }.get(entry['status'], '')
 
-            rows += f'''<tr>
-                <td>{entry['timestamp'][:19]}</td>
-                <td>{entry['module']}</td>
-                <td>{entry['action']}</td>
-                <td class="{status_class}">{entry['status']}</td>
-                <td>{entry['result'][:100] if entry['result'] else entry['error'][:100] if entry['error'] else '-'}</td>
-            </tr>'''
+            # Properly escape all user-facing content
+            detail_text = entry['result'][:100] if entry['result'] else (
+                entry['error'][:100] if entry['error'] else '-')
+
+            rows += (
+                f'<tr>'
+                f'<td>{html_escape(entry["timestamp"][:19])}</td>'
+                f'<td>{html_escape(entry["module"])}</td>'
+                f'<td>{html_escape(entry["action"])}</td>'
+                f'<td class="{status_class}">{html_escape(entry["status"])}</td>'
+                f'<td>{html_escape(detail_text)}</td>'
+                f'</tr>\n'
+            )
+
+        # Escape summary values
+        status_summary = ' | '.join(
+            f'{html_escape(status)}: {count}'
+            for status, count in summary['by_status'].items()
+        )
 
         html = f'''<!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Maintenance Report - {self.session_id}</title>
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <title>CleanCPU Report - {html_escape(self.session_id)}</title>
     <style>
         body {{ font-family: 'Segoe UI', sans-serif; margin: 20px; background: #f5f5f5; }}
         h1 {{ color: #1a365d; }}
@@ -184,14 +226,13 @@ class MaintenanceLog:
     </style>
 </head>
 <body>
-    <h1>Maintenance Report</h1>
+    <h1>CleanCPU - Maintenance Report</h1>
     <div class="summary">
-        <p><strong>Session:</strong> {self.session_id}</p>
-        <p><strong>Generated:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+        <p><strong>Session:</strong> {html_escape(self.session_id)}</p>
+        <p><strong>Generated:</strong> {html_escape(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))}</p>
+        <p><strong>Version:</strong> {html_escape(Config.APP_VERSION)}</p>
         <p><strong>Total Actions:</strong> {summary['total_actions']}</p>
-        <p><strong>Results:</strong>
-            {' | '.join(f'{status}: {count}' for status, count in summary['by_status'].items())}
-        </p>
+        <p><strong>Results:</strong> {status_summary}</p>
     </div>
     <table>
         <thead>
@@ -199,6 +240,9 @@ class MaintenanceLog:
         </thead>
         <tbody>{rows}</tbody>
     </table>
+    <footer style="margin-top: 20px; font-size: 11px; color: #a0aec0;">
+        Generated by CleanCPU v{html_escape(Config.APP_VERSION)}
+    </footer>
 </body>
 </html>'''
 
@@ -207,20 +251,23 @@ class MaintenanceLog:
         return filepath
 
 
-# Global instance (initialized when app starts)
-maintenance_log = None
+# Thread-safe global instance management
+_log_lock = threading.Lock()
+_maintenance_log = None
 
 
 def get_log():
-    """Get or create the global maintenance log."""
-    global maintenance_log
-    if maintenance_log is None:
-        maintenance_log = MaintenanceLog()
-    return maintenance_log
+    """Get or create the global maintenance log (thread-safe)."""
+    global _maintenance_log
+    with _log_lock:
+        if _maintenance_log is None:
+            _maintenance_log = MaintenanceLog()
+        return _maintenance_log
 
 
 def reset_log():
-    """Reset the global maintenance log (new session)."""
-    global maintenance_log
-    maintenance_log = MaintenanceLog()
-    return maintenance_log
+    """Reset the global maintenance log (new session, thread-safe)."""
+    global _maintenance_log
+    with _log_lock:
+        _maintenance_log = MaintenanceLog()
+        return _maintenance_log
