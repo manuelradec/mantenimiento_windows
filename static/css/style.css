@@ -535,6 +535,41 @@ table.data-table tr:hover td {
     font-weight: 600;
 }
 
+/* Job Status Bar */
+.job-status-bar {
+    position: fixed;
+    bottom: 0;
+    left: var(--sidebar-width);
+    right: 0;
+    background: var(--primary);
+    color: white;
+    padding: 10px 20px;
+    z-index: 150;
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+}
+
+.job-status-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Mode indicator in sidebar */
+.mode-indicator {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    background: rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.9);
+    margin-bottom: 6px;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .sidebar { width: 60px; }
@@ -542,4 +577,5 @@ table.data-table tr:hover td {
     .sidebar-header h1 { display: none; }
     .main-content { margin-left: 60px; }
     .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+    .job-status-bar { left: 60px; }
 }

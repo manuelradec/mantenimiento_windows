@@ -50,14 +50,18 @@ def api_open_settings():
 @update_bp.route('/api/hard-reset', methods=['POST'])
 def api_hard_reset():
     results = wu_svc.hard_reset_windows_update()
-    get_log().add_entry('update', 'Hard reset Windows Update', 'success',
-                        result='Hard reset sequence completed')
+    composite = results.get('_composite', {})
+    status = composite.get('status', 'success')
+    get_log().add_entry('update', 'Hard reset Windows Update', status,
+                        result=composite.get('message', 'Hard reset completed'))
     return jsonify(results)
 
 
 @update_bp.route('/api/resync-time', methods=['POST'])
 def api_resync_time():
     results = wu_svc.resync_time()
-    get_log().add_entry('update', 'Resync system time', 'success',
+    composite = results.get('_composite', {})
+    status = composite.get('status', 'success')
+    get_log().add_entry('update', 'Resync system time', status,
                         result='Time sync completed')
     return jsonify(results)

@@ -3,7 +3,10 @@ Cleanup and optimization module.
 
 Handles: temp file cleanup, recycle bin, DNS cache, Explorer restart,
 component cleanup, duplicate file scanning, SSD retrim, HDD defrag,
-optional SysMain/WSearch management.
+Store cache reset, prefetch cleanup.
+
+Safety: No service-disabling operations. All cleanup targets are safe
+directories that Windows rebuilds automatically.
 """
 import os
 import shutil
@@ -14,7 +17,7 @@ from collections import defaultdict
 
 from services.command_runner import run_cmd, run_powershell, CommandStatus, CommandResult
 
-logger = logging.getLogger('maintenance.cleanup')
+logger = logging.getLogger('cleancpu.cleanup')
 
 
 def clean_user_temp():
@@ -91,7 +94,7 @@ def empty_recycle_bin():
         'Clear-RecycleBin -Confirm:$false -ErrorAction SilentlyContinue',
         description='Empty Recycle Bin',
     )
-    if result.status == CommandStatus.ERROR and 'not find' in result.error.lower():
+    if result.status == CommandStatus.ERROR and result.error and 'not find' in result.error.lower():
         return CommandResult(status=CommandStatus.SUCCESS,
                              output='Recycle Bin is already empty.')
     return result
@@ -104,7 +107,6 @@ def flush_dns_cache():
 
 def run_cleanmgr():
     """Run Windows Disk Cleanup utility."""
-    # First configure the cleanup options, then run
     result = run_cmd(
         'cleanmgr /sagerun:1',
         requires_admin=True,
@@ -126,26 +128,53 @@ def dism_component_cleanup():
 
 
 def restart_explorer():
-    """Restart Windows Explorer (taskbar refresh)."""
-    result = run_cmd(
+    """
+    Restart Windows Explorer (taskbar refresh).
+
+    Reports accurate status: only SUCCESS if both stop and start succeed.
+    """
+    stop_result = run_cmd(
         'taskkill /f /im explorer.exe',
         description='Stop Explorer',
     )
+
     start_result = run_cmd(
         'start explorer.exe',
         shell=True,
         description='Start Explorer',
     )
+
+    # Determine overall status based on sub-steps
+    sub_results = {
+        'stop': stop_result.to_dict(),
+        'start': start_result.to_dict(),
+    }
+
+    if stop_result.is_error:
+        return CommandResult(
+            status=CommandStatus.ERROR,
+            output='Failed to stop Explorer.',
+            error=stop_result.error,
+            details=sub_results,
+        )
+
+    if start_result.is_error:
+        return CommandResult(
+            status=CommandStatus.WARNING,
+            output='Explorer stopped but may not have restarted properly.',
+            error=start_result.error,
+            details=sub_results,
+        )
+
     return CommandResult(
         status=CommandStatus.SUCCESS,
         output='Explorer restarted successfully.',
-        details={'stop': result.to_dict(), 'start': start_result.to_dict()},
+        details=sub_results,
     )
 
 
 def retrim_ssd():
     """Run TRIM optimization on SSD drives."""
-    # First check if SSD exists
     check = run_powershell(
         "Get-PhysicalDisk | Where-Object MediaType -eq 'SSD' | "
         "Select-Object FriendlyName",
@@ -168,13 +197,6 @@ def retrim_ssd():
 
 def defrag_hdd():
     """Defragment HDD (only if HDD is detected, never SSD)."""
-    # Check disk type first
-    check = run_powershell(
-        "Get-PhysicalDisk | Select-Object FriendlyName,MediaType | Format-Table -AutoSize",
-        description='Check disk types for defrag',
-    )
-
-    # Verify HDD presence
     hdd_check = run_powershell(
         "(Get-PhysicalDisk | Where-Object MediaType -eq 'HDD').Count",
         description='Count HDDs',
@@ -185,14 +207,6 @@ def defrag_hdd():
             status=CommandStatus.NOT_APPLICABLE,
             output='No HDD detected. Defragmentation skipped (SSD does not need defrag).',
         )
-
-    # Analyze first
-    analysis = run_cmd(
-        'defrag C: /A',
-        requires_admin=True,
-        timeout=120,
-        description='Analyze disk fragmentation',
-    )
 
     result = run_cmd(
         'defrag C: /O /U /V',
@@ -216,6 +230,11 @@ def analyze_fragmentation():
 def scan_duplicate_files(directory=None):
     """
     Scan for duplicate files in the specified directory (default: Downloads).
+
+    Uses a two-phase approach:
+    1. Group files by size (quick filter)
+    2. SHA-256 hash for size-matched files (accurate dedup)
+
     Returns duplicates grouped by hash. Does NOT delete anything.
     """
     if sys.platform != 'win32':
@@ -231,7 +250,8 @@ def scan_duplicate_files(directory=None):
             output=f'Directory not found: {target}',
         )
 
-    hash_map = defaultdict(list)
+    # Phase 1: Group by file size
+    size_map = defaultdict(list)
     file_count = 0
     error_count = 0
 
@@ -242,21 +262,33 @@ def scan_duplicate_files(directory=None):
                 file_size = os.path.getsize(filepath)
                 if file_size == 0:
                     continue
-                # Quick hash: first 8KB + file size
-                hasher = hashlib.md5()
+                size_map[file_size].append(filepath)
+                file_count += 1
+            except (PermissionError, OSError):
+                error_count += 1
+
+    # Phase 2: Hash only size-matched candidates using SHA-256
+    hash_map = defaultdict(list)
+    candidates = {size: paths for size, paths in size_map.items() if len(paths) > 1}
+
+    for file_size, paths in candidates.items():
+        for filepath in paths:
+            try:
+                hasher = hashlib.sha256()
                 with open(filepath, 'rb') as f:
-                    hasher.update(f.read(8192))
-                hasher.update(str(file_size).encode())
+                    while True:
+                        chunk = f.read(65536)
+                        if not chunk:
+                            break
+                        hasher.update(chunk)
                 file_hash = hasher.hexdigest()
                 hash_map[file_hash].append({
                     'path': filepath,
-                    'name': filename,
+                    'name': os.path.basename(filepath),
                     'size': file_size,
                 })
-                file_count += 1
-            except (PermissionError, OSError) as e:
+            except (PermissionError, OSError):
                 error_count += 1
-                logger.debug(f"Cannot read {filepath}: {e}")
 
     duplicates = {h: files for h, files in hash_map.items() if len(files) > 1}
     dup_count = sum(len(files) - 1 for files in duplicates.values())

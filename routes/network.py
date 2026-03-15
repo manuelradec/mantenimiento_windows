@@ -115,6 +115,11 @@ def api_shared_folders():
 @network_bp.route('/api/repair', methods=['POST'])
 def api_network_repair():
     results = net_svc.run_network_repair()
-    get_log().add_entry('network', 'Network repair sequence', 'success',
-                        result='Repair sequence completed')
+    has_error = any(
+        v.get('status') in ('error', 'timeout')
+        for v in results.values() if isinstance(v, dict)
+    )
+    status = 'partial_success' if has_error else 'success'
+    get_log().add_entry('network', 'Network repair sequence', status,
+                        result=f'Repair sequence completed ({status})')
     return jsonify(results)

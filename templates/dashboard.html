@@ -11,6 +11,23 @@
 </div>
 {% endif %}
 
+<!-- Operation Mode Selector -->
+<div class="card" style="margin-bottom: 16px;">
+    <div class="card-header">
+        <h3>Operation Mode</h3>
+        <span class="badge" id="current-mode-badge">{{ policy_mode | upper }}</span>
+    </div>
+    <div class="card-body">
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+            <button class="btn btn-sm btn-outline" onclick="setOperationMode('diagnostic')" title="Read-only diagnostics only">Diagnostic</button>
+            <button class="btn btn-sm btn-success" onclick="setOperationMode('safe_maintenance')" title="Safe cleanup and diagnostics">Safe Maintenance</button>
+            <button class="btn btn-sm btn-warning" onclick="setOperationMode('advanced')" title="All except destructive operations">Advanced</button>
+            <button class="btn btn-sm btn-danger" onclick="setOperationMode('expert')" title="All operations including destructive">Expert</button>
+            <span style="font-size: 12px; color: #718096; margin-left: 8px;">Controls which actions are permitted by the policy engine</span>
+        </div>
+    </div>
+</div>
+
 <!-- System Stats -->
 <div class="grid grid-4" style="margin-bottom: 20px;">
     <div class="stat-box">
