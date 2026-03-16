@@ -272,7 +272,7 @@ class JobRunner:
             job.status = 'failed'
             job.error = str(e)
             job.completed_at = datetime.now().isoformat()
-            job.duration_ms = int((time.time() - time.time()) * 1000)
+            job.duration_ms = int((time.time() - start_time) * 1000)
 
             JobStore.update_completed(job.job_id, 'failed', error_message=str(e))
             AuditStore.log(

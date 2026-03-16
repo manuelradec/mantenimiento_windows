@@ -6,7 +6,9 @@ SMB sessions, network adapters, proxy settings, service status.
 """
 import logging
 
-from services.command_runner import run_cmd, run_powershell, CommandStatus, CommandResult
+from services.command_runner import (
+    run_cmd, run_powershell, run_powershell_json, CommandStatus, CommandResult
+)
 
 logger = logging.getLogger('maintenance.network')
 
@@ -87,10 +89,10 @@ def test_connectivity(host='8.8.8.8', port=443):
 
 
 def get_network_adapters():
-    """List all network adapters with details."""
-    return run_powershell(
-        'Get-NetAdapter | Select-Object Name,InterfaceDescription,Status,'
-        'LinkSpeed,MacAddress,DriverVersion | Format-Table -AutoSize',
+    """List all network adapters with details as structured JSON."""
+    return run_powershell_json(
+        'Get-NetAdapter | Select-Object Name, InterfaceDescription, '
+        'Status, LinkSpeed, MacAddress, DriverVersion',
         description='List network adapters',
     )
 
@@ -125,11 +127,11 @@ def show_proxy_settings():
 
 
 def show_network_services():
-    """Check status of network-related Windows services."""
-    return run_powershell(
-        "Get-Service wuauserv,BITS,cryptsvc,Dnscache,Dhcp,LanmanWorkstation,"
-        "LanmanServer -ErrorAction SilentlyContinue | "
-        "Select-Object Name,DisplayName,Status,StartType | Format-Table -AutoSize",
+    """Check status of network-related Windows services as structured JSON."""
+    return run_powershell_json(
+        "Get-Service wuauserv,BITS,cryptsvc,Dnscache,Dhcp,"
+        "LanmanWorkstation,LanmanServer -ErrorAction SilentlyContinue | "
+        "Select-Object Name, DisplayName, Status, StartType",
         description='Check network-related services',
     )
 
