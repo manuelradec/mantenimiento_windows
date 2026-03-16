@@ -6,7 +6,7 @@ CHKDSK, WinSAT, memory diagnostics.
 """
 import logging
 
-from services.command_runner import run_cmd, run_powershell, CommandStatus, CommandResult
+from services.command_runner import run_cmd, CommandStatus
 
 logger = logging.getLogger('maintenance.repair')
 

@@ -6,7 +6,6 @@ third-party tool detection.
 """
 import logging
 import os
-import sys
 
 from services.command_runner import run_cmd, run_powershell, CommandStatus, CommandResult
 

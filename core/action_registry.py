@@ -208,6 +208,7 @@ def _register_all_actions():
         ('network.set_autotuning', 'Set TCP Autotuning', 'network', 'Set autotuning to normal', 30),
         ('network.test_connectivity', 'Test Connectivity', 'network', 'Test network connection', 30),
         ('security.update_signatures', 'Update Defender Signatures', 'security', 'Download latest definitions', 120),
+        ('security.set_cpu_load', 'Set Defender CPU Load', 'security', 'Adjust Defender scan CPU usage', 30),
         ('security.quick_scan', 'Defender Quick Scan', 'security', 'Run a quick malware scan', 600),
         ('update.scan', 'Scan for Updates', 'update', 'Check for Windows Updates', 120),
         ('update.download', 'Download Updates', 'update', 'Download pending updates', 300),

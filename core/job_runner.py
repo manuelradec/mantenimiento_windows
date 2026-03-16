@@ -14,8 +14,8 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Optional, Callable
 
-from core.action_registry import ActionDef, registry
-from core.policy_engine import policy, PolicyViolation
+from core.action_registry import ActionDef
+from core.policy_engine import policy
 from core.persistence import JobStore, AuditStore
 
 logger = logging.getLogger('cleancpu.jobs')
@@ -33,6 +33,7 @@ class Job:
         'output', 'error', 'return_code', 'duration_ms',
         'needs_reboot', 'progress', 'handler', 'params',
         'session_id', 'hostname', 'username', 'is_admin',
+        'cancel_requested', 'process',
     )
 
     def __init__(self, action: ActionDef, session_id: str, hostname: str = '',
@@ -59,6 +60,8 @@ class Job:
         self.hostname = hostname
         self.username = username
         self.is_admin = is_admin
+        self.cancel_requested = False
+        self.process = None
 
     def to_dict(self) -> dict:
         return {
@@ -305,6 +308,57 @@ class JobRunner:
     def list_recent(self, session_id: str, limit: int = 50) -> list[dict]:
         """List recent jobs for a session."""
         return JobStore.list_by_session(session_id, limit)
+
+    def cancel_job(self, job_id: str) -> dict:
+        """
+        Request cancellation of a job.
+        For queued jobs: immediately cancel.
+        For running jobs: set cancel_requested flag and attempt process kill.
+        """
+        with self._lock:
+            job = self._jobs.get(job_id)
+
+        if not job:
+            # Try DB
+            db_job = JobStore.get(job_id)
+            if db_job and db_job.get('status') in ('queued', 'running'):
+                JobStore.cancel(job_id)
+                return {'status': 'cancelled', 'job_id': job_id, 'message': 'Job cancelled in DB.'}
+            return {'status': 'error', 'error': 'Job not found or already completed.'}
+
+        if job.status == 'queued':
+            job.status = 'cancelled'
+            job.completed_at = datetime.now().isoformat()
+            JobStore.cancel(job_id)
+            logger.info(f"Job {job_id} cancelled (was queued)")
+            return {'status': 'cancelled', 'job_id': job_id, 'message': 'Queued job cancelled.'}
+
+        if job.status == 'running':
+            job.cancel_requested = True
+            # Try to kill the process tree if we have a reference
+            if job.process:
+                try:
+                    import subprocess
+                    import sys
+                    if sys.platform == 'win32':
+                        subprocess.run(
+                            ['taskkill', '/F', '/T', '/PID', str(job.process.pid)],
+                            capture_output=True, timeout=10,
+                            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
+                        )
+                    else:
+                        job.process.kill()
+                except Exception as e:
+                    logger.warning(f"Could not kill process for job {job_id}: {e}")
+
+            logger.info(f"Cancel requested for running job {job_id}")
+            return {
+                'status': 'cancel_requested',
+                'job_id': job_id,
+                'message': 'Cancellation requested. The process may still be running briefly.',
+            }
+
+        return {'status': 'error', 'error': f'Job is already {job.status}, cannot cancel.'}
 
     def cleanup_completed(self, max_age_seconds: int = 3600):
         """Remove completed jobs from in-memory cache (they persist in DB)."""

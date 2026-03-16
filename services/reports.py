@@ -132,12 +132,13 @@ class MaintenanceLog:
                 f'report_{self.session_id}.txt'
             )
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        sep = '=' * 70
         lines = [
-            f"{'='*70}",
+            sep,
             f"  MAINTENANCE REPORT - {Config.APP_NAME} v{Config.APP_VERSION}",
             f"  Session: {self.session_id}",
             f"  Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-            f"{'='*70}",
+            sep,
             "",
         ]
 
@@ -146,9 +147,9 @@ class MaintenanceLog:
         for status, count in summary['by_status'].items():
             lines.append(f"  - {status}: {count}")
         lines.append("")
-        lines.append(f"{'='*70}")
+        lines.append(sep)
         lines.append("DETAILED LOG:")
-        lines.append(f"{'='*70}")
+        lines.append(sep)
 
         for entry in self.entries:
             lines.append(f"\n[{entry['timestamp']}] [{entry['module']}]")
@@ -159,7 +160,7 @@ class MaintenanceLog:
             if entry['error']:
                 lines.append(f"  Error: {entry['error'][:200]}")
 
-        lines.append(f"\n{'='*70}")
+        lines.append(f"\n{sep}")
         lines.append("END OF REPORT")
 
         with open(filepath, 'w', encoding='utf-8') as f:

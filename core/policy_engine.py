@@ -13,7 +13,7 @@ import threading
 from typing import Optional
 
 from core.action_registry import (
-    ActionDef, ActionRegistry, RiskClass, OperationMode, MODE_ALLOWED_RISKS, registry
+    ActionDef, RiskClass, OperationMode, MODE_ALLOWED_RISKS
 )
 
 logger = logging.getLogger('cleancpu.policy')

@@ -51,7 +51,14 @@ class Config:
     COMMAND_TIMEOUT_LONG = 600         # for SFC, DISM, etc.
     COMMAND_TIMEOUT_VERY_LONG = 1800   # for full scans
 
+    # Session cookie hardening (also set in security.py init_security)
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Strict'
+    SESSION_COOKIE_SECURE = False  # HTTP localhost
+    SESSION_COOKIE_NAME = 'cleancpu_session'
+    PERMANENT_SESSION_LIFETIME = 28800  # 8 hours
+
     # App metadata
     APP_NAME = 'CleanCPU'
-    APP_VERSION = '2.1.0'
+    APP_VERSION = '3.0.0'
     APP_DESCRIPTION = 'Professional logical maintenance tool for Windows 10/11'

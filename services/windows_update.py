@@ -8,7 +8,7 @@ import logging
 from datetime import datetime
 
 from services.command_runner import (
-    run_cmd, run_powershell, CommandStatus, CommandResult
+    run_cmd, run_powershell
 )
 
 logger = logging.getLogger('cleancpu.windows_update')
@@ -87,8 +87,9 @@ def hard_reset_windows_update():
     # Step 1: Stop services
     services_to_stop = ['wuauserv', 'bits', 'cryptsvc', 'msiserver']
     for svc in services_to_stop:
-        r = run_cmd(f'net stop {svc}', requires_admin=True, timeout=30,
-                     description=f'Stop {svc}')
+        r = run_cmd(
+            f'net stop {svc}', requires_admin=True, timeout=30,
+            description=f'Stop {svc}')
         results[f'stop_{svc}'] = r.to_dict()
         if r.is_error:
             errors.append(f'Failed to stop {svc}: {r.error}')
@@ -112,15 +113,17 @@ def hard_reset_windows_update():
     # Step 4: Restart services
     services_to_start = ['cryptsvc', 'bits', 'msiserver', 'wuauserv']
     for svc in services_to_start:
-        r = run_cmd(f'net start {svc}', requires_admin=True, timeout=30,
-                     description=f'Start {svc}')
+        r = run_cmd(
+            f'net start {svc}', requires_admin=True, timeout=30,
+            description=f'Start {svc}')
         results[f'start_{svc}'] = r.to_dict()
         if r.is_error:
             errors.append(f'Failed to start {svc}: {r.error}')
 
     # Step 5: Trigger scan
-    r = run_cmd('UsoClient StartScan', requires_admin=True, timeout=60,
-                 description='Trigger update scan after reset')
+    r = run_cmd(
+        'UsoClient StartScan', requires_admin=True, timeout=60,
+        description='Trigger update scan after reset')
     results['rescan'] = r.to_dict()
 
     # Composite status

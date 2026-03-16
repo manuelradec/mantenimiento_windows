@@ -12,7 +12,7 @@ import logging
 import webbrowser
 import threading
 
-from flask import Flask, jsonify, request, session
+from flask import Flask, jsonify, request
 
 from config import Config, get_base_path
 from routes import register_blueprints
@@ -69,7 +69,7 @@ def create_app():
 
 
 def _register_core_routes(app):
-    """Register core API endpoints for jobs, policy, and action registry."""
+    """Register core API endpoints for jobs, policy, action registry, and system info."""
 
     @app.route('/api/system-overview')
     def api_system_overview():
@@ -103,6 +103,12 @@ def _register_core_routes(app):
         jobs = job_runner.list_recent(session_id, limit=50)
         return jsonify({'jobs': jobs})
 
+    @app.route('/api/jobs/<job_id>/cancel', methods=['POST'])
+    def api_cancel_job(job_id):
+        """Request cancellation of a running/queued job."""
+        result = job_runner.cancel_job(job_id)
+        return jsonify(result)
+
     # === Policy Engine ===
 
     @app.route('/api/policy/status')
@@ -120,6 +126,13 @@ def _register_core_routes(app):
         except ValueError:
             valid = [m.value for m in OperationMode]
             return jsonify({'error': f'Invalid mode. Valid: {valid}'}), 400
+
+        from core.governance import write_jsonl_event
+        write_jsonl_event({
+            'event': 'mode_change',
+            'old_mode': policy.mode.value,
+            'new_mode': mode_str,
+        })
         policy.set_mode(mode)
         return jsonify(policy.get_status())
 
@@ -196,13 +209,14 @@ def main():
     app = create_app()
     port = Config.PORT
 
-    print(f"\n{'='*60}")
+    sep = '=' * 60
+    print(f"\n{sep}")
     print(f"  {Config.APP_NAME} v{Config.APP_VERSION}")
     print(f"  [DEV MODE] Running at: http://127.0.0.1:{port}")
-    print(f"  For production, use: python server.py")
+    print("  For production, use: python server.py")
     print(f"  Admin: {get_elevation_info()['is_admin']}")
     print(f"  Logs: {Config.LOG_DIR}")
-    print(f"{'='*60}\n")
+    print(f"{sep}\n")
 
     open_browser(port)
 

@@ -6,7 +6,7 @@ Panel Self Refresh guidance.
 """
 import logging
 
-from services.command_runner import run_cmd, run_powershell, CommandStatus, CommandResult
+from services.command_runner import run_cmd, run_powershell
 
 logger = logging.getLogger('maintenance.graphics')
 

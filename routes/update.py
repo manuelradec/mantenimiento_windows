@@ -1,8 +1,8 @@
-"""Windows Update routes."""
-from flask import Blueprint, render_template, jsonify
+"""Windows Update routes - ALL mutating endpoints governed."""
+from flask import Blueprint, render_template, jsonify, request
 
 from services import windows_update as wu_svc
-from services.reports import get_log
+from core.governance import execute_governed_action
 
 update_bp = Blueprint('update', __name__)
 
@@ -12,56 +12,70 @@ def index():
     return render_template('update.html')
 
 
-@update_bp.route('/api/scan', methods=['POST'])
-def api_scan():
-    result = wu_svc.scan_updates()
-    get_log().add_entry('update', 'Scan updates', result.status.value,
-                        result=result.output, error=result.error)
-    return jsonify(result.to_dict())
-
-
-@update_bp.route('/api/download', methods=['POST'])
-def api_download():
-    result = wu_svc.download_updates()
-    get_log().add_entry('update', 'Download updates', result.status.value,
-                        result=result.output, error=result.error)
-    return jsonify(result.to_dict())
-
-
-@update_bp.route('/api/install', methods=['POST'])
-def api_install():
-    result = wu_svc.install_updates()
-    get_log().add_entry('update', 'Install updates', result.status.value,
-                        result=result.output, error=result.error)
-    return jsonify(result.to_dict())
-
+# --- Read-only ---
 
 @update_bp.route('/api/services')
 def api_services():
     return jsonify(wu_svc.get_update_services_status().to_dict())
 
 
+# --- Mutating endpoints - ALL governed ---
+
+@update_bp.route('/api/scan', methods=['POST'])
+def api_scan():
+    data = request.get_json(silent=True) or {}
+    result = execute_governed_action(
+        'update.scan', wu_svc.scan_updates,
+        confirmation_token=data.get('confirmation_token'),
+    )
+    return jsonify(result)
+
+
+@update_bp.route('/api/download', methods=['POST'])
+def api_download():
+    data = request.get_json(silent=True) or {}
+    result = execute_governed_action(
+        'update.download', wu_svc.download_updates,
+        confirmation_token=data.get('confirmation_token'),
+    )
+    return jsonify(result)
+
+
+@update_bp.route('/api/install', methods=['POST'])
+def api_install():
+    data = request.get_json(silent=True) or {}
+    result = execute_governed_action(
+        'update.install', wu_svc.install_updates,
+        confirmation_token=data.get('confirmation_token'),
+    )
+    return jsonify(result)
+
+
 @update_bp.route('/api/open-settings', methods=['POST'])
 def api_open_settings():
-    result = wu_svc.open_windows_update_settings()
-    return jsonify(result.to_dict())
+    data = request.get_json(silent=True) or {}
+    result = execute_governed_action(
+        'update.open_settings', wu_svc.open_windows_update_settings,
+        confirmation_token=data.get('confirmation_token'),
+    )
+    return jsonify(result)
 
 
 @update_bp.route('/api/hard-reset', methods=['POST'])
 def api_hard_reset():
-    results = wu_svc.hard_reset_windows_update()
-    composite = results.get('_composite', {})
-    status = composite.get('status', 'success')
-    get_log().add_entry('update', 'Hard reset Windows Update', status,
-                        result=composite.get('message', 'Hard reset completed'))
-    return jsonify(results)
+    data = request.get_json(silent=True) or {}
+    result = execute_governed_action(
+        'update.hard_reset', wu_svc.hard_reset_windows_update,
+        confirmation_token=data.get('confirmation_token'),
+    )
+    return jsonify(result)
 
 
 @update_bp.route('/api/resync-time', methods=['POST'])
 def api_resync_time():
-    results = wu_svc.resync_time()
-    composite = results.get('_composite', {})
-    status = composite.get('status', 'success')
-    get_log().add_entry('update', 'Resync system time', status,
-                        result='Time sync completed')
-    return jsonify(results)
+    data = request.get_json(silent=True) or {}
+    result = execute_governed_action(
+        'update.resync_time', wu_svc.resync_time,
+        confirmation_token=data.get('confirmation_token'),
+    )
+    return jsonify(result)

@@ -6,7 +6,7 @@ Handles: restore point creation, restore enablement, operation modes.
 import logging
 from datetime import datetime
 
-from services.command_runner import run_cmd, run_powershell, CommandStatus, CommandResult
+from services.command_runner import run_powershell, CommandStatus
 
 logger = logging.getLogger('maintenance.restore')
 
