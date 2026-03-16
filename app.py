@@ -169,11 +169,15 @@ def _setup_logging(app):
     console_handler.setFormatter(logging.Formatter(log_format))
     console_handler.setLevel(logging.INFO)
 
-    # File handler
-    log_file = os.path.join(Config.LOG_DIR, 'app.log')
-    file_handler = logging.FileHandler(log_file, encoding='utf-8')
-    file_handler.setFormatter(logging.Formatter(log_format))
-    file_handler.setLevel(logging.DEBUG)
+    # File handler (skip gracefully if log dir is not writable)
+    file_handler = None
+    try:
+        log_file = os.path.join(Config.LOG_DIR, 'app.log')
+        file_handler = logging.FileHandler(log_file, encoding='utf-8')
+        file_handler.setFormatter(logging.Formatter(log_format))
+        file_handler.setLevel(logging.DEBUG)
+    except (PermissionError, OSError):
+        pass
 
     # Root logger
     root_logger = logging.getLogger()
@@ -181,7 +185,8 @@ def _setup_logging(app):
     if not root_logger.handlers:
         root_logger.setLevel(logging.DEBUG)
         root_logger.addHandler(console_handler)
-        root_logger.addHandler(file_handler)
+        if file_handler:
+            root_logger.addHandler(file_handler)
 
     # Suppress noisy Flask/Werkzeug logs
     logging.getLogger('werkzeug').setLevel(logging.WARNING)
