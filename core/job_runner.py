@@ -185,14 +185,13 @@ class JobRunner:
             )
             return
 
+        start_time = time.time()
         try:
             # Mark as running
             job.status = 'running'
             job.started_at = datetime.now().isoformat()
             JobStore.update_started(job.job_id)
             logger.info(f"Job {job.job_id} started: {job.action_name}")
-
-            start_time = time.time()
 
             # Execute the handler
             if job.params:

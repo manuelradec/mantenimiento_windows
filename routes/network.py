@@ -61,6 +61,16 @@ def api_flush_dns():
     return jsonify(result)
 
 
+@network_bp.route('/api/purge-netbios', methods=['POST'])
+def api_purge_netbios():
+    data = request.get_json(silent=True) or {}
+    result = execute_governed_action(
+        'network.purge_netbios', net_svc.purge_netbios_cache,
+        confirmation_token=data.get('confirmation_token'),
+    )
+    return jsonify(result)
+
+
 @network_bp.route('/api/release-ip', methods=['POST'])
 def api_release_ip():
     data = request.get_json(silent=True) or {}

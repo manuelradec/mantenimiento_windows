@@ -56,7 +56,7 @@ def api_dism_restore():
 def api_component_cleanup():
     data = request.get_json(silent=True) or {}
     result = execute_governed_action(
-        'cleanup.component_cleanup', repair_svc.dism_component_cleanup,
+        'repair.component_cleanup', repair_svc.dism_component_cleanup,
         confirmation_token=data.get('confirmation_token'),
     )
     return jsonify(result)

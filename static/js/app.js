@@ -265,7 +265,7 @@ async function pollJobStatus(jobId, actionName) {
 
 async function cancelActiveJob() {
     if (!activeJobId) {
-        alert('No active job to cancel.');
+        displayResult({ status: 'info', output: 'No active job to cancel.' });
         return;
     }
     try {
@@ -288,7 +288,7 @@ async function cancelActiveJob() {
 // ============================================================
 
 function displayResult(data) {
-    const consoleEl = document.getElementById('output-console');
+    const consoleEl = document.getElementById('output-console') || document.getElementById('output-area');
     if (!consoleEl) return;
 
     const timestamp = new Date().toLocaleTimeString();
@@ -473,10 +473,12 @@ async function exportReport(format) {
         });
         const data = await response.json();
         if (data.status === 'success') {
-            alert(`Report exported to:\n${data.path}`);
+            displayResult({ status: 'success', output: `Report exported to: ${data.path}` });
+        } else {
+            displayResult({ status: 'error', error: data.error || 'Export failed.' });
         }
     } catch (error) {
-        alert(`Export failed: ${error.message}`);
+        displayResult({ status: 'error', error: `Export failed: ${error.message}` });
     }
 }
 

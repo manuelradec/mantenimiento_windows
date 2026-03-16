@@ -167,7 +167,21 @@ ROLLBACK_STRATEGIES = {
         'needs_reboot': False,
         'restore_point_recommended': True,
     },
+    'repair.component_cleanup': {
+        'classification': 'not_reversible',
+        'reversible': 'no',
+        'instructions': 'Superseded components are permanently removed. Use restore point to revert.',
+        'needs_reboot': False,
+        'restore_point_recommended': True,
+    },
     # network
+    'network.purge_netbios': {
+        'classification': 'auto_reversible',
+        'reversible': 'auto',
+        'instructions': 'NetBIOS cache rebuilds automatically.',
+        'needs_reboot': False,
+        'restore_point_recommended': False,
+    },
     'network.flush_dns': {
         'classification': 'auto_reversible',
         'reversible': 'auto',

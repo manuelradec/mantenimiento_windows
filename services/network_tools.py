@@ -69,13 +69,27 @@ def set_autotuning_normal():
 def test_connectivity(host='8.8.8.8', port=443):
     """Test network connectivity to a specific host and port."""
     import re
-    # Sanitize host to prevent command injection
-    if not re.match(r'^[a-zA-Z0-9.\-:]+$', str(host)):
+    import ipaddress
+    host = str(host).strip()
+    # Validate host: must be a valid IP address or a safe hostname
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        # Not an IP, validate as hostname (RFC 952/1123)
+        if not re.match(r'^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?'
+                        r'(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$',
+                        host) or len(host) > 253:
+            return CommandResult(
+                status=CommandStatus.ERROR,
+                error='Invalid host. Must be a valid IP address or hostname.',
+            )
+    try:
+        port = int(port)
+    except (ValueError, TypeError):
         return CommandResult(
             status=CommandStatus.ERROR,
-            error='Invalid host format. Only alphanumeric characters, dots, hyphens, and colons are allowed.',
+            error='Invalid port. Must be an integer.',
         )
-    port = int(port)
     if not (1 <= port <= 65535):
         return CommandResult(
             status=CommandStatus.ERROR,

@@ -204,6 +204,7 @@ def _register_all_actions():
         ('cleanup.store_cache', 'Reset Store Cache', 'cleanup', 'Reset Microsoft Store cache', 60),
         ('cleanup.scan_duplicates', 'Scan Duplicates', 'cleanup', 'Scan Downloads for duplicates (read-only)', 120),
         ('network.flush_dns', 'Flush DNS', 'network', 'Flush DNS resolver cache', 30),
+        ('network.purge_netbios', 'Purge NetBIOS Cache', 'network', 'Purge NetBIOS name cache', 30),
         ('network.renew_ip', 'Renew IP', 'network', 'Renew DHCP IP address', 30),
         ('network.set_autotuning', 'Set TCP Autotuning', 'network', 'Set autotuning to normal', 30),
         ('network.test_connectivity', 'Test Connectivity', 'network', 'Test network connection', 30),
@@ -242,6 +243,8 @@ def _register_all_actions():
          'All mapped network drives will be disconnected. Continue?'),
         ('power.set_balanced', 'Set Balanced Mode', 'power',
          'Switch to Balanced power plan', 10, ''),
+        ('repair.component_cleanup', 'DISM Component Cleanup (Repair)', 'repair',
+         'Remove obsolete Windows components via repair module', 600, ''),
         ('advanced.create_restore_point', 'Create Restore Point', 'advanced',
          'Create a system restore point', 60, ''),
     ]:
