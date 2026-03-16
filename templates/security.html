@@ -82,6 +82,68 @@
     </div>
 </div>
 
+<div class="card" style="margin-bottom: 16px;">
+    <div class="card-header">
+        <h3>Control Inteligente de Aplicaciones</h3>
+        <span class="badge badge-danger">Avanzado</span>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-warning" style="margin-bottom: 16px;">
+            <strong>Advertencia de seguridad:</strong> El Control Inteligente de Aplicaciones (Smart App Control)
+            es una función de seguridad de Windows 11. <strong>Desactivarlo es una acción potencialmente NO reversible</strong>
+            sin una reinstalación limpia del sistema operativo. Solo disponible en Windows 11 22H2 o posterior.
+        </div>
+
+        <div id="sac-status-panel" style="background: var(--bg-secondary); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px;">
+                <div><strong>Estado actual:</strong> <span id="sac-state">—</span></div>
+                <div><strong>Compatible con este equipo:</strong> <span id="sac-supported">—</span></div>
+                <div><strong>Requiere privilegios de administrador:</strong> Sí</div>
+                <div><strong>Puede requerir reinicio:</strong> <span id="sac-reboot">—</span></div>
+                <div><strong>Cambio potencialmente no reversible:</strong> <span id="sac-oneway">Sí</span></div>
+                <div><strong>Método de detección:</strong> <span id="sac-method">—</span></div>
+            </div>
+            <div id="sac-explanation" style="margin-top: 10px; font-size: 12px; color: var(--text-light);"></div>
+        </div>
+
+        <div class="action-list">
+            <div class="action-item">
+                <div class="action-info">
+                    <div class="action-name">Detectar estado</div>
+                    <div class="action-desc">Verificar si el Control Inteligente de Aplicaciones está disponible y su estado actual</div>
+                </div>
+                <span class="badge badge-safe">Lectura</span>
+                <button class="btn btn-sm btn-primary" onclick="detectSacStatus()">Detectar</button>
+            </div>
+            <div class="action-item">
+                <div class="action-info">
+                    <div class="action-name">Abrir configuración de Windows</div>
+                    <div class="action-desc">Abrir la página de Seguridad de Windows para gestionar esta función manualmente</div>
+                </div>
+                <button class="btn btn-sm btn-outline" onclick="executeAction('/security/api/smart-app-control/open-settings', this)">Abrir</button>
+            </div>
+            <div class="action-item" id="sac-disable-row" style="display: none;">
+                <div class="action-info">
+                    <div class="action-name">Desactivar Control Inteligente de Aplicaciones</div>
+                    <div class="action-desc">
+                        <strong style="color: var(--danger);">IRREVERSIBLE</strong> — Solo se puede reactivar reinstalando Windows 11 desde cero.
+                    </div>
+                </div>
+                <div class="action-badges">
+                    <span class="badge badge-admin">Admin</span>
+                    <span class="badge badge-danger">Destructivo</span>
+                </div>
+                <button class="btn btn-sm btn-danger" onclick="executeAction('/security/api/smart-app-control/disable', this, {confirm: true, confirmTitle: 'Desactivar Control Inteligente de Aplicaciones', confirmMessage: 'ADVERTENCIA CRÍTICA: Esta acción desactivará el Control Inteligente de Aplicaciones de forma PERMANENTE. No es posible reactivarlo sin reinstalar Windows 11 desde cero. ¿Está seguro de que desea continuar?', dangerLevel: 'danger'})">Desactivar</button>
+            </div>
+        </div>
+
+        <div id="sac-not-available-msg" style="display: none; margin-top: 12px;" class="alert alert-info">
+            No disponible en este sistema. El Control Inteligente de Aplicaciones requiere Windows 11 22H2 o posterior
+            y que el equipo haya pasado por la experiencia inicial (OOBE) con la función habilitada.
+        </div>
+    </div>
+</div>
+
 <div class="card">
     <div class="card-header">
         <h3>Output</h3>
@@ -92,4 +154,64 @@
         <div id="output-console" class="console" style="min-height: 150px;">Ready.</div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function detectSacStatus() {
+    const stateEl = document.getElementById('sac-state');
+    const supportedEl = document.getElementById('sac-supported');
+    const rebootEl = document.getElementById('sac-reboot');
+    const methodEl = document.getElementById('sac-method');
+    const explanationEl = document.getElementById('sac-explanation');
+    const disableRow = document.getElementById('sac-disable-row');
+    const notAvailableMsg = document.getElementById('sac-not-available-msg');
+
+    stateEl.textContent = 'Detectando...';
+
+    try {
+        const response = await fetch('/security/api/smart-app-control/status');
+        const data = await response.json();
+        const d = data.details || {};
+
+        stateEl.textContent = d.state_label || d.state || 'Desconocido';
+        supportedEl.textContent = d.supported ? 'Sí' : 'No';
+        rebootEl.textContent = d.reboot_required ? 'Sí' : 'No';
+        methodEl.textContent = d.detection_method || '—';
+        explanationEl.textContent = d.explanation || '';
+
+        // Show/hide disable button based on state
+        if (d.can_disable) {
+            disableRow.style.display = '';
+            notAvailableMsg.style.display = 'none';
+        } else {
+            disableRow.style.display = 'none';
+            if (!d.supported || d.state === 'not_available' || d.state === 'unsupported') {
+                notAvailableMsg.style.display = '';
+            } else {
+                notAvailableMsg.style.display = 'none';
+            }
+        }
+
+        // Color the state
+        if (d.state === 'on') {
+            stateEl.style.color = 'var(--success)';
+        } else if (d.state === 'evaluation') {
+            stateEl.style.color = 'var(--warning-text, #b7791f)';
+        } else if (d.state === 'off') {
+            stateEl.style.color = 'var(--danger)';
+        } else {
+            stateEl.style.color = 'var(--text-light)';
+        }
+
+        // Also show in output area
+        if (data.output) {
+            fetchDiagnostic('/security/api/smart-app-control/status', 'output-area');
+        }
+    } catch (error) {
+        stateEl.textContent = 'Error de detección';
+        explanationEl.textContent = error.message;
+    }
+}
+</script>
 {% endblock %}

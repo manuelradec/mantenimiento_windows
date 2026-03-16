@@ -386,6 +386,25 @@ ROLLBACK_STRATEGIES = {
         'needs_reboot': False,
         'restore_point_recommended': False,
     },
+    'security.open_sac_settings': {
+        'classification': 'not_applicable',
+        'reversible': 'n/a',
+        'instructions': 'Opens Windows Security settings page only.',
+        'needs_reboot': False,
+        'restore_point_recommended': False,
+    },
+    'security.disable_sac': {
+        'classification': 'not_reversible',
+        'reversible': 'no',
+        'instructions': (
+            'Desactivar el Control Inteligente de Aplicaciones es IRREVERSIBLE. '
+            'Una vez desactivado, solo se puede reactivar realizando una instalación '
+            'limpia de Windows 11. Se recomienda crear un punto de restauración antes, '
+            'aunque este no restaurará el estado de SAC si se reinicia el equipo.'
+        ),
+        'needs_reboot': True,
+        'restore_point_recommended': True,
+    },
     # power
     'power.set_balanced': {
         'classification': 'manually_reversible',

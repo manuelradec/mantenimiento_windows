@@ -175,6 +175,7 @@ def _register_all_actions():
         ('diag.defender_config', 'Defender Configuration', 'security'),
         ('diag.third_party_av', 'Third-Party Antivirus', 'security'),
         ('diag.security_overview', 'Security Overview', 'security'),
+        ('diag.smart_app_control', 'Smart App Control Status', 'security'),
         ('diag.active_power_plan', 'Active Power Plan', 'power'),
         ('diag.list_power_plans', 'All Power Plans', 'power'),
         ('diag.power_plan_details', 'Power Plan Details', 'power'),
@@ -214,6 +215,7 @@ def _register_all_actions():
         ('update.scan', 'Scan for Updates', 'update', 'Check for Windows Updates', 120),
         ('update.download', 'Download Updates', 'update', 'Download pending updates', 300),
         ('update.open_settings', 'Open Windows Update', 'update', 'Open WU settings page', 10),
+        ('security.open_sac_settings', 'Open SAC Settings', 'security', 'Open Windows Security Smart App Control page', 10),
     ]:
         registry.register(ActionDef(
             action_id=aid, name=name, module=module,
@@ -336,6 +338,11 @@ def _register_all_actions():
          'Delete hiberfil.sys and disable hibernate', 10,
          'This deletes hiberfil.sys and frees space equal to your RAM. '
          'You will no longer be able to hibernate. Continue?', False),
+        ('security.disable_sac', 'Disable Smart App Control', 'security',
+         'Disable Windows Smart App Control (irreversible without clean install)', 30,
+         'ADVERTENCIA: Desactivar el Control Inteligente de Aplicaciones es una '
+         'acción NO REVERSIBLE. Una vez desactivado, solo se puede reactivar '
+         'reinstalando Windows 11 desde cero. ¿Desea continuar?', True),
     ]:
         registry.register(ActionDef(
             action_id=aid, name=name, module=module,

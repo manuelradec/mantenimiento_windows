@@ -2,6 +2,7 @@
 from flask import Blueprint, render_template, jsonify, request
 
 from services import antivirus_tools as av_svc
+from services import smart_app_control as sac_svc
 from core.governance import execute_governed_action
 
 security_bp = Blueprint('security', __name__)
@@ -76,6 +77,36 @@ def api_update_sigs():
     data = request.get_json(silent=True) or {}
     result = execute_governed_action(
         'security.update_signatures', av_svc.update_defender_signatures,
+        confirmation_token=data.get('confirmation_token'),
+    )
+    return jsonify(result)
+
+
+# --- Smart App Control (Control Inteligente de Aplicaciones) ---
+
+@security_bp.route('/api/smart-app-control/status')
+def api_sac_status():
+    """Read-only: detect Smart App Control state."""
+    return jsonify(sac_svc.detect_smart_app_control_status().to_dict())
+
+
+@security_bp.route('/api/smart-app-control/disable', methods=['POST'])
+def api_sac_disable():
+    """Governed: attempt to disable Smart App Control (DESTRUCTIVE)."""
+    data = request.get_json(silent=True) or {}
+    result = execute_governed_action(
+        'security.disable_sac', sac_svc.attempt_disable_smart_app_control,
+        confirmation_token=data.get('confirmation_token'),
+    )
+    return jsonify(result)
+
+
+@security_bp.route('/api/smart-app-control/open-settings', methods=['POST'])
+def api_sac_open_settings():
+    """Governed: open Windows Security SAC settings page."""
+    data = request.get_json(silent=True) or {}
+    result = execute_governed_action(
+        'security.open_sac_settings', sac_svc.open_smart_app_control_settings,
         confirmation_token=data.get('confirmation_token'),
     )
     return jsonify(result)
