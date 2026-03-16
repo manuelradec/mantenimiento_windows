@@ -1,7 +1,7 @@
-# Mantenimiento Windows v2.0
+# CleanCPU v3.0.0
 
 Herramienta profesional de mantenimiento logico para Windows 10/11.
-Aplicacion web local basada en Flask, empaquetable como `.exe` para distribucion interna.
+Aplicacion web local basada en Flask con arquitectura de gobernanza completa, empaquetable como `.exe` para distribucion interna.
 
 ---
 
@@ -20,36 +20,99 @@ Unifica en una sola interfaz web local todas las tareas de mantenimiento tecnico
 | **Energia** | Planes de energia, reporte de bateria, hibernacion, contadores de procesador |
 | **Drivers** | Listar drivers, dispositivos con problemas, drivers de terceros, drivers de video, errores en Event Log |
 | **Seguridad** | Estado de Defender, escaneo rapido/completo, actualizar firmas, carga de CPU de escaneo, deteccion de antivirus de terceros |
-| **Reportes** | Log de sesion, exportar a HTML/TXT/JSON |
+| **Reportes** | Reportes incident-grade desde SQLite: HTML/TXT/JSON con resumen ejecutivo, snapshots, Event Viewer |
 | **Avanzado** | Puntos de restauracion, diagnosticos de display/DWM/GPU, Panel Self Refresh |
 
 ---
 
-## Requisitos para desarrollo
+## Requisitos
 
-- Python 3.10 o superior
-- Windows 10/11 (las funciones de mantenimiento solo operan en Windows)
-- Permisos de administrador (requerido para la mayoria de operaciones)
+- **Python** 3.10 o superior
+- **Sistema operativo**: Windows 10 (21H2+) o Windows 11 (22H2+)
+- **Permisos**: Administrador recomendado (requerido para la mayoria de operaciones)
+- **Editor recomendado**: Visual Studio Code
 
-## Instalacion para desarrollo
+---
+
+## Clonar el repositorio e iniciar en VS Code
+
+### 1. Clonar con Git
+
+Abre una terminal (PowerShell, CMD o la terminal integrada de VS Code) y ejecuta:
 
 ```bash
-git clone <url-del-repositorio>
+git clone https://github.com/manuelradec/mantenimiento_windows.git
 cd mantenimiento_windows
-
-python -m venv venv
-venv\Scripts\activate
-
-pip install -r requirements.txt
 ```
 
-## Ejecutar en modo desarrollo
+### 2. Abrir en VS Code
+
+Desde la misma terminal:
 
 ```bash
-python app.py
+code .
+```
+
+O bien: abre VS Code > `File` > `Open Folder...` > selecciona la carpeta `mantenimiento_windows`.
+
+### 3. Crear entorno virtual
+
+Abre la terminal integrada de VS Code (`Ctrl+`` `) y ejecuta:
+
+```bash
+python -m venv venv
+```
+
+**Activar el entorno:**
+
+```bash
+# PowerShell (default en VS Code)
+.\venv\Scripts\Activate.ps1
+
+# CMD
+venv\Scripts\activate.bat
+
+# Git Bash
+source venv/Scripts/activate
+```
+
+> VS Code puede detectar el venv automaticamente. Si aparece un popup preguntando si deseas seleccionarlo como interprete, acepta.
+
+### 4. Instalar dependencias
+
+```bash
+# Dependencias de produccion
+pip install -r requirements.txt
+
+# Dependencias de desarrollo (tests, linting, types)
+pip install -r requirements-dev.txt
+```
+
+### 5. Ejecutar en modo desarrollo
+
+```bash
+python server.py --dev
 ```
 
 Se abre automaticamente en `http://127.0.0.1:5000`.
+
+Para modo produccion (Waitress WSGI server):
+
+```bash
+python server.py
+```
+
+### 6. Ejecutar tests
+
+```bash
+python -m pytest tests/ -v
+```
+
+### 7. Ejecutar linting
+
+```bash
+flake8 core/ services/ routes/ app.py config.py
+```
 
 ---
 
@@ -59,34 +122,59 @@ Se abre automaticamente en `http://127.0.0.1:5000`.
 
 1. Doble clic en **`build.bat`**
 2. Espera 1-3 minutos
-3. El ejecutable queda en `dist\MantenimientoWindows.exe`
+3. El ejecutable queda en `dist\CleanCPU.exe`
 
-El script crea el entorno virtual, instala dependencias y genera el `.exe` automaticamente.
+El script automaticamente:
+- Verifica que Python este instalado
+- Crea un entorno virtual si no existe
+- Instala las dependencias de build (`requirements-build.txt`)
+- Limpia builds anteriores
+- Genera el `.exe` con PyInstaller
 
-### Opcion B: Manual
+### Opcion B: Build manual
 
 ```bash
 # Activar entorno virtual
-venv\Scripts\activate
+.\venv\Scripts\Activate.ps1
 
-# Instalar PyInstaller si no lo tienes
-pip install pyinstaller
+# Instalar dependencias de build
+pip install -r requirements-build.txt
 
-# Construir
+# Construir el ejecutable
 pyinstaller mantenimiento_windows.spec --noconfirm
 ```
 
-El resultado esta en `dist\MantenimientoWindows.exe`.
+El resultado esta en `dist\CleanCPU.exe`.
+
+### Verificar el build
+
+Tras el build exitoso, la terminal muestra:
+
+```
+============================================================
+  BUILD SUCCESSFUL
+============================================================
+
+  Output: dist\CleanCPU.exe
+  Size: XXXXX bytes
+============================================================
+```
+
+Puedes probar el ejecutable localmente:
+
+```bash
+.\dist\CleanCPU.exe
+```
 
 ---
 
 ## Distribuir a los usuarios
 
-Solo se entrega **un archivo**: `MantenimientoWindows.exe`
+Solo se entrega **un archivo**: `CleanCPU.exe`
 
 | Concepto | Detalle |
 |---|---|
-| **Archivo** | `MantenimientoWindows.exe` (~15-25 MB) |
+| **Archivo** | `CleanCPU.exe` (~15-25 MB) |
 | **Requisitos del PC destino** | Windows 10 o 11, nada mas |
 | **NO necesita instalar** | Python, pip, Flask, ni ninguna otra dependencia |
 | **Permisos** | El .exe pide elevacion de administrador (UAC) automaticamente |
@@ -97,10 +185,10 @@ Solo se entrega **un archivo**: `MantenimientoWindows.exe`
 2. Se abre una ventana de consola mostrando:
    ```
    ============================================================
-     Mantenimiento Windows v2.0.0
+     CleanCPU v3.0.0
      Running at: http://127.0.0.1:5000
      Admin: True
-     Logs: C:\ProgramData\MantenimientoWindows\logs
+     Mode: safe_maintenance
    ============================================================
    ```
 3. El navegador se abre automaticamente con la interfaz
@@ -111,8 +199,63 @@ Solo se entrega **un archivo**: `MantenimientoWindows.exe`
 
 | Tipo | Ubicacion |
 |---|---|
-| Logs de aplicacion | `C:\ProgramData\MantenimientoWindows\logs\` |
-| Reportes exportados | `C:\ProgramData\MantenimientoWindows\reports\` |
+| Base de datos SQLite | `C:\ProgramData\CleanCPU\cleancpu.db` |
+| Logs de aplicacion | `C:\ProgramData\CleanCPU\logs\` |
+| Log de eventos JSONL | `C:\ProgramData\CleanCPU\logs\events.jsonl` |
+| Reportes exportados | `C:\ProgramData\CleanCPU\reports\` |
+
+---
+
+## Arquitectura v3.0.0
+
+### Flujo de una accion mutante
+
+```
+Route (POST) ──> execute_governed_action()
+                    │
+                    ├── 1. Registry lookup (action_registry)
+                    ├── 2. Applicability check (platform/hardware)
+                    ├── 3. Before-snapshot (disk, RAM, CPU)
+                    ├── 4. Policy check (mode + risk class)
+                    ├── 5. Job submission (job_runner + locking)
+                    ├── 6. Handler execution (service function)
+                    ├── 7. After-snapshot
+                    ├── 8. Rollback info attachment
+                    ├── 9. SQLite persistence (audit + snapshots)
+                    └── 10. JSONL event log
+```
+
+**Ninguna ruta mutante ejecuta logica directamente** — toda accion pasa por `execute_governed_action()` que garantiza registro, politica, auditoria y snapshots.
+
+### Motor de politicas
+
+| Modo | Permite | Bloquea |
+|---|---|---|
+| `DIAGNOSTIC` | Solo lectura | Toda mutacion |
+| `SAFE_MAINTENANCE` | SAFE_READONLY, SAFE_MUTATION | DISRUPTIVE, RISKY, DESTRUCTIVE |
+| `ADVANCED` | + DISRUPTIVE, RISKY (con confirmacion) | DESTRUCTIVE |
+| `EXPERT` | Todo (con confirmacion para destructivas) | Nada |
+
+### Clasificacion de riesgo
+
+| Clase | Ejemplo | Confirmacion |
+|---|---|---|
+| `SAFE_READONLY` | Diagnosticos, listar drivers | No |
+| `SAFE_MUTATION` | Limpiar temp, flush DNS | No |
+| `DISRUPTIVE` | Reset Winsock, SFC | Si |
+| `RISKY` | CHKDSK, hard reset WU | Si |
+| `DESTRUCTIVE` | Eliminar perfil, DISM RestoreHealth | Si + token |
+
+### Seguridad
+
+- **Solo localhost** (`127.0.0.1`) — no expone ningun puerto a la red
+- **CSRF tokens** en cada POST/PUT/DELETE/PATCH via `X-CSRF-Token`
+- **Validacion de Host header** — rechaza requests con Host distinto a localhost
+- **Validacion de Origin/Referer** — bloquea si faltan ambos headers
+- **Session cookies** hardened: `HttpOnly`, `SameSite=Strict`, nombre `cleancpu_session`
+- **CSP** con `default-src 'self'`, `form-action 'self'`, `frame-ancestors 'none'`
+- **Allowlist de comandos** granular por ejecutable con subcomandos y argumentos denegados
+- **Sanitizacion de argumentos** — bloquea `;`, `|`, `` ` ``, `..`, saltos de linea
 
 ---
 
@@ -120,15 +263,27 @@ Solo se entrega **un archivo**: `MantenimientoWindows.exe`
 
 ```
 mantenimiento_windows/
-├── app.py                          # Entrypoint Flask
+├── app.py                          # Factory Flask + API endpoints
 ├── config.py                       # Configuracion centralizada
-├── requirements.txt                # Dependencias Python
+├── server.py                       # Servidor produccion (Waitress)
 ├── build.bat                       # Script de build automatico
 ├── mantenimiento_windows.spec      # Configuracion PyInstaller
-├── main.py                         # Legacy (Tkinter original)
+├── requirements.txt                # Dependencias produccion
+├── requirements-dev.txt            # Dependencias desarrollo (test, lint)
+├── requirements-build.txt          # Dependencias build (PyInstaller)
+├── .flake8                         # Configuracion linting
+├── VALIDATION_PLAN.md              # Plan de validacion Windows
+│
+├── core/                           # Capa de gobernanza y seguridad
+│   ├── governance.py               # execute_governed_action() - puente central
+│   ├── action_registry.py          # Catalogo de ~70 acciones con clasificacion de riesgo
+│   ├── policy_engine.py            # Motor de politicas (4 modos operativos)
+│   ├── job_runner.py               # Ejecucion en background con ThreadPoolExecutor
+│   ├── persistence.py              # SQLite: audit, jobs, sessions, snapshots, event_viewer
+│   └── security.py                 # CSRF, Origin, Host, cookies, CSP, headers
 │
 ├── services/                       # Capa de servicios (logica de negocio)
-│   ├── command_runner.py           # Ejecucion segura de comandos
+│   ├── command_runner.py           # Ejecucion segura con allowlist granular
 │   ├── permissions.py              # Validacion de admin
 │   ├── system_info.py              # Diagnosticos del sistema
 │   ├── cleanup.py                  # Limpieza y optimizacion
@@ -140,64 +295,37 @@ mantenimiento_windows/
 │   ├── antivirus_tools.py          # Seguridad y antivirus
 │   ├── restore_tools.py            # Puntos de restauracion
 │   ├── drivers.py                  # Diagnostico de drivers
-│   └── reports.py                  # Logs y reportes
+│   ├── event_viewer.py             # Recopilacion Event Viewer (PowerShell JSON)
+│   └── reports.py                  # Logs y reportes legacy
 │
-├── routes/                         # Blueprints Flask (rutas HTTP)
-│   ├── dashboard.py
-│   ├── diagnostics.py
-│   ├── cleanup.py
-│   ├── repair.py
-│   ├── network.py
-│   ├── update.py
-│   ├── power.py
-│   ├── drivers.py
-│   ├── security.py
-│   ├── reports.py
-│   └── advanced.py
+├── routes/                         # Blueprints Flask (todas gobernadas)
+│   ├── dashboard.py                # Solo lectura
+│   ├── diagnostics.py              # Solo lectura
+│   ├── cleanup.py                  # 14 endpoints gobernados
+│   ├── repair.py                   # 10 endpoints gobernados
+│   ├── network.py                  # 10 endpoints gobernados
+│   ├── update.py                   # 6 endpoints gobernados
+│   ├── power.py                    # 5 endpoints gobernados
+│   ├── security.py                 # 4 endpoints gobernados
+│   ├── advanced.py                 # 1 endpoint gobernado
+│   ├── drivers.py                  # Solo lectura
+│   └── reports.py                  # SQLite-first, incident-grade
 │
 ├── templates/                      # Plantillas Jinja2 (HTML)
-│   ├── base.html                   # Layout principal con sidebar
-│   ├── dashboard.html
-│   ├── diagnostics.html
-│   ├── cleanup.html
-│   ├── repair.html
-│   ├── network.html
-│   ├── update.html
-│   ├── power.html
-│   ├── drivers.html
-│   ├── security.html
-│   ├── reports.html
-│   └── advanced.html
+│   ├── base.html                   # Layout con sidebar, job status bar, cancel button
+│   └── *.html                      # Una plantilla por seccion
 │
-└── static/
-    ├── css/style.css               # Estilos CSS
-    └── js/app.js                   # JavaScript frontend
+├── static/
+│   ├── css/style.css               # Estilos CSS
+│   └── js/app.js                   # Frontend: CSRF, confirmacion, cancelacion, rollback
+│
+├── tests/                          # 102 tests
+│   ├── test_routes.py              # Rutas, CSRF, Origin, Host, headers, endpoints gobernados
+│   ├── test_governance.py          # Comandos, sanitizacion, rollback, registry, policy, DB
+│   └── test_policy_engine.py       # Policy engine, registry, persistence
+│
+└── .github/workflows/ci.yml       # CI: flake8 + pytest + mypy (Python 3.10/3.11/3.12)
 ```
-
----
-
-## Seguridad y diseno
-
-- **Todas las acciones destructivas requieren confirmacion** del usuario antes de ejecutarse
-- **Indicadores de riesgo** visibles en la interfaz (verde/amarillo/rojo)
-- **Capa centralizada de ejecucion de comandos** (`command_runner.py`):
-  - Timeouts configurables
-  - Captura de stdout, stderr y codigo de retorno
-  - Validacion de permisos de admin
-  - Prevencion de inyeccion de shell
-  - Resultados estructurados: `success`, `warning`, `error`, `not_applicable`, `timeout`, `requires_admin`
-- **Logging completo** de cada accion ejecutada
-- **Deteccion de hardware** antes de operaciones especificas (SSD vs HDD, Intel vs otro GPU)
-- **Solo acceso local** (`127.0.0.1`) — no expone ningun puerto a la red
-
-### Clasificacion de operaciones
-
-| Nivel | Significado | Ejemplo |
-|---|---|---|
-| **Safe** | Sin riesgo, solo lectura o limpieza basica | Diagnosticos, flush DNS, limpiar temp |
-| **Admin** | Requiere permisos de administrador | SFC, DISM, servicios |
-| **Caution** | Puede causar desconexion temporal o cambios reversibles | Release IP, restart Explorer |
-| **Danger** | Cambio significativo, requiere confirmacion explicita | Reset TCP/IP, hard reset WU, CHKDSK /f /r |
 
 ---
 
@@ -207,4 +335,17 @@ mantenimiento_windows/
 - `uac_admin=True` en el `.spec`: Windows solicita elevacion UAC automaticamente.
 - `use_reloader=False` en `app.py`: el reloader de Flask no es compatible con ejecutables empaquetados por PyInstaller.
 - Los templates y archivos estaticos se incluyen via `datas` en el `.spec` porque Flask los lee desde disco en tiempo de ejecucion.
-- Los modulos Python (`services/`, `routes/`) se incluyen via `hiddenimports` para que PyInstaller los compile e integre correctamente.
+- Los modulos Python (`services/`, `routes/`, `core/`) se incluyen via `hiddenimports` para que PyInstaller los compile e integre correctamente.
+- La base de datos SQLite se crea automaticamente en el primer arranque.
+
+---
+
+## CI/CD
+
+El repositorio incluye un workflow de GitHub Actions (`.github/workflows/ci.yml`) que ejecuta en cada push y PR:
+
+1. **Lint** — `flake8` sobre `core/`, `services/`, `routes/`, `app.py`, `config.py`
+2. **Tests** — `pytest` con cobertura sobre `core/`, `services/`, `routes/`
+3. **Type check** — `mypy` sobre modulos core
+
+Matrix: Python 3.10, 3.11, 3.12.
