@@ -1,6 +1,10 @@
 /**
- * CleanCPU - Professional Windows Maintenance Tool
- * Frontend JavaScript with CSRF protection and background job polling.
+ * CleanCPU v3.0 - Professional Windows Maintenance Tool
+ * Frontend JavaScript with:
+ * - CSRF protection on all state-changing requests
+ * - Background job polling with cancellation
+ * - Governed action support (policy, confirmation, rollback)
+ * - Enhanced operational observability
  */
 
 // ============================================================
@@ -20,7 +24,7 @@ function getDefaultHeaders() {
 }
 
 // ============================================================
-// Action Execution (with CSRF and Job Support)
+// Action Execution (with Governance, CSRF, Job Support)
 // ============================================================
 
 async function executeAction(url, buttonEl, options = {}) {
@@ -34,7 +38,7 @@ async function executeAction(url, buttonEl, options = {}) {
         dangerLevel = 'safe',
     } = options;
 
-    // Show confirmation if required
+    // Show confirmation if required by caller
     if (confirm) {
         const confirmed = await showConfirm(confirmTitle, confirmMessage, dangerLevel);
         if (!confirmed) return null;
@@ -67,28 +71,47 @@ async function executeAction(url, buttonEl, options = {}) {
 
         const data = await response.json();
 
-        // Check if this is a background job
+        // Handle governance responses
+
+        // 1. Background job submitted
         if (data.status === 'submitted' && data.job_id) {
-            // Start polling for job completion
             displayResult({
                 status: 'info',
-                output: `Background job started: ${data.action_name} (ID: ${data.job_id})`,
+                output: `Background job started: ${data.action_name || data.action_id} (ID: ${data.job_id})`,
+                action_id: data.action_id,
+                risk_class: data.risk_class,
             });
-            pollJobStatus(data.job_id, data.action_name);
+            pollJobStatus(data.job_id, data.action_name || data.action_id);
             return data;
         }
 
-        // Check if confirmation is needed (server-side policy)
+        // 2. Needs confirmation (server-side policy)
         if (data.status === 'needs_confirmation') {
             buttonEl.disabled = false;
             buttonEl.innerHTML = originalText;
+
+            const warnings = data.warnings || [];
+            if (data.needs_reboot) {
+                warnings.push('This action may require a system reboot.');
+            }
+            if (data.needs_restore_point) {
+                warnings.push('Creating a restore point before this action is recommended.');
+            }
+
             const confirmed = await showConfirm(
-                data.action_id || 'Confirm',
+                data.action_id || 'Confirm Action',
                 data.confirm_message || 'This action requires confirmation.',
                 data.risk_class === 'destructive' ? 'danger' : 'warning',
-                data.warnings || []
+                warnings
             );
+
             if (confirmed) {
+                // First register the confirmation token via API
+                await fetch('/api/policy/confirm', {
+                    method: 'POST',
+                    headers: getDefaultHeaders(),
+                    body: JSON.stringify({ token: data.action_id }),
+                });
                 // Re-submit with confirmation token
                 return executeAction(url, buttonEl, {
                     ...options,
@@ -99,17 +122,48 @@ async function executeAction(url, buttonEl, options = {}) {
             return null;
         }
 
-        // Check if rejected by policy
+        // 3. Rejected by policy
         if (data.status === 'rejected') {
             displayResult({
                 status: 'error',
                 error: data.reason || 'Action rejected by policy engine.',
+                action_id: data.action_id,
             });
             return null;
         }
 
-        // Normal result
+        // 4. Not applicable
+        if (data.status === 'not_applicable') {
+            displayResult({
+                status: 'info',
+                output: data.error || 'Action not applicable on this system.',
+                action_id: data.action_id,
+            });
+            return data;
+        }
+
+        // 5. Normal result - display with enriched info
         displayResult(data);
+
+        // Show rollback info if available
+        if (data.rollback_info) {
+            const rb = data.rollback_info;
+            if (rb.reversible && rb.reversible !== 'n/a') {
+                displayResult({
+                    status: 'info',
+                    output: `Rollback: ${rb.reversible} — ${rb.instructions}`,
+                });
+            }
+        }
+
+        // Show reboot warning
+        if (data.needs_reboot) {
+            displayResult({
+                status: 'warning',
+                output: 'A system reboot is recommended to complete this operation.',
+            });
+        }
+
         if (onSuccess) onSuccess(data);
         return data;
     } catch (error) {
@@ -125,20 +179,23 @@ async function executeAction(url, buttonEl, options = {}) {
 }
 
 // ============================================================
-// Background Job Polling
+// Background Job Polling (with cancellation support)
 // ============================================================
 
+let activeJobId = null;
+
 async function pollJobStatus(jobId, actionName) {
+    activeJobId = jobId;
     const statusBar = document.getElementById('job-status-bar');
     const statusText = document.getElementById('job-status-text');
     const statusName = document.getElementById('job-status-name');
 
     if (statusBar) {
         statusBar.style.display = 'flex';
-        statusName.textContent = actionName;
+        if (statusName) statusName.textContent = actionName;
     }
 
-    const maxPolls = 720; // 1 hour at 5-second intervals
+    const maxPolls = 720;
     let pollCount = 0;
 
     const poll = async () => {
@@ -149,24 +206,30 @@ async function pollJobStatus(jobId, actionName) {
             if (job.error && response.status === 404) {
                 if (statusBar) statusBar.style.display = 'none';
                 displayResult({ status: 'error', error: 'Job not found.' });
+                activeJobId = null;
                 return;
             }
 
             if (statusText) {
-                statusText.textContent = `${job.status}...`;
+                const elapsed = job.duration_ms ? `${Math.round(job.duration_ms/1000)}s` : '';
+                statusText.textContent = `${job.status}... ${elapsed}`;
             }
 
             if (['completed', 'failed', 'cancelled', 'partial_success'].includes(job.status)) {
-                // Job finished
                 if (statusBar) statusBar.style.display = 'none';
+                activeJobId = null;
 
                 displayResult({
                     status: job.status === 'completed' ? 'success' :
-                            job.status === 'partial_success' ? 'warning' : 'error',
+                            job.status === 'partial_success' ? 'warning' :
+                            job.status === 'cancelled' ? 'info' : 'error',
                     output: job.stdout || job.output || `Job ${job.status}`,
                     error: job.stderr || job.error_message || job.error || '',
                     duration: job.duration_ms ? (job.duration_ms / 1000) : undefined,
                     command: job.command || '',
+                    job_id: job.job_id,
+                    action_id: job.action_id,
+                    risk_class: job.risk_class,
                 });
 
                 if (job.needs_reboot) {
@@ -178,12 +241,12 @@ async function pollJobStatus(jobId, actionName) {
                 return;
             }
 
-            // Still running, poll again
             pollCount++;
             if (pollCount < maxPolls) {
                 setTimeout(poll, 5000);
             } else {
                 if (statusBar) statusBar.style.display = 'none';
+                activeJobId = null;
                 displayResult({
                     status: 'warning',
                     output: `Job ${jobId} is still running. Check back later.`,
@@ -197,35 +260,64 @@ async function pollJobStatus(jobId, actionName) {
         }
     };
 
-    // Start polling after a short delay
     setTimeout(poll, 2000);
 }
 
+async function cancelActiveJob() {
+    if (!activeJobId) {
+        alert('No active job to cancel.');
+        return;
+    }
+    try {
+        const response = await fetch(`/api/jobs/${activeJobId}/cancel`, {
+            method: 'POST',
+            headers: getDefaultHeaders(),
+        });
+        const data = await response.json();
+        displayResult({
+            status: data.status === 'error' ? 'error' : 'info',
+            output: data.message || data.error || 'Cancel requested.',
+        });
+    } catch (error) {
+        displayResult({ status: 'error', error: `Cancel failed: ${error.message}` });
+    }
+}
+
 // ============================================================
-// Display Results
+// Display Results (Enhanced with governance metadata)
 // ============================================================
 
 function displayResult(data) {
-    const console = document.getElementById('output-console');
-    if (!console) return;
+    const consoleEl = document.getElementById('output-console');
+    if (!consoleEl) return;
 
     const timestamp = new Date().toLocaleTimeString();
     let statusClass = 'line-info';
     let statusIcon = 'i';
 
-    if (data.status === 'success' || data.status === 'completed') {
+    const status = data.status || 'unknown';
+    if (status === 'success' || status === 'completed') {
         statusClass = 'line-success';
         statusIcon = '+';
-    } else if (data.status === 'warning' || data.status === 'partial_success') {
+    } else if (status === 'warning' || status === 'partial_success') {
         statusClass = 'line-warning';
         statusIcon = '!';
-    } else if (data.status === 'error' || data.status === 'timeout' || data.status === 'failed') {
+    } else if (status === 'error' || status === 'timeout' || status === 'failed') {
         statusClass = 'line-error';
         statusIcon = 'x';
     }
 
-    let lines = `<span class="${statusClass}">[${timestamp}] [${statusIcon}] Status: ${data.status || 'unknown'}</span>\n`;
+    let lines = `<span class="${statusClass}">[${timestamp}] [${statusIcon}] Status: ${escapeHtml(status)}</span>\n`;
 
+    if (data.action_id) {
+        lines += `<span class="line-info">  Action: ${escapeHtml(data.action_id)}</span>\n`;
+    }
+    if (data.job_id) {
+        lines += `<span class="line-info">  Job ID: ${escapeHtml(data.job_id)}</span>\n`;
+    }
+    if (data.risk_class) {
+        lines += `<span class="line-info">  Risk: ${escapeHtml(data.risk_class)}</span>\n`;
+    }
     if (data.command) {
         lines += `<span class="line-info">  Command: ${escapeHtml(data.command)}</span>\n`;
     }
@@ -243,8 +335,8 @@ function displayResult(data) {
     }
     lines += '\n';
 
-    console.innerHTML += lines;
-    console.scrollTop = console.scrollHeight;
+    consoleEl.innerHTML += lines;
+    consoleEl.scrollTop = consoleEl.scrollHeight;
 }
 
 // ============================================================
@@ -296,7 +388,6 @@ function showConfirm(title, message, dangerLevel = 'safe', warnings = []) {
         titleEl.textContent = title;
         msgEl.textContent = message;
 
-        // Show warnings if any
         if (warningsEl) {
             if (warnings.length > 0) {
                 warningsEl.innerHTML = warnings.map(w =>
@@ -339,7 +430,7 @@ function showConfirm(title, message, dangerLevel = 'safe', warnings = []) {
 function escapeHtml(text) {
     if (!text) return '';
     const div = document.createElement('div');
-    div.textContent = text;
+    div.textContent = String(text);
     return div.innerHTML;
 }
 
@@ -432,4 +523,10 @@ document.addEventListener('DOMContentLoaded', () => {
             link.classList.add('active');
         }
     });
+
+    // Wire up cancel button if present
+    const cancelBtn = document.getElementById('cancel-job-btn');
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', cancelActiveJob);
+    }
 });

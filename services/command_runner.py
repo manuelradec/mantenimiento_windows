@@ -21,7 +21,6 @@ import os
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 logger = logging.getLogger('cleancpu.command_runner')
 
@@ -76,35 +75,46 @@ class CommandResult:
 
 
 # ============================================================
-# COMMAND ALLOWLIST
+# COMMAND ALLOWLIST - Fine-grained per-executable validation
 # ============================================================
-# Only commands in this list are permitted to execute.
-# Each entry maps a command base to allowed argument patterns.
+# Each entry maps a command base (case-insensitive) to either:
+#   True                    -> allowed with any arguments (legacy, discouraged)
+#   {'subcommands': [...]}  -> only these subcommands/flags allowed
+#   {'patterns': [...]}     -> regex patterns for allowed argument strings
 
 ALLOWED_COMMANDS = {
     # System diagnostics & repair
-    'sfc': True,
-    'DISM': True,
-    'chkdsk': True,
-    'winsat': True,
-    'mdsched.exe': True,
-    'ipconfig': True,
-    'nbtstat': True,
-    'netsh': True,
-    'net': True,
-    'route': True,
-    'defrag': True,
-    'cleanmgr': True,
+    'sfc': {'subcommands': ['/scannow', '/verifyonly']},
+    'dism': {'subcommands': ['/Online', '/Cleanup-Image', '/CheckHealth',
+                             '/ScanHealth', '/RestoreHealth', '/StartComponentCleanup']},
+    'chkdsk': {'subcommands': ['/scan', '/f', '/r', '/x']},
+    'winsat': {'subcommands': ['disk', 'formal']},
+    'mdsched.exe': True,  # No arguments needed
+    'ipconfig': {'subcommands': ['/flushdns', '/release', '/renew', '/all']},
+    'nbtstat': {'subcommands': ['-R']},
+    'netsh': {'subcommands': ['int', 'winsock', 'winhttp'],
+              'allowed_verbs': ['show', 'reset', 'set']},
+    'net': {'subcommands': ['stop', 'start', 'use', 'share'],
+            'denied_first_arg': ['config', 'user', 'accounts', 'group']},
+    'route': {'subcommands': ['print']},
+    'defrag': {'subcommands': ['/O', '/U', '/V', '/A']},
+    'cleanmgr': {'subcommands': ['/sagerun:1', '/d']},
     'wsreset.exe': True,
-    'taskkill': True,
-    'start': True,
-    'ren': True,
-    'w32tm': True,
-    'sc': True,
-    'UsoClient': True,
-    'powercfg': True,
+    'taskkill': {'subcommands': ['/f', '/im', '/F', '/T', '/PID'],
+                 'denied_args': ['/fi']},
+    'start': {'allowed_patterns': [r'^(explorer\.exe|ms-settings:.*)$']},
+    'ren': True,  # Used for WU reset renames
+    'w32tm': {'subcommands': ['/resync', '/query']},
+    'sc': {'subcommands': ['config', 'query'],
+           'denied_args': ['delete', 'create']},
+    'usoclient': {'subcommands': ['StartScan', 'StartDownload', 'StartInstall']},
+    'powercfg': {'subcommands': ['/GETACTIVESCHEME', '/Q', '/LIST', '-setactive',
+                                 '/batteryreport', '-h', '/output']},
+    'cscript': True,  # For slmgr.vbs
+    'fsutil': {'subcommands': ['behavior']},
+    'pnputil': {'subcommands': ['/enum-drivers', '/enum-devices']},
 
-    # PowerShell (handled separately)
+    # PowerShell (validated separately via script content)
     'powershell.exe': True,
 }
 
@@ -132,15 +142,69 @@ def sanitize_argument(arg: str) -> str:
 
 
 def _validate_command(cmd_parts: list) -> bool:
-    """Validate that a command is in the allowlist."""
+    """
+    Validate that a command is in the allowlist with fine-grained checks.
+    Returns True if allowed, False if blocked.
+    """
     if not cmd_parts:
         return False
+
     base_cmd = os.path.basename(cmd_parts[0]).lower().replace('.exe', '')
-    # Check against allowlist (case-insensitive for Windows)
-    for allowed in ALLOWED_COMMANDS:
-        if allowed.lower().replace('.exe', '') == base_cmd:
-            return True
-    return False
+
+    # Find matching allowlist entry (case-insensitive)
+    entry = None
+    for allowed_name, allowed_spec in ALLOWED_COMMANDS.items():
+        if allowed_name.lower().replace('.exe', '') == base_cmd:
+            entry = allowed_spec
+            break
+
+    if entry is None:
+        return False
+
+    # Simple True means allowed with any arguments
+    if entry is True:
+        return True
+
+    if not isinstance(entry, dict):
+        return False
+
+    args_str = ' '.join(cmd_parts[1:]).lower() if len(cmd_parts) > 1 else ''
+
+    # Check denied_args (substring match in full args string)
+    denied = entry.get('denied_args', [])
+    for denied_arg in denied:
+        if denied_arg.lower() in args_str:
+            logger.warning(f"Denied argument '{denied_arg}' for command '{base_cmd}'")
+            return False
+
+    # Check denied_first_arg (exact match on first argument only)
+    denied_first = entry.get('denied_first_arg', [])
+    if denied_first and len(cmd_parts) > 1:
+        first_arg = cmd_parts[1].lower()
+        if first_arg in [d.lower() for d in denied_first]:
+            logger.warning(f"Denied first argument '{first_arg}' for command '{base_cmd}'")
+            return False
+
+    # Check allowed_patterns (regex)
+    patterns = entry.get('allowed_patterns', [])
+    if patterns:
+        import re as re_mod
+        for pattern in patterns:
+            if re_mod.match(pattern, args_str, re_mod.IGNORECASE):
+                return True
+        if patterns:  # Had patterns but none matched
+            return False
+
+    # If subcommands specified, at least one must appear in the args
+    subcommands = entry.get('subcommands', [])
+    if subcommands:
+        found = any(sc.lower() in args_str for sc in subcommands)
+        if not found and args_str:
+            # Args were given but don't match any allowed subcommand
+            logger.warning(f"No matching subcommand for '{base_cmd}' in: {args_str[:100]}")
+            return False
+
+    return True
 
 
 def is_admin() -> bool:

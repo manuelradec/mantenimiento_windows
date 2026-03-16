@@ -1,8 +1,8 @@
-"""Repair routes."""
-from flask import Blueprint, render_template, jsonify
+"""Repair routes - ALL mutating endpoints governed via execute_governed_action."""
+from flask import Blueprint, render_template, jsonify, request
 
 from services import repair as repair_svc
-from services.reports import get_log
+from core.governance import execute_governed_action
 
 repair_bp = Blueprint('repair', __name__)
 
@@ -14,85 +14,99 @@ def index():
 
 @repair_bp.route('/api/sfc', methods=['POST'])
 def api_sfc():
-    result = repair_svc.run_sfc_scan()
-    get_log().add_entry('repair', 'SFC /scannow', result.status.value,
-                        result=result.output, error=result.error)
-    return jsonify(result.to_dict())
+    data = request.get_json(silent=True) or {}
+    result = execute_governed_action(
+        'repair.sfc', repair_svc.run_sfc_scan,
+        confirmation_token=data.get('confirmation_token'),
+    )
+    return jsonify(result)
 
 
 @repair_bp.route('/api/dism-check', methods=['POST'])
 def api_dism_check():
-    result = repair_svc.dism_check_health()
-    get_log().add_entry('repair', 'DISM CheckHealth', result.status.value,
-                        result=result.output, error=result.error)
-    return jsonify(result.to_dict())
+    data = request.get_json(silent=True) or {}
+    result = execute_governed_action(
+        'repair.dism_check', repair_svc.dism_check_health,
+        confirmation_token=data.get('confirmation_token'),
+    )
+    return jsonify(result)
 
 
 @repair_bp.route('/api/dism-scan', methods=['POST'])
 def api_dism_scan():
-    result = repair_svc.dism_scan_health()
-    get_log().add_entry('repair', 'DISM ScanHealth', result.status.value,
-                        result=result.output, error=result.error)
-    return jsonify(result.to_dict())
+    data = request.get_json(silent=True) or {}
+    result = execute_governed_action(
+        'repair.dism_scan', repair_svc.dism_scan_health,
+        confirmation_token=data.get('confirmation_token'),
+    )
+    return jsonify(result)
 
 
 @repair_bp.route('/api/dism-restore', methods=['POST'])
 def api_dism_restore():
-    result = repair_svc.dism_restore_health()
-    get_log().add_entry('repair', 'DISM RestoreHealth', result.status.value,
-                        result=result.output, error=result.error)
-    return jsonify(result.to_dict())
+    data = request.get_json(silent=True) or {}
+    result = execute_governed_action(
+        'repair.dism_restore', repair_svc.dism_restore_health,
+        confirmation_token=data.get('confirmation_token'),
+    )
+    return jsonify(result)
 
 
 @repair_bp.route('/api/component-cleanup', methods=['POST'])
 def api_component_cleanup():
-    result = repair_svc.dism_component_cleanup()
-    get_log().add_entry('repair', 'DISM ComponentCleanup', result.status.value,
-                        result=result.output, error=result.error)
-    return jsonify(result.to_dict())
+    data = request.get_json(silent=True) or {}
+    result = execute_governed_action(
+        'cleanup.component_cleanup', repair_svc.dism_component_cleanup,
+        confirmation_token=data.get('confirmation_token'),
+    )
+    return jsonify(result)
 
 
 @repair_bp.route('/api/chkdsk-scan', methods=['POST'])
 def api_chkdsk_scan():
-    result = repair_svc.chkdsk_scan_online()
-    get_log().add_entry('repair', 'CHKDSK online scan', result.status.value,
-                        result=result.output, error=result.error)
-    return jsonify(result.to_dict())
+    data = request.get_json(silent=True) or {}
+    result = execute_governed_action(
+        'repair.chkdsk_scan', repair_svc.chkdsk_scan_online,
+        confirmation_token=data.get('confirmation_token'),
+    )
+    return jsonify(result)
 
 
 @repair_bp.route('/api/chkdsk-schedule', methods=['POST'])
 def api_chkdsk_schedule():
-    result = repair_svc.chkdsk_schedule_full()
-    get_log().add_entry('repair', 'Schedule full CHKDSK', result.status.value,
-                        result=result.output, error=result.error)
-    return jsonify(result.to_dict())
+    data = request.get_json(silent=True) or {}
+    result = execute_governed_action(
+        'repair.chkdsk_schedule', repair_svc.chkdsk_schedule_full,
+        confirmation_token=data.get('confirmation_token'),
+    )
+    return jsonify(result)
 
 
 @repair_bp.route('/api/winsat', methods=['POST'])
 def api_winsat():
-    result = repair_svc.winsat_disk()
-    get_log().add_entry('repair', 'WinSAT disk', result.status.value,
-                        result=result.output, error=result.error)
-    return jsonify(result.to_dict())
+    data = request.get_json(silent=True) or {}
+    result = execute_governed_action(
+        'repair.winsat', repair_svc.winsat_disk,
+        confirmation_token=data.get('confirmation_token'),
+    )
+    return jsonify(result)
 
 
 @repair_bp.route('/api/memory-diagnostic', methods=['POST'])
 def api_memory_diag():
-    result = repair_svc.schedule_memory_diagnostic()
-    get_log().add_entry('repair', 'Memory Diagnostic', result.status.value,
-                        result=result.output, error=result.error)
-    return jsonify(result.to_dict())
+    data = request.get_json(silent=True) or {}
+    result = execute_governed_action(
+        'repair.memory_diagnostic', repair_svc.schedule_memory_diagnostic,
+        confirmation_token=data.get('confirmation_token'),
+    )
+    return jsonify(result)
 
 
 @repair_bp.route('/api/full-sequence', methods=['POST'])
 def api_full_sequence():
-    results = repair_svc.run_repair_sequence()
-    # Determine composite status from sub-step results
-    has_error = any(
-        v.get('status') in ('error', 'timeout')
-        for v in results.values() if isinstance(v, dict)
+    data = request.get_json(silent=True) or {}
+    result = execute_governed_action(
+        'repair.full_sequence', repair_svc.run_repair_sequence,
+        confirmation_token=data.get('confirmation_token'),
     )
-    status = 'partial_success' if has_error else 'success'
-    get_log().add_entry('repair', 'Full repair sequence', status,
-                        result=f'Sequence completed ({status})')
-    return jsonify(results)
+    return jsonify(result)

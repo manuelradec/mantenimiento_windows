@@ -117,6 +117,34 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_audit_session ON audit_log(session_id);
             CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log(timestamp);
             CREATE INDEX IF NOT EXISTS idx_audit_module ON audit_log(module);
+
+            CREATE TABLE IF NOT EXISTS snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                job_id TEXT,
+                session_id TEXT NOT NULL,
+                action_id TEXT NOT NULL,
+                snapshot_type TEXT NOT NULL,
+                captured_at TEXT NOT NULL,
+                data_json TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_snapshots_job ON snapshots(job_id);
+            CREATE INDEX IF NOT EXISTS idx_snapshots_session ON snapshots(session_id);
+
+            CREATE TABLE IF NOT EXISTS event_viewer_cache (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL,
+                job_id TEXT,
+                log_name TEXT NOT NULL,
+                provider TEXT,
+                event_id INTEGER,
+                level TEXT,
+                time_created TEXT,
+                message TEXT,
+                collected_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_evtcache_session ON event_viewer_cache(session_id);
         """)
     logger.info(f"Database initialized at {_get_db_path()}")
 
@@ -276,6 +304,16 @@ class AuditStore:
             return [dict(r) for r in rows]
 
     @staticmethod
+    def get_all(session_id: str, limit: int = 500) -> list[dict]:
+        """Get all audit entries for a session (for reporting)."""
+        with get_db() as conn:
+            rows = conn.execute(
+                "SELECT * FROM audit_log WHERE session_id = ? ORDER BY timestamp ASC LIMIT ?",
+                (session_id, limit)
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    @staticmethod
     def get_summary(session_id: str) -> dict:
         """Get audit summary for a session."""
         with get_db() as conn:
@@ -306,3 +344,62 @@ class AuditStore:
                 'by_status': by_status,
                 'by_module': by_module,
             }
+
+
+class SnapshotStore:
+    """Manages before/after snapshots."""
+
+    @staticmethod
+    def get_by_job(job_id: str) -> list[dict]:
+        with get_db() as conn:
+            rows = conn.execute(
+                "SELECT * FROM snapshots WHERE job_id = ? ORDER BY captured_at",
+                (job_id,)
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    @staticmethod
+    def get_by_session(session_id: str) -> list[dict]:
+        with get_db() as conn:
+            rows = conn.execute(
+                "SELECT * FROM snapshots WHERE session_id = ? ORDER BY captured_at",
+                (session_id,)
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+
+class EventViewerStore:
+    """Manages cached Event Viewer entries."""
+
+    @staticmethod
+    def store_events(session_id: str, events: list[dict], job_id: str = ''):
+        with get_db() as conn:
+            for evt in events:
+                conn.execute(
+                    "INSERT INTO event_viewer_cache "
+                    "(session_id, job_id, log_name, provider, event_id, level, "
+                    "time_created, message, collected_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (session_id, job_id,
+                     evt.get('log_name', ''), evt.get('provider', ''),
+                     evt.get('event_id'), evt.get('level', ''),
+                     evt.get('time_created', ''), evt.get('message', ''),
+                     datetime.now().isoformat())
+                )
+
+    @staticmethod
+    def get_by_session(session_id: str, log_name: str = '', limit: int = 200) -> list[dict]:
+        with get_db() as conn:
+            if log_name:
+                rows = conn.execute(
+                    "SELECT * FROM event_viewer_cache WHERE session_id = ? AND log_name = ? "
+                    "ORDER BY time_created DESC LIMIT ?",
+                    (session_id, log_name, limit)
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM event_viewer_cache WHERE session_id = ? "
+                    "ORDER BY time_created DESC LIMIT ?",
+                    (session_id, limit)
+                ).fetchall()
+            return [dict(r) for r in rows]
