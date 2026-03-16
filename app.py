@@ -209,13 +209,14 @@ def main():
     app = create_app()
     port = Config.PORT
 
-    print(f"\n{'='*60}")
+    sep = '=' * 60
+    print(f"\n{sep}")
     print(f"  {Config.APP_NAME} v{Config.APP_VERSION}")
     print(f"  [DEV MODE] Running at: http://127.0.0.1:{port}")
     print("  For production, use: python server.py")
     print(f"  Admin: {get_elevation_info()['is_admin']}")
     print(f"  Logs: {Config.LOG_DIR}")
-    print(f"{'='*60}\n")
+    print(f"{sep}\n")
 
     open_browser(port)
 

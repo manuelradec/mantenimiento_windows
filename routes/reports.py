@@ -269,7 +269,7 @@ def _render_html_report(bundle: dict) -> str:
             <div><strong>Username:</strong> {he(bundle["username"])}</div>
             <div><strong>Admin:</strong> {he(str(bundle["is_admin"]))}</div>
             <div><strong>Version:</strong> {he(Config.APP_VERSION)}</div>
-            <div><strong>OS:</strong> {he(bundle["os_info"].get("os_name",""))} {he(bundle["os_info"].get("os_version",""))}</div>
+            <div><strong>OS:</strong> {he(bundle["os_info"].get("os_name", ""))} {he(bundle["os_info"].get("os_version", ""))}</div>
             <div><strong>Reboot Required:</strong> {he(str(bundle["executive_summary"]["reboot_required"]))}</div>
         </div>
     </div>
