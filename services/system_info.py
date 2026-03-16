@@ -20,7 +20,9 @@ try:
 except ImportError:
     HAS_PSUTIL = False
 
-from services.command_runner import run_cmd, run_powershell, CommandStatus, CommandResult
+from services.command_runner import (
+    run_cmd, run_powershell, run_powershell_json, CommandStatus, CommandResult
+)
 
 
 def get_system_overview():
@@ -62,40 +64,43 @@ def get_system_overview():
 
 
 def get_windows_version():
-    """Get detailed Windows version information."""
-    result = run_powershell(
-        '[System.Environment]::OSVersion | Format-List *',
+    """Get detailed Windows version information as structured JSON."""
+    result = run_powershell_json(
+        '[System.Environment]::OSVersion | Select-Object Platform, '
+        'ServicePack, Version, VersionString',
         description='Get Windows version details',
     )
     return result
 
 
 def get_ram_details():
-    """Get detailed RAM module information using modern CIM."""
-    result = run_powershell(
+    """Get detailed RAM module information as structured JSON."""
+    result = run_powershell_json(
         'Get-CimInstance Win32_PhysicalMemory | '
-        'Select-Object BankLabel,Capacity,Manufacturer,PartNumber,Speed,MemoryType | '
-        'Format-Table -AutoSize',
+        'Select-Object BankLabel, '
+        '@{N="CapacityGB";E={[math]::Round($_.Capacity/1GB,2)}}, '
+        'Manufacturer, PartNumber, Speed, MemoryType',
         description='Get RAM module details',
     )
     return result
 
 
 def get_disk_details():
-    """Get physical disk information using modern Get-PhysicalDisk."""
-    result = run_powershell(
-        'Get-PhysicalDisk | Select-Object FriendlyName,MediaType,BusType,Size,HealthStatus | '
-        'Format-Table -AutoSize',
+    """Get physical disk information as structured JSON."""
+    result = run_powershell_json(
+        'Get-PhysicalDisk | Select-Object FriendlyName, MediaType, '
+        'BusType, @{N="SizeGB";E={[math]::Round($_.Size/1GB,2)}}, '
+        'HealthStatus',
         description='Get physical disk details',
     )
     return result
 
 
 def get_smart_status():
-    """Get disk health/SMART status."""
-    result = run_powershell(
-        'Get-PhysicalDisk | Select-Object FriendlyName,HealthStatus,OperationalStatus | '
-        'Format-Table -AutoSize',
+    """Get disk health/SMART status as structured JSON."""
+    result = run_powershell_json(
+        'Get-PhysicalDisk | Select-Object FriendlyName, HealthStatus, '
+        'OperationalStatus',
         description='Get disk SMART/health status',
     )
     return result
@@ -156,7 +161,7 @@ def get_top_processes(count=15):
 
 
 def get_important_services():
-    """Check status of important Windows services."""
+    """Check status of important Windows services as structured JSON."""
     services = [
         'wuauserv', 'BITS', 'cryptsvc', 'msiserver', 'Spooler',
         'W32Time', 'WinDefend', 'mpssvc', 'EventLog', 'Dhcp',
@@ -164,9 +169,9 @@ def get_important_services():
         'WSearch', 'SysMain', 'TrustedInstaller',
     ]
     svc_list = "','".join(services)
-    result = run_powershell(
+    result = run_powershell_json(
         f"Get-Service -Name '{svc_list}' -ErrorAction SilentlyContinue | "
-        "Select-Object Name,DisplayName,Status,StartType | Format-Table -AutoSize",
+        "Select-Object Name, DisplayName, Status, StartType",
         description='Check important services status',
     )
     return result
@@ -191,10 +196,10 @@ def get_problem_devices():
 
 
 def get_network_overview():
-    """Get basic network adapter information."""
-    result = run_powershell(
-        'Get-NetAdapter | Select-Object Name,InterfaceDescription,Status,LinkSpeed,MacAddress | '
-        'Format-Table -AutoSize',
+    """Get basic network adapter information as structured JSON."""
+    result = run_powershell_json(
+        'Get-NetAdapter | Select-Object Name, InterfaceDescription, '
+        'Status, LinkSpeed, MacAddress',
         description='Get network adapters',
     )
     return result
@@ -207,10 +212,10 @@ def get_route_table():
 
 
 def get_startup_programs():
-    """Get startup programs using modern CIM."""
-    result = run_powershell(
+    """Get startup programs using modern CIM as structured JSON."""
+    result = run_powershell_json(
         'Get-CimInstance Win32_StartupCommand | '
-        'Select-Object Name,Command,Location,User | Format-Table -AutoSize -Wrap',
+        'Select-Object Name, Command, Location, User',
         description='Get startup programs',
     )
     return result

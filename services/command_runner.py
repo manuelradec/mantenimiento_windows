@@ -86,37 +86,66 @@ ALLOWED_COMMANDS = {
     # System diagnostics & repair
     'sfc': {'subcommands': ['/scannow', '/verifyonly']},
     'dism': {'subcommands': ['/Online', '/Cleanup-Image', '/CheckHealth',
-                             '/ScanHealth', '/RestoreHealth', '/StartComponentCleanup']},
+                             '/ScanHealth', '/RestoreHealth',
+                             '/StartComponentCleanup']},
     'chkdsk': {'subcommands': ['/scan', '/f', '/r', '/x']},
     'winsat': {'subcommands': ['disk', 'formal']},
-    'mdsched.exe': True,  # No arguments needed
+    'mdsched.exe': {'max_args': 0},  # No arguments allowed
     'ipconfig': {'subcommands': ['/flushdns', '/release', '/renew', '/all']},
     'nbtstat': {'subcommands': ['-R']},
     'netsh': {'subcommands': ['int', 'winsock', 'winhttp'],
-              'allowed_verbs': ['show', 'reset', 'set']},
+              'allowed_verbs': ['show', 'reset', 'set'],
+              'denied_args': ['firewall', 'advfirewall']},
     'net': {'subcommands': ['stop', 'start', 'use', 'share'],
-            'denied_first_arg': ['config', 'user', 'accounts', 'group']},
+            'denied_first_arg': ['config', 'user', 'accounts', 'group',
+                                 'localgroup']},
     'route': {'subcommands': ['print']},
-    'defrag': {'subcommands': ['/O', '/U', '/V', '/A']},
+    'defrag': {'subcommands': ['/O', '/U', '/V', '/A'],
+               'denied_args': ['/x']},
     'cleanmgr': {'subcommands': ['/sagerun:1', '/d']},
-    'wsreset.exe': True,
+    'wsreset.exe': {'max_args': 0},
     'taskkill': {'subcommands': ['/f', '/im', '/F', '/T', '/PID'],
                  'denied_args': ['/fi']},
     'start': {'allowed_patterns': [r'^(explorer\.exe|ms-settings:.*)$']},
-    'ren': True,  # Used for WU reset renames
+    'ren': {'allowed_patterns': [
+        r'^.*\\softwaredistribution\s+softwaredistribution\.bak\.',
+        r'^.*\\catroot2\s+catroot2\.bak\.',
+    ]},
     'w32tm': {'subcommands': ['/resync', '/query']},
     'sc': {'subcommands': ['config', 'query'],
            'denied_args': ['delete', 'create']},
-    'usoclient': {'subcommands': ['StartScan', 'StartDownload', 'StartInstall']},
-    'powercfg': {'subcommands': ['/GETACTIVESCHEME', '/Q', '/LIST', '-setactive',
-                                 '/batteryreport', '-h', '/output']},
-    'cscript': True,  # For slmgr.vbs
+    'usoclient': {'subcommands': ['StartScan', 'StartDownload',
+                                  'StartInstall']},
+    'powercfg': {'subcommands': ['/GETACTIVESCHEME', '/Q', '/LIST',
+                                 '-setactive', '/batteryreport', '-h',
+                                 '/output']},
+    'cscript': {'allowed_patterns': [
+        r'^//nologo\s+.*\\slmgr\.vbs\s+/\w+$',
+    ]},
     'fsutil': {'subcommands': ['behavior']},
-    'pnputil': {'subcommands': ['/enum-drivers', '/enum-devices']},
+    'pnputil': {'subcommands': ['/enum-drivers', '/enum-devices'],
+                'denied_args': ['/delete-driver', '/remove']},
 
-    # PowerShell (validated separately via script content)
-    'powershell.exe': True,
+    # PowerShell — allowed only via internal wrappers (run_powershell/
+    # run_powershell_json) which build the command list themselves.
+    # Direct invocation with arbitrary scripts is blocked by requiring
+    # that the command comes through the powershell=True path in run_cmd.
+    'powershell.exe': {'subcommands': ['-NoProfile', '-NonInteractive',
+                                       '-ExecutionPolicy', '-Command']},
 }
+
+# Commands that require shell=True with justification
+SHELL_REQUIRED_COMMANDS = {
+    # 'start explorer.exe' requires shell because 'start' is a shell builtin
+    'start',
+}
+
+# Documentation of shell=True usage:
+# 1. String commands passed to run_cmd() use shell=True because they
+#    cannot be split reliably (e.g., paths with spaces, quoted args).
+#    This is ONLY used when the base command passes allowlist validation.
+# 2. 'start' is a CMD shell builtin, not an executable.
+#    It requires shell=True to function.
 
 
 # Characters that must never appear in command arguments
@@ -161,14 +190,24 @@ def _validate_command(cmd_parts: list) -> bool:
     if entry is None:
         return False
 
-    # Simple True means allowed with any arguments
+    # Simple True means allowed with any arguments (legacy, discouraged)
     if entry is True:
         return True
 
     if not isinstance(entry, dict):
         return False
 
-    args_str = ' '.join(cmd_parts[1:]).lower() if len(cmd_parts) > 1 else ''
+    args = cmd_parts[1:]
+    args_str = ' '.join(args).lower() if args else ''
+
+    # Check max_args constraint (e.g., mdsched.exe takes no arguments)
+    max_args = entry.get('max_args')
+    if max_args is not None and len(args) > max_args:
+        logger.warning(
+            f"Too many arguments ({len(args)} > {max_args}) "
+            f"for command '{base_cmd}'"
+        )
+        return False
 
     # Check denied_args (substring match in full args string)
     denied = entry.get('denied_args', [])
@@ -309,28 +348,38 @@ def run_cmd(command, timeout=120, requires_admin=False, shell=False,
         use_shell = shell
         # Validate against allowlist
         if not _validate_command(command):
-            logger.warning(f"[{operation_id}] Command not in allowlist: {command[0]}")
+            logger.warning(
+                f"[{operation_id}] BLOCKED by allowlist: "
+                f"{_redact_command_for_log(cmd_display)}"
+            )
             return CommandResult(
                 status=CommandStatus.ERROR,
                 command=cmd_display,
-                error=f'Command not in allowlist: {command[0]}',
+                error=f'Command blocked by allowlist: {command[0]}',
                 duration=time.time() - start_time,
                 operation_id=operation_id,
+                details={'validation': 'blocked_by_allowlist',
+                         'base_command': command[0]},
             )
     elif isinstance(command, str):
         # String command - try to validate the base command
         parts = command.split()
         if parts and not _validate_command(parts):
-            logger.warning(f"[{operation_id}] Command not in allowlist: {parts[0]}")
+            logger.warning(
+                f"[{operation_id}] BLOCKED by allowlist: "
+                f"{_redact_command_for_log(cmd_display)}"
+            )
             return CommandResult(
                 status=CommandStatus.ERROR,
                 command=cmd_display,
-                error=f'Command not in allowlist: {parts[0]}',
+                error=f'Command blocked by allowlist: {parts[0]}',
                 duration=time.time() - start_time,
                 operation_id=operation_id,
+                details={'validation': 'blocked_by_allowlist',
+                         'base_command': parts[0]},
             )
         actual_cmd = command
-        use_shell = True  # String commands require shell
+        use_shell = True  # String commands require shell (documented above)
     else:
         actual_cmd = command
         use_shell = shell
