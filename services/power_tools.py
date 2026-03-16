@@ -7,7 +7,7 @@ processor power settings.
 import logging
 
 from services.command_runner import (
-    run_cmd, run_powershell, run_powershell_json, CommandStatus, CommandResult
+    run_cmd, run_powershell, CommandStatus, CommandResult
 )
 
 logger = logging.getLogger('maintenance.power')
