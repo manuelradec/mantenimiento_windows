@@ -1,59 +1,59 @@
 {% extends "base.html" %}
-{% block title %}CleanCPU - Security{% endblock %}
-{% block page_title %}Security & Antivirus{% endblock %}
-{% block page_desc %}Microsoft Defender management and security diagnostics{% endblock %}
+{% block title %}CleanCPU - Seguridad{% endblock %}
+{% block page_title %}Seguridad y antivirus{% endblock %}
+{% block page_desc %}Gestión de Microsoft Defender y diagnósticos de seguridad{% endblock %}
 
 {% block content %}
-<div class="grid grid-2" style="margin-bottom: 16px;">
+<div class="grid grid-2" style="margin-bottom: 20px;">
     <div class="card">
         <div class="card-header">
             <h3>Microsoft Defender</h3>
-            <span class="badge badge-info">Native</span>
+            <span class="badge badge-info">Nativo</span>
         </div>
         <div class="card-body">
             <div class="action-list">
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Defender Status</div>
-                        <div class="action-desc">Real-time protection, signature age, etc.</div>
+                        <div class="action-name">Estado de Defender</div>
+                        <div class="action-desc">Protección en tiempo real, antigüedad de firmas, etc.</div>
                     </div>
-                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/security/api/defender-status', 'output-area')">Check</button>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/security/api/defender-status', 'output-area')">Verificar</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Defender Configuration</div>
-                        <div class="action-desc">Exclusions, CPU load factor, etc.</div>
+                        <div class="action-name">Configuración de Defender</div>
+                        <div class="action-desc">Exclusiones, factor de carga CPU, etc.</div>
                     </div>
-                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/security/api/defender-config', 'output-area')">View</button>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/security/api/defender-config', 'output-area')">Ver</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Quick Scan</div>
-                        <div class="action-desc">Run a quick Defender scan (5-15 min)</div>
+                        <div class="action-name">Escaneo rápido</div>
+                        <div class="action-desc">Ejecutar escaneo rápido de Defender (5-15 min)</div>
                     </div>
-                    <button class="btn btn-sm btn-success" onclick="executeAction('/security/api/quick-scan', this)">Scan</button>
+                    <button class="btn btn-sm btn-success" onclick="executeAction('/security/api/quick-scan', this)">Escanear</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Full Scan</div>
-                        <div class="action-desc">Run a full system scan (can take hours)</div>
+                        <div class="action-name">Escaneo completo</div>
+                        <div class="action-desc">Escaneo completo del sistema (puede tardar horas)</div>
                     </div>
-                    <button class="btn btn-sm btn-warning" onclick="executeAction('/security/api/full-scan', this, {confirm: true, confirmTitle: 'Full Scan', confirmMessage: 'A full scan checks every file on your system and can take 1-3 hours. Proceed?', dangerLevel: 'warning'})">Scan</button>
+                    <button class="btn btn-sm btn-warning" onclick="executeAction('/security/api/full-scan', this, {confirm: true, confirmTitle: 'Escaneo completo', confirmMessage: 'Un escaneo completo verifica cada archivo del sistema y puede tardar 1-3 horas. ¿Continuar?', dangerLevel: 'warning'})">Escanear</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Update Signatures</div>
-                        <div class="action-desc">Update virus definition database</div>
+                        <div class="action-name">Actualizar firmas</div>
+                        <div class="action-desc">Actualizar base de datos de definiciones de virus</div>
                     </div>
-                    <button class="btn btn-sm btn-primary" onclick="executeAction('/security/api/update-signatures', this)">Update</button>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/security/api/update-signatures', this)">Actualizar</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Set Scan CPU Load</div>
-                        <div class="action-desc">Reduce Defender scan CPU impact (default: 50%)</div>
+                        <div class="action-name">Configurar carga CPU de escaneo</div>
+                        <div class="action-desc">Reducir impacto de CPU de escaneo de Defender (predeterminado: 50%)</div>
                     </div>
                     <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
-                    <button class="btn btn-sm btn-primary" onclick="executeAction('/security/api/set-cpu-load', this, {body: {factor: 30}, confirm: true, confirmTitle: 'Reduce Defender CPU Load', confirmMessage: 'Set Defender scan CPU load factor to 30%? This makes scans slower but less impactful on system performance.'})">Set 30%</button>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/security/api/set-cpu-load', this, {body: {factor: 30}, confirm: true, confirmTitle: 'Reducir carga CPU de Defender', confirmMessage: '¿Establecer el factor de carga CPU de escaneo de Defender al 30%? Esto hace los escaneos más lentos pero con menos impacto en el rendimiento.'})">Establecer 30%</button>
                 </div>
             </div>
         </div>
@@ -61,28 +61,28 @@
 
     <div class="card">
         <div class="card-header">
-            <h3>Third-Party Security</h3>
-            <span class="badge badge-optional">Optional</span>
+            <h3>Seguridad de terceros</h3>
+            <span class="badge badge-optional">Opcional</span>
         </div>
         <div class="card-body">
             <div class="action-list">
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Detect Installed AV</div>
-                        <div class="action-desc">Check for third-party antivirus products</div>
+                        <div class="action-name">Detectar antivirus instalados</div>
+                        <div class="action-desc">Verificar productos antivirus de terceros</div>
                     </div>
-                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/security/api/third-party', 'output-area')">Detect</button>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/security/api/third-party', 'output-area')">Detectar</button>
                 </div>
             </div>
             <div class="alert alert-info" style="margin-top: 16px;">
-                Third-party tools like Malwarebytes, Norton, Kaspersky, etc. must be managed
-                through their own interfaces. This tool only detects their presence.
+                Herramientas de terceros como Malwarebytes, Norton, Kaspersky, etc. deben gestionarse
+                a través de sus propias interfaces. Esta herramienta solo detecta su presencia.
             </div>
         </div>
     </div>
 </div>
 
-<div class="card" style="margin-bottom: 16px;">
+<div class="card" style="margin-bottom: 20px;">
     <div class="card-header">
         <h3>Control Inteligente de Aplicaciones</h3>
         <span class="badge badge-danger">Avanzado</span>
@@ -94,7 +94,7 @@
             sin una reinstalación limpia del sistema operativo. Solo disponible en Windows 11 22H2 o posterior.
         </div>
 
-        <div id="sac-status-panel" style="background: var(--bg-secondary); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+        <div id="sac-status-panel" style="background: var(--bg-surface-1); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px;">
                 <div><strong>Estado actual:</strong> <span id="sac-state">—</span></div>
                 <div><strong>Compatible con este equipo:</strong> <span id="sac-supported">—</span></div>
@@ -103,7 +103,7 @@
                 <div><strong>Cambio potencialmente no reversible:</strong> <span id="sac-oneway">Sí</span></div>
                 <div><strong>Método de detección:</strong> <span id="sac-method">—</span></div>
             </div>
-            <div id="sac-explanation" style="margin-top: 10px; font-size: 12px; color: var(--text-light);"></div>
+            <div id="sac-explanation" style="margin-top: 10px; font-size: 12px; color: var(--text-muted);"></div>
         </div>
 
         <div class="action-list">
@@ -146,12 +146,12 @@
 
 <div class="card">
     <div class="card-header">
-        <h3>Output</h3>
-        <button class="btn btn-sm btn-outline" onclick="var a=document.getElementById('output-area');var c=document.getElementById('output-console');if(a)a.innerHTML='';if(c)c.innerHTML='Ready.'">Clear</button>
+        <h3>Salida</h3>
+        <button class="btn btn-sm btn-outline" onclick="var a=document.getElementById('output-area');var c=document.getElementById('output-console');if(a)a.innerHTML='';if(c)c.innerHTML='Listo.'">Limpiar</button>
     </div>
     <div class="card-body">
         <div id="output-area"></div>
-        <div id="output-console" class="console" style="min-height: 150px;">Ready.</div>
+        <div id="output-console" class="console" style="min-height: 150px;">Listo.</div>
     </div>
 </div>
 {% endblock %}
@@ -197,11 +197,11 @@ async function detectSacStatus() {
         if (d.state === 'on') {
             stateEl.style.color = 'var(--success)';
         } else if (d.state === 'evaluation') {
-            stateEl.style.color = 'var(--warning-text, #b7791f)';
+            stateEl.style.color = 'var(--warning)';
         } else if (d.state === 'off') {
             stateEl.style.color = 'var(--danger)';
         } else {
-            stateEl.style.color = 'var(--text-light)';
+            stateEl.style.color = 'var(--text-muted)';
         }
 
         // Also show in output area

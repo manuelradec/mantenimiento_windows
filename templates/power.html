@@ -1,82 +1,80 @@
 {% extends "base.html" %}
-{% block title %}CleanCPU - Power{% endblock %}
-{% block page_title %}Power & Performance{% endblock %}
-{% block page_desc %}Power plan management, hibernation, and performance settings{% endblock %}
+{% block title %}CleanCPU - Energía{% endblock %}
+{% block page_title %}Energía y rendimiento{% endblock %}
+{% block page_desc %}Gestión de planes de energía, hibernación y configuración de rendimiento{% endblock %}
 
 {% block content %}
-<div class="grid grid-2" style="margin-bottom: 16px;">
+<div class="grid grid-2" style="margin-bottom: 20px;">
     <div class="card">
         <div class="card-header">
-            <h3>Power Plans</h3>
+            <h3>Planes de energía</h3>
         </div>
         <div class="card-body">
             <div class="action-list">
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Active Power Plan</div>
-                        <div class="action-desc">Show currently active power plan</div>
+                        <div class="action-name">Plan de energía activo</div>
+                        <div class="action-desc">Mostrar plan de energía actualmente activo</div>
                     </div>
-                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/power/api/active-plan', 'output-area')">View</button>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/power/api/active-plan', 'output-area')">Ver</button>
+                </div>
+                <div class="action-item">
+                    <div class="action-info"><div class="action-name">Listar todos los planes</div></div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/power/api/list-plans', 'output-area')">Ver</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">List All Plans</div>
+                        <div class="action-name">Detalles del plan</div>
+                        <div class="action-desc">Configuración detallada de energía (detallado)</div>
                     </div>
-                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/power/api/list-plans', 'output-area')">View</button>
-                </div>
-                <div class="action-item">
-                    <div class="action-info">
-                        <div class="action-name">Plan Details</div>
-                        <div class="action-desc">Detailed power settings (verbose)</div>
-                    </div>
-                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/power/api/plan-details', 'output-area')">View</button>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/power/api/plan-details', 'output-area')">Ver</button>
                 </div>
             </div>
-            <div style="margin-top: 16px; display: flex; gap: 8px;">
-                <button class="btn btn-primary" onclick="executeAction('/power/api/set-balanced', this)">Set Balanced</button>
-                <button class="btn btn-warning" onclick="executeAction('/power/api/set-high-performance', this, {confirm: true, confirmTitle: 'High Performance', confirmMessage: 'Switch to High Performance power plan? This increases energy consumption.', dangerLevel: 'warning'})">Set High Performance</button>
+            <div style="margin-top: 16px; display: flex; gap: 10px;">
+                <button class="btn btn-primary" onclick="executeAction('/power/api/set-balanced', this)">Establecer Equilibrado</button>
+                <button class="btn btn-warning" onclick="executeAction('/power/api/set-high-performance', this, {confirm: true, confirmTitle: 'Alto rendimiento', confirmMessage: '¿Cambiar al plan de Alto rendimiento? Esto aumenta el consumo de energía.', dangerLevel: 'warning'})">Establecer Alto rendimiento</button>
             </div>
         </div>
     </div>
 
     <div class="card">
         <div class="card-header">
-            <h3>Other Settings</h3>
+            <h3>Otras configuraciones</h3>
         </div>
         <div class="card-body">
             <div class="action-list">
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Battery Report</div>
-                        <div class="action-desc">Generate detailed battery report (laptops only)</div>
+                        <div class="action-name">Reporte de batería</div>
+                        <div class="action-desc">Generar reporte detallado de batería (solo laptops)</div>
                     </div>
-                    <button class="btn btn-sm btn-primary" onclick="executeAction('/power/api/battery-report', this)">Generate</button>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/power/api/battery-report', this)">Generar</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Processor Counters</div>
-                        <div class="action-desc">View current processor power metrics</div>
+                        <div class="action-name">Contadores de procesador</div>
+                        <div class="action-desc">Ver métricas actuales de energía del procesador</div>
                     </div>
-                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/power/api/processor-info', 'output-area')">View</button>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/power/api/processor-info', 'output-area')">Ver</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Disable Hibernation</div>
-                        <div class="action-desc">Disable hibernate and free disk space (~RAM size)</div>
+                        <div class="action-name">Deshabilitar hibernación</div>
+                        <div class="action-desc">Deshabilitar hibernar y liberar espacio en disco (~tamaño RAM)</div>
                     </div>
                     <div class="action-badges">
                         <span class="badge badge-admin">Admin</span>
-                        <span class="badge badge-warning">Caution</span>
+                        <span class="badge badge-warning">Precaución</span>
                     </div>
-                    <button class="btn btn-sm btn-warning" onclick="executeAction('/power/api/disable-hibernation', this, {confirm: true, confirmTitle: 'Disable Hibernation', confirmMessage: 'This removes the ability to hibernate and deletes hiberfil.sys, freeing disk space equal to your RAM size. Proceed?', dangerLevel: 'warning'})">Disable</button>
+                    <button class="btn btn-sm btn-warning" onclick="executeAction('/power/api/disable-hibernation', this, {confirm: true, confirmTitle: 'Deshabilitar hibernación', confirmMessage: 'Esto elimina la capacidad de hibernar y borra hiberfil.sys, liberando espacio igual al tamaño de su RAM. ¿Continuar?', dangerLevel: 'warning'})">Deshabilitar</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Enable Hibernation</div>
-                        <div class="action-desc">Re-enable hibernate mode</div>
+                        <div class="action-name">Habilitar hibernación</div>
+                        <div class="action-desc">Reactivar modo hibernar</div>
                     </div>
                     <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
-                    <button class="btn btn-sm btn-primary" onclick="executeAction('/power/api/enable-hibernation', this)">Enable</button>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/power/api/enable-hibernation', this)">Habilitar</button>
                 </div>
             </div>
         </div>
@@ -85,11 +83,11 @@
 
 <div class="card">
     <div class="card-header">
-        <h3>Output</h3>
-        <button class="btn btn-sm btn-outline" onclick="var a=document.getElementById('output-area');if(a)a.innerHTML='Ready.'">Clear</button>
+        <h3>Salida</h3>
+        <button class="btn btn-sm btn-outline" onclick="var a=document.getElementById('output-area');if(a)a.innerHTML='Listo.'">Limpiar</button>
     </div>
     <div class="card-body">
-        <div id="output-area" class="console" style="min-height: 150px;">Ready.</div>
+        <div id="output-area" class="console" style="min-height: 150px;">Listo.</div>
     </div>
 </div>
 {% endblock %}

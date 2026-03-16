@@ -1,44 +1,44 @@
 {% extends "base.html" %}
-{% block title %}CleanCPU - Network{% endblock %}
-{% block page_title %}Network & Connectivity{% endblock %}
-{% block page_desc %}Network diagnostics, repair, and configuration{% endblock %}
+{% block title %}CleanCPU - Red{% endblock %}
+{% block page_title %}Red y conectividad{% endblock %}
+{% block page_desc %}Diagnósticos de red, reparación y configuración{% endblock %}
 
 {% block content %}
-<div class="grid grid-2" style="margin-bottom: 16px;">
+<div class="grid grid-2" style="margin-bottom: 20px;">
     <div class="card">
         <div class="card-header">
-            <h3>Diagnostics</h3>
-            <span class="badge badge-safe">Read-only</span>
+            <h3>Diagnósticos</h3>
+            <span class="badge badge-safe">Solo lectura</span>
         </div>
         <div class="card-body">
             <div class="action-list">
                 <div class="action-item">
-                    <div class="action-info"><div class="action-name">IP Configuration</div></div>
-                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/network/api/ip-config', 'output-area')">View</button>
+                    <div class="action-info"><div class="action-name">Configuración IP</div></div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/network/api/ip-config', 'output-area')">Ver</button>
                 </div>
                 <div class="action-item">
-                    <div class="action-info"><div class="action-name">Network Adapters</div></div>
-                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/network/api/adapters', 'output-area')">View</button>
+                    <div class="action-info"><div class="action-name">Adaptadores de red</div></div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/network/api/adapters', 'output-area')">Ver</button>
                 </div>
                 <div class="action-item">
-                    <div class="action-info"><div class="action-name">TCP Global Settings</div></div>
-                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/network/api/tcp-global', 'output-area')">View</button>
+                    <div class="action-info"><div class="action-name">Configuración TCP global</div></div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/network/api/tcp-global', 'output-area')">Ver</button>
                 </div>
                 <div class="action-item">
-                    <div class="action-info"><div class="action-name">Proxy Settings</div></div>
-                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/network/api/proxy', 'output-area')">View</button>
+                    <div class="action-info"><div class="action-name">Configuración de proxy</div></div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/network/api/proxy', 'output-area')">Ver</button>
                 </div>
                 <div class="action-item">
-                    <div class="action-info"><div class="action-name">SMB Sessions (net use)</div></div>
-                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/network/api/smb-sessions', 'output-area')">View</button>
+                    <div class="action-info"><div class="action-name">Sesiones SMB (net use)</div></div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/network/api/smb-sessions', 'output-area')">Ver</button>
                 </div>
                 <div class="action-item">
-                    <div class="action-info"><div class="action-name">Shared Folders</div></div>
-                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/network/api/shared-folders', 'output-area')">View</button>
+                    <div class="action-info"><div class="action-name">Carpetas compartidas</div></div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/network/api/shared-folders', 'output-area')">Ver</button>
                 </div>
                 <div class="action-item">
-                    <div class="action-info"><div class="action-name">Network Services Status</div></div>
-                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/network/api/services', 'output-area')">View</button>
+                    <div class="action-info"><div class="action-name">Estado de servicios de red</div></div>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/network/api/services', 'output-area')">Ver</button>
                 </div>
             </div>
         </div>
@@ -46,97 +46,97 @@
 
     <div class="card">
         <div class="card-header">
-            <h3>Actions</h3>
+            <h3>Acciones</h3>
         </div>
         <div class="card-body">
             <div class="action-list">
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Flush DNS</div>
-                        <div class="action-desc">Clear DNS resolver cache</div>
+                        <div class="action-name">Vaciar DNS</div>
+                        <div class="action-desc">Limpiar caché del resolutor DNS</div>
                     </div>
-                    <span class="badge badge-safe">Safe</span>
-                    <button class="btn btn-sm btn-success" onclick="executeAction('/network/api/flush-dns', this)">Run</button>
+                    <span class="badge badge-safe">Seguro</span>
+                    <button class="btn btn-sm btn-success" onclick="executeAction('/network/api/flush-dns', this)">Ejecutar</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Renew IP</div>
-                        <div class="action-desc">Request new IP from DHCP</div>
+                        <div class="action-name">Renovar IP</div>
+                        <div class="action-desc">Solicitar nueva IP del DHCP</div>
                     </div>
-                    <span class="badge badge-safe">Safe</span>
-                    <button class="btn btn-sm btn-success" onclick="executeAction('/network/api/renew-ip', this)">Run</button>
+                    <span class="badge badge-safe">Seguro</span>
+                    <button class="btn btn-sm btn-success" onclick="executeAction('/network/api/renew-ip', this)">Ejecutar</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Set Autotuning Normal</div>
-                        <div class="action-desc">Restore TCP autotuning to default</div>
+                        <div class="action-name">Autotuning TCP normal</div>
+                        <div class="action-desc">Restaurar autotuning TCP al valor predeterminado</div>
                     </div>
                     <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
-                    <button class="btn btn-sm btn-primary" onclick="executeAction('/network/api/set-autotuning', this)">Run</button>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/network/api/set-autotuning', this)">Ejecutar</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Purge NetBIOS Cache</div>
-                        <div class="action-desc">Clear NetBIOS name resolution cache</div>
+                        <div class="action-name">Purgar caché NetBIOS</div>
+                        <div class="action-desc">Limpiar caché de resolución de nombres NetBIOS</div>
                     </div>
-                    <button class="btn btn-sm btn-primary" onclick="executeAction('/network/api/purge-netbios', this)">Run</button>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/network/api/purge-netbios', this)">Ejecutar</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Connectivity Test</div>
-                        <div class="action-desc">Test connection to 8.8.8.8:443</div>
+                        <div class="action-name">Prueba de conectividad</div>
+                        <div class="action-desc">Probar conexión a 8.8.8.8:443</div>
                     </div>
-                    <button class="btn btn-sm btn-primary" onclick="executeAction('/network/api/test-connectivity', this, {body: {host: '8.8.8.8', port: 443}})">Test</button>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/network/api/test-connectivity', this, {body: {host: '8.8.8.8', port: 443}})">Probar</button>
                 </div>
             </div>
 
             <div style="margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--border);">
-                <h4 style="font-size: 13px; margin-bottom: 10px; color: var(--text-light);">Advanced (may disconnect network)</h4>
+                <h4 style="font-size: 13px; margin-bottom: 10px; color: var(--text-muted);">Avanzado (puede desconectar la red)</h4>
                 <div class="action-list">
                     <div class="action-item">
                         <div class="action-info">
-                            <div class="action-name">Release IP</div>
-                            <div class="action-desc">Drop current IP address</div>
+                            <div class="action-name">Liberar IP</div>
+                            <div class="action-desc">Soltar dirección IP actual</div>
                         </div>
-                        <span class="badge badge-warning">Caution</span>
-                        <button class="btn btn-sm btn-warning" onclick="executeAction('/network/api/release-ip', this, {confirm: true, confirmTitle: 'Release IP', confirmMessage: 'This will release your current IP address, causing a temporary network disconnection. Proceed?', dangerLevel: 'warning'})">Run</button>
+                        <span class="badge badge-warning">Precaución</span>
+                        <button class="btn btn-sm btn-warning" onclick="executeAction('/network/api/release-ip', this, {confirm: true, confirmTitle: 'Liberar IP', confirmMessage: 'Esto liberará su dirección IP actual, causando una desconexión temporal de red. ¿Continuar?', dangerLevel: 'warning'})">Ejecutar</button>
                     </div>
                     <div class="action-item">
                         <div class="action-info">
-                            <div class="action-name">Reset TCP/IP Stack</div>
-                            <div class="action-desc">Full TCP/IP reset (reboot recommended)</div>
+                            <div class="action-name">Restablecer pila TCP/IP</div>
+                            <div class="action-desc">Restablecimiento completo de TCP/IP (se recomienda reiniciar)</div>
                         </div>
                         <div class="action-badges">
                             <span class="badge badge-admin">Admin</span>
-                            <span class="badge badge-danger">Risk</span>
+                            <span class="badge badge-danger">Riesgo</span>
                         </div>
-                        <button class="btn btn-sm btn-danger" onclick="executeAction('/network/api/reset-ip-stack', this, {confirm: true, confirmTitle: 'Reset TCP/IP Stack', confirmMessage: 'WARNING: This resets the entire TCP/IP stack. You may lose network connectivity and a reboot is recommended. Proceed?', dangerLevel: 'danger'})">Reset</button>
+                        <button class="btn btn-sm btn-danger" onclick="executeAction('/network/api/reset-ip-stack', this, {confirm: true, confirmTitle: 'Restablecer pila TCP/IP', confirmMessage: 'ADVERTENCIA: Esto restablece toda la pila TCP/IP. Puede perder la conectividad de red y se recomienda reiniciar. ¿Continuar?', dangerLevel: 'danger'})">Restablecer</button>
                     </div>
                     <div class="action-item">
                         <div class="action-info">
-                            <div class="action-name">Reset Winsock</div>
-                            <div class="action-desc">Reset Winsock catalog (reboot recommended)</div>
+                            <div class="action-name">Restablecer Winsock</div>
+                            <div class="action-desc">Restablecer catálogo Winsock (se recomienda reiniciar)</div>
                         </div>
                         <div class="action-badges">
                             <span class="badge badge-admin">Admin</span>
-                            <span class="badge badge-danger">Risk</span>
+                            <span class="badge badge-danger">Riesgo</span>
                         </div>
-                        <button class="btn btn-sm btn-danger" onclick="executeAction('/network/api/reset-winsock', this, {confirm: true, confirmTitle: 'Reset Winsock', confirmMessage: 'WARNING: This resets the Winsock catalog. Reboot is required. Proceed?', dangerLevel: 'danger'})">Reset</button>
+                        <button class="btn btn-sm btn-danger" onclick="executeAction('/network/api/reset-winsock', this, {confirm: true, confirmTitle: 'Restablecer Winsock', confirmMessage: 'ADVERTENCIA: Esto restablece el catálogo Winsock. Se requiere reinicio. ¿Continuar?', dangerLevel: 'danger'})">Restablecer</button>
                     </div>
                     <div class="action-item">
                         <div class="action-info">
-                            <div class="action-name">Clear All SMB Sessions</div>
-                            <div class="action-desc">Disconnect all mapped drives</div>
+                            <div class="action-name">Limpiar todas las sesiones SMB</div>
+                            <div class="action-desc">Desconectar todas las unidades mapeadas</div>
                         </div>
-                        <span class="badge badge-warning">Caution</span>
-                        <button class="btn btn-sm btn-warning" onclick="executeAction('/network/api/clear-smb', this, {confirm: true, confirmTitle: 'Clear SMB Sessions', confirmMessage: 'This will disconnect all mapped network drives. Proceed?', dangerLevel: 'warning'})">Clear</button>
+                        <span class="badge badge-warning">Precaución</span>
+                        <button class="btn btn-sm btn-warning" onclick="executeAction('/network/api/clear-smb', this, {confirm: true, confirmTitle: 'Limpiar sesiones SMB', confirmMessage: 'Esto desconectará todas las unidades de red mapeadas. ¿Continuar?', dangerLevel: 'warning'})">Limpiar</button>
                     </div>
                 </div>
             </div>
 
             <div style="margin-top: 16px;">
-                <button class="btn btn-lg btn-primary" onclick="executeAction('/network/api/repair', this, {confirm: true, confirmTitle: 'Network Repair', confirmMessage: 'This will flush DNS, release/renew IP, and set autotuning to normal. Brief disconnection possible. Proceed?'})">
-                    Run Network Repair Sequence
+                <button class="btn btn-lg btn-primary" onclick="executeAction('/network/api/repair', this, {confirm: true, confirmTitle: 'Reparación de red', confirmMessage: 'Esto vaciará DNS, liberará/renovará IP y establecerá autotuning en normal. Posible desconexión breve. ¿Continuar?'})">
+                    Ejecutar secuencia de reparación de red
                 </button>
             </div>
         </div>
@@ -145,12 +145,12 @@
 
 <div class="card">
     <div class="card-header">
-        <h3>Output</h3>
-        <button class="btn btn-sm btn-outline" onclick="var a=document.getElementById('output-area');var c=document.getElementById('output-console');if(a)a.innerHTML='';if(c)c.innerHTML='Ready.'">Clear</button>
+        <h3>Salida</h3>
+        <button class="btn btn-sm btn-outline" onclick="var a=document.getElementById('output-area');var c=document.getElementById('output-console');if(a)a.innerHTML='';if(c)c.innerHTML='Listo.'">Limpiar</button>
     </div>
     <div class="card-body">
         <div id="output-area"></div>
-        <div id="output-console" class="console" style="min-height: 150px;">Ready.</div>
+        <div id="output-console" class="console" style="min-height: 150px;">Listo.</div>
     </div>
 </div>
 {% endblock %}

@@ -31,8 +31,8 @@ async function executeAction(url, buttonEl, options = {}) {
     const {
         method = 'POST',
         confirm = false,
-        confirmTitle = 'Confirm Action',
-        confirmMessage = 'Are you sure you want to proceed?',
+        confirmTitle = 'Confirmar acción',
+        confirmMessage = '¿Está seguro de que desea continuar?',
         body = null,
         onSuccess = null,
         dangerLevel = 'safe',
@@ -47,7 +47,7 @@ async function executeAction(url, buttonEl, options = {}) {
     // Set loading state
     const originalText = buttonEl.innerHTML;
     buttonEl.disabled = true;
-    buttonEl.innerHTML = '<span class="spinner"></span> Running...';
+    buttonEl.innerHTML = '<span class="spinner"></span> Ejecutando...';
 
     try {
         const fetchOptions = {
@@ -64,7 +64,7 @@ async function executeAction(url, buttonEl, options = {}) {
             const errorData = await response.json().catch(() => ({}));
             displayResult({
                 status: 'error',
-                error: errorData.description || errorData.error || 'Request forbidden (CSRF or policy violation)',
+                error: errorData.description || errorData.error || 'Solicitud prohibida (violación de CSRF o política)',
             });
             return null;
         }
@@ -77,7 +77,7 @@ async function executeAction(url, buttonEl, options = {}) {
         if (data.status === 'submitted' && data.job_id) {
             displayResult({
                 status: 'info',
-                output: `Background job started: ${data.action_name || data.action_id} (ID: ${data.job_id})`,
+                output: `Tarea en segundo plano iniciada: ${data.action_name || data.action_id} (ID: ${data.job_id})`,
                 action_id: data.action_id,
                 risk_class: data.risk_class,
             });
@@ -92,15 +92,15 @@ async function executeAction(url, buttonEl, options = {}) {
 
             const warnings = data.warnings || [];
             if (data.needs_reboot) {
-                warnings.push('This action may require a system reboot.');
+                warnings.push('Esta acción puede requerir un reinicio del sistema.');
             }
             if (data.needs_restore_point) {
-                warnings.push('Creating a restore point before this action is recommended.');
+                warnings.push('Se recomienda crear un punto de restauración antes de esta acción.');
             }
 
             const confirmed = await showConfirm(
-                data.action_id || 'Confirm Action',
-                data.confirm_message || 'This action requires confirmation.',
+                data.action_id || 'Confirmar acción',
+                data.confirm_message || 'Esta acción requiere confirmación.',
                 data.risk_class === 'destructive' ? 'danger' : 'warning',
                 warnings
             );
@@ -126,7 +126,7 @@ async function executeAction(url, buttonEl, options = {}) {
         if (data.status === 'rejected') {
             displayResult({
                 status: 'error',
-                error: data.reason || 'Action rejected by policy engine.',
+                error: data.reason || 'Acción rechazada por el motor de políticas.',
                 action_id: data.action_id,
             });
             return null;
@@ -136,7 +136,7 @@ async function executeAction(url, buttonEl, options = {}) {
         if (data.status === 'not_applicable') {
             displayResult({
                 status: 'info',
-                output: data.error || 'Action not applicable on this system.',
+                output: data.error || 'Acción no aplicable en este sistema.',
                 action_id: data.action_id,
             });
             return data;
@@ -160,7 +160,7 @@ async function executeAction(url, buttonEl, options = {}) {
         if (data.needs_reboot) {
             displayResult({
                 status: 'warning',
-                output: 'A system reboot is recommended to complete this operation.',
+                output: 'Se recomienda reiniciar el sistema para completar esta operación.',
             });
         }
 
@@ -169,7 +169,7 @@ async function executeAction(url, buttonEl, options = {}) {
     } catch (error) {
         displayResult({
             status: 'error',
-            error: `Request failed: ${error.message}`,
+            error: `Solicitud fallida: ${error.message}`,
         });
         return null;
     } finally {
@@ -205,7 +205,7 @@ async function pollJobStatus(jobId, actionName) {
 
             if (job.error && response.status === 404) {
                 if (statusBar) statusBar.style.display = 'none';
-                displayResult({ status: 'error', error: 'Job not found.' });
+                displayResult({ status: 'error', error: 'Tarea no encontrada.' });
                 activeJobId = null;
                 return;
             }
@@ -235,7 +235,7 @@ async function pollJobStatus(jobId, actionName) {
                 if (job.needs_reboot) {
                     displayResult({
                         status: 'warning',
-                        output: 'A system reboot is recommended to complete this operation.',
+                        output: 'Se recomienda reiniciar el sistema para completar esta operación.',
                     });
                 }
                 return;
@@ -249,7 +249,7 @@ async function pollJobStatus(jobId, actionName) {
                 activeJobId = null;
                 displayResult({
                     status: 'warning',
-                    output: `Job ${jobId} is still running. Check back later.`,
+                    output: `La tarea ${jobId} aún se está ejecutando. Verifique más tarde.`,
                 });
             }
         } catch (error) {
@@ -265,7 +265,7 @@ async function pollJobStatus(jobId, actionName) {
 
 async function cancelActiveJob() {
     if (!activeJobId) {
-        displayResult({ status: 'info', output: 'No active job to cancel.' });
+        displayResult({ status: 'info', output: 'No hay tarea activa para cancelar.' });
         return;
     }
     try {
@@ -276,10 +276,10 @@ async function cancelActiveJob() {
         const data = await response.json();
         displayResult({
             status: data.status === 'error' ? 'error' : 'info',
-            output: data.message || data.error || 'Cancel requested.',
+            output: data.message || data.error || 'Cancelación solicitada.',
         });
     } catch (error) {
-        displayResult({ status: 'error', error: `Cancel failed: ${error.message}` });
+        displayResult({ status: 'error', error: `Cancelación fallida: ${error.message}` });
     }
 }
 
@@ -347,7 +347,7 @@ async function fetchDiagnostic(url, targetId) {
     const target = document.getElementById(targetId);
     if (!target) return;
 
-    target.innerHTML = '<span class="spinner-dark"></span> Loading...';
+    target.innerHTML = '<span class="spinner-dark"></span> Cargando...';
 
     try {
         const response = await fetch(url);
@@ -356,14 +356,14 @@ async function fetchDiagnostic(url, targetId) {
         if (data.output) {
             target.innerHTML = `<pre class="console">${escapeHtml(data.output)}</pre>`;
         } else if (data.status === 'not_applicable') {
-            target.innerHTML = `<div class="alert alert-info">${escapeHtml(data.error || data.output || 'Not applicable on this system.')}</div>`;
+            target.innerHTML = `<div class="alert alert-info">${escapeHtml(data.error || data.output || 'No aplicable en este sistema.')}</div>`;
         } else if (data.error) {
             target.innerHTML = `<div class="alert alert-danger">${escapeHtml(data.error)}</div>`;
         } else {
             target.innerHTML = `<pre class="console">${escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
         }
     } catch (error) {
-        target.innerHTML = `<div class="alert alert-danger">Failed to load: ${escapeHtml(error.message)}</div>`;
+        target.innerHTML = `<div class="alert alert-danger">Error al cargar: ${escapeHtml(error.message)}</div>`;
     }
 }
 
@@ -473,12 +473,12 @@ async function exportReport(format) {
         });
         const data = await response.json();
         if (data.status === 'success') {
-            displayResult({ status: 'success', output: `Report exported to: ${data.path}` });
+            displayResult({ status: 'success', output: `Reporte exportado a: ${data.path}` });
         } else {
-            displayResult({ status: 'error', error: data.error || 'Export failed.' });
+            displayResult({ status: 'error', error: data.error || 'Error al exportar.' });
         }
     } catch (error) {
-        displayResult({ status: 'error', error: `Export failed: ${error.message}` });
+        displayResult({ status: 'error', error: `Error al exportar: ${error.message}` });
     }
 }
 
@@ -502,12 +502,12 @@ async function setOperationMode(mode) {
         if (badge) badge.textContent = data.mode.toUpperCase();
         displayResult({
             status: 'success',
-            output: `Operation mode changed to: ${data.mode}`,
+            output: `Modo de operación cambiado a: ${data.mode}`,
         });
     } catch (error) {
         displayResult({
             status: 'error',
-            error: `Failed to change mode: ${error.message}`,
+            error: `Error al cambiar modo: ${error.message}`,
         });
     }
 }
