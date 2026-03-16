@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Windows Update - Mantenimiento Windows{% endblock %}
+{% block title %}CleanCPU - Windows Update{% endblock %}
 {% block page_title %}Windows Update{% endblock %}
 {% block page_desc %}Update management, service control, and repair{% endblock %}
 
@@ -95,7 +95,7 @@
 <div class="card">
     <div class="card-header">
         <h3>Output</h3>
-        <button class="btn btn-sm btn-outline" onclick="document.getElementById('output-area').innerHTML = ''; document.getElementById('output-console').innerHTML = ''">Clear</button>
+        <button class="btn btn-sm btn-outline" onclick="var a=document.getElementById('output-area');var c=document.getElementById('output-console');if(a)a.innerHTML='';if(c)c.innerHTML='Ready.'">Clear</button>
     </div>
     <div class="card-body">
         <div id="output-area"></div>

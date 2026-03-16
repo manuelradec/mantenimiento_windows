@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Network - Mantenimiento Windows{% endblock %}
+{% block title %}CleanCPU - Network{% endblock %}
 {% block page_title %}Network & Connectivity{% endblock %}
 {% block page_desc %}Network diagnostics, repair, and configuration{% endblock %}
 
@@ -77,8 +77,9 @@
                 <div class="action-item">
                     <div class="action-info">
                         <div class="action-name">Purge NetBIOS Cache</div>
+                        <div class="action-desc">Clear NetBIOS name resolution cache</div>
                     </div>
-                    <button class="btn btn-sm btn-primary" onclick="executeAction('/network/api/flush-dns', this)">Run</button>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/network/api/purge-netbios', this)">Run</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
@@ -145,7 +146,7 @@
 <div class="card">
     <div class="card-header">
         <h3>Output</h3>
-        <button class="btn btn-sm btn-outline" onclick="document.getElementById('output-area').innerHTML = ''; document.getElementById('output-console').innerHTML = ''">Clear</button>
+        <button class="btn btn-sm btn-outline" onclick="var a=document.getElementById('output-area');var c=document.getElementById('output-console');if(a)a.innerHTML='';if(c)c.innerHTML='Ready.'">Clear</button>
     </div>
     <div class="card-body">
         <div id="output-area"></div>

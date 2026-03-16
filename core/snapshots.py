@@ -228,6 +228,7 @@ def snapshot_security(action_id: str) -> dict:
 
     if sys.platform != 'win32':
         snap['defender'] = 'not_applicable'
+        snap['smart_app_control'] = 'not_applicable'
         return snap
 
     try:
@@ -245,6 +246,18 @@ def snapshot_security(action_id: str) -> dict:
             snap['defender'] = 'collection_failed'
     except Exception:
         snap['defender'] = 'collection_error'
+
+    # Smart App Control state
+    try:
+        from services.smart_app_control import detect_smart_app_control_status
+        sac_result = detect_smart_app_control_status()
+        snap['smart_app_control'] = {
+            'state': sac_result.details.get('state', 'unknown'),
+            'supported': sac_result.details.get('supported', False),
+            'detection_method': sac_result.details.get('detection_method', 'unknown'),
+        }
+    except Exception:
+        snap['smart_app_control'] = 'collection_error'
 
     return snap
 

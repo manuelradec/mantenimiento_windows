@@ -141,6 +141,14 @@ body {
     padding: 24px 28px;
 }
 
+.page-footer {
+    padding: 12px 28px;
+    font-size: 11px;
+    color: var(--text-light);
+    border-top: 1px solid var(--border);
+    text-align: center;
+}
+
 /* Cards */
 .card {
     background: var(--bg-card);

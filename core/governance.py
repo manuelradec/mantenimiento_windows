@@ -167,7 +167,21 @@ ROLLBACK_STRATEGIES = {
         'needs_reboot': False,
         'restore_point_recommended': True,
     },
+    'repair.component_cleanup': {
+        'classification': 'not_reversible',
+        'reversible': 'no',
+        'instructions': 'Superseded components are permanently removed. Use restore point to revert.',
+        'needs_reboot': False,
+        'restore_point_recommended': True,
+    },
     # network
+    'network.purge_netbios': {
+        'classification': 'auto_reversible',
+        'reversible': 'auto',
+        'instructions': 'NetBIOS cache rebuilds automatically.',
+        'needs_reboot': False,
+        'restore_point_recommended': False,
+    },
     'network.flush_dns': {
         'classification': 'auto_reversible',
         'reversible': 'auto',
@@ -371,6 +385,25 @@ ROLLBACK_STRATEGIES = {
         'instructions': 'Scan only.',
         'needs_reboot': False,
         'restore_point_recommended': False,
+    },
+    'security.open_sac_settings': {
+        'classification': 'not_applicable',
+        'reversible': 'n/a',
+        'instructions': 'Opens Windows Security settings page only.',
+        'needs_reboot': False,
+        'restore_point_recommended': False,
+    },
+    'security.disable_sac': {
+        'classification': 'not_reversible',
+        'reversible': 'no',
+        'instructions': (
+            'Desactivar el Control Inteligente de Aplicaciones es IRREVERSIBLE. '
+            'Una vez desactivado, solo se puede reactivar realizando una instalación '
+            'limpia de Windows 11. Se recomienda crear un punto de restauración antes, '
+            'aunque este no restaurará el estado de SAC si se reinicia el equipo.'
+        ),
+        'needs_reboot': True,
+        'restore_point_recommended': True,
     },
     # power
     'power.set_balanced': {

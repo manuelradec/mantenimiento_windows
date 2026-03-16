@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Power - Mantenimiento Windows{% endblock %}
+{% block title %}CleanCPU - Power{% endblock %}
 {% block page_title %}Power & Performance{% endblock %}
 {% block page_desc %}Power plan management, hibernation, and performance settings{% endblock %}
 
@@ -86,11 +86,10 @@
 <div class="card">
     <div class="card-header">
         <h3>Output</h3>
-        <button class="btn btn-sm btn-outline" onclick="document.getElementById('output-area').innerHTML = ''">Clear</button>
+        <button class="btn btn-sm btn-outline" onclick="var a=document.getElementById('output-area');if(a)a.innerHTML='Ready.'">Clear</button>
     </div>
     <div class="card-body">
         <div id="output-area" class="console" style="min-height: 150px;">Ready.</div>
-        <div id="output-console" class="console" style="min-height: 50px; margin-top: 8px; display: none;"></div>
     </div>
 </div>
 {% endblock %}

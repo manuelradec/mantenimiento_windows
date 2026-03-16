@@ -175,6 +175,7 @@ def _register_all_actions():
         ('diag.defender_config', 'Defender Configuration', 'security'),
         ('diag.third_party_av', 'Third-Party Antivirus', 'security'),
         ('diag.security_overview', 'Security Overview', 'security'),
+        ('diag.smart_app_control', 'Smart App Control Status', 'security'),
         ('diag.active_power_plan', 'Active Power Plan', 'power'),
         ('diag.list_power_plans', 'All Power Plans', 'power'),
         ('diag.power_plan_details', 'Power Plan Details', 'power'),
@@ -204,6 +205,7 @@ def _register_all_actions():
         ('cleanup.store_cache', 'Reset Store Cache', 'cleanup', 'Reset Microsoft Store cache', 60),
         ('cleanup.scan_duplicates', 'Scan Duplicates', 'cleanup', 'Scan Downloads for duplicates (read-only)', 120),
         ('network.flush_dns', 'Flush DNS', 'network', 'Flush DNS resolver cache', 30),
+        ('network.purge_netbios', 'Purge NetBIOS Cache', 'network', 'Purge NetBIOS name cache', 30),
         ('network.renew_ip', 'Renew IP', 'network', 'Renew DHCP IP address', 30),
         ('network.set_autotuning', 'Set TCP Autotuning', 'network', 'Set autotuning to normal', 30),
         ('network.test_connectivity', 'Test Connectivity', 'network', 'Test network connection', 30),
@@ -213,6 +215,7 @@ def _register_all_actions():
         ('update.scan', 'Scan for Updates', 'update', 'Check for Windows Updates', 120),
         ('update.download', 'Download Updates', 'update', 'Download pending updates', 300),
         ('update.open_settings', 'Open Windows Update', 'update', 'Open WU settings page', 10),
+        ('security.open_sac_settings', 'Open SAC Settings', 'security', 'Open Windows Security Smart App Control page', 10),
     ]:
         registry.register(ActionDef(
             action_id=aid, name=name, module=module,
@@ -242,6 +245,8 @@ def _register_all_actions():
          'All mapped network drives will be disconnected. Continue?'),
         ('power.set_balanced', 'Set Balanced Mode', 'power',
          'Switch to Balanced power plan', 10, ''),
+        ('repair.component_cleanup', 'DISM Component Cleanup (Repair)', 'repair',
+         'Remove obsolete Windows components via repair module', 600, ''),
         ('advanced.create_restore_point', 'Create Restore Point', 'advanced',
          'Create a system restore point', 60, ''),
     ]:
@@ -333,6 +338,11 @@ def _register_all_actions():
          'Delete hiberfil.sys and disable hibernate', 10,
          'This deletes hiberfil.sys and frees space equal to your RAM. '
          'You will no longer be able to hibernate. Continue?', False),
+        ('security.disable_sac', 'Disable Smart App Control', 'security',
+         'Disable Windows Smart App Control (irreversible without clean install)', 30,
+         'ADVERTENCIA: Desactivar el Control Inteligente de Aplicaciones es una '
+         'acción NO REVERSIBLE. Una vez desactivado, solo se puede reactivar '
+         'reinstalando Windows 11 desde cero. ¿Desea continuar?', True),
     ]:
         registry.register(ActionDef(
             action_id=aid, name=name, module=module,
