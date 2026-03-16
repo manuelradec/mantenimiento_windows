@@ -12,26 +12,44 @@ def get_base_path():
     return os.path.dirname(os.path.abspath(__file__))
 
 
+def _ensure_writable_dir(primary: str, fallback: str) -> str:
+    """Try to create primary dir; on permission error, fall back to a local dir."""
+    for path in (primary, fallback):
+        try:
+            os.makedirs(path, exist_ok=True)
+            # Verify we can actually write
+            test_file = os.path.join(path, '.write_test')
+            with open(test_file, 'w') as f:
+                f.write('ok')
+            os.remove(test_file)
+            return path
+        except (PermissionError, OSError):
+            continue
+    # Last resort: return fallback anyway, let caller handle errors
+    os.makedirs(fallback, exist_ok=True)
+    return fallback
+
+
 def get_log_dir():
     """Get the log directory. Uses ProgramData on Windows, else a local 'logs' folder."""
+    local_fallback = os.path.join(get_base_path(), 'logs')
     if sys.platform == 'win32':
         base = os.environ.get('PROGRAMDATA', 'C:\\ProgramData')
-        log_dir = os.path.join(base, 'CleanCPU', 'logs')
-    else:
-        log_dir = os.path.join(get_base_path(), 'logs')
-    os.makedirs(log_dir, exist_ok=True)
-    return log_dir
+        primary = os.path.join(base, 'CleanCPU', 'logs')
+        return _ensure_writable_dir(primary, local_fallback)
+    os.makedirs(local_fallback, exist_ok=True)
+    return local_fallback
 
 
 def get_report_dir():
     """Get the report output directory."""
+    local_fallback = os.path.join(get_base_path(), 'reports')
     if sys.platform == 'win32':
         base = os.environ.get('PROGRAMDATA', 'C:\\ProgramData')
-        report_dir = os.path.join(base, 'CleanCPU', 'reports')
-    else:
-        report_dir = os.path.join(get_base_path(), 'reports')
-    os.makedirs(report_dir, exist_ok=True)
-    return report_dir
+        primary = os.path.join(base, 'CleanCPU', 'reports')
+        return _ensure_writable_dir(primary, local_fallback)
+    os.makedirs(local_fallback, exist_ok=True)
+    return local_fallback
 
 
 class Config:

@@ -5,13 +5,20 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app import create_app
-from core.persistence import init_db
-
 
 @pytest.fixture
-def app():
-    """Create test application."""
+def app(tmp_path):
+    """Create test application with temp dirs to avoid PermissionError."""
+    import config as cfg
+    # Override log/report dirs to temp before importing create_app
+    cfg.Config.LOG_DIR = str(tmp_path / 'logs')
+    cfg.Config.REPORT_DIR = str(tmp_path / 'reports')
+    os.makedirs(cfg.Config.LOG_DIR, exist_ok=True)
+    os.makedirs(cfg.Config.REPORT_DIR, exist_ok=True)
+
+    from app import create_app
+    from core.persistence import init_db
+
     app = create_app()
     app.config['TESTING'] = True
     app.config['SESSION_ID'] = 'test-session'

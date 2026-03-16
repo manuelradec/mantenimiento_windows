@@ -16,4 +16,4 @@ ignore =
     E722
 per-file-ignores =
     __init__.py:F401
-    tests/*:E501,E302
+    tests/*:E501,E302,E126,E128,F401,F811,F841
