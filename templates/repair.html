@@ -1,69 +1,69 @@
 {% extends "base.html" %}
-{% block title %}CleanCPU - Repair{% endblock %}
-{% block page_title %}System Repair{% endblock %}
-{% block page_desc %}OS health checks, file repair, and disk diagnostics{% endblock %}
+{% block title %}CleanCPU - Reparación{% endblock %}
+{% block page_title %}Reparación del sistema{% endblock %}
+{% block page_desc %}Verificaciones de salud del SO, reparación de archivos y diagnósticos de disco{% endblock %}
 
 {% block content %}
 <div class="alert alert-info">
-    Most repair operations require administrator privileges and can take several minutes to complete.
-    It is recommended to create a restore point before running repairs.
+    La mayoría de las operaciones de reparación requieren privilegios de administrador y pueden tardar varios minutos.
+    Se recomienda crear un punto de restauración antes de ejecutar reparaciones.
 </div>
 
-<div class="grid grid-2" style="margin-bottom: 16px;">
+<div class="grid grid-2" style="margin-bottom: 20px;">
     <div class="card">
         <div class="card-header">
-            <h3>System File Repair</h3>
-            <span class="badge badge-safe">Safe</span>
+            <h3>Reparación de archivos del sistema</h3>
+            <span class="badge badge-safe">Seguro</span>
         </div>
         <div class="card-body">
-            <p style="font-size: 12px; color: var(--text-light); margin-bottom: 12px;">
-                Run in order: SFC first, then DISM if SFC reports issues.
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
+                Ejecutar en orden: SFC primero, luego DISM si SFC reporta problemas.
             </p>
             <div class="action-list">
                 <div class="action-item">
                     <div class="action-info">
                         <div class="action-name">SFC /scannow</div>
-                        <div class="action-desc">System File Checker - repairs corrupted system files (5-15 min)</div>
+                        <div class="action-desc">Verificador de archivos del sistema — repara archivos del sistema corruptos (5-15 min)</div>
                     </div>
                     <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
-                    <button class="btn btn-sm btn-primary" onclick="executeAction('/repair/api/sfc', this)">Run</button>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/repair/api/sfc', this)">Ejecutar</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
                         <div class="action-name">DISM CheckHealth</div>
-                        <div class="action-desc">Quick component store integrity check</div>
+                        <div class="action-desc">Verificación rápida de integridad del almacén de componentes</div>
                     </div>
                     <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
-                    <button class="btn btn-sm btn-primary" onclick="executeAction('/repair/api/dism-check', this)">Run</button>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/repair/api/dism-check', this)">Ejecutar</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
                         <div class="action-name">DISM ScanHealth</div>
-                        <div class="action-desc">Deep component store scan (may take several minutes)</div>
+                        <div class="action-desc">Escaneo profundo del almacén de componentes (puede tardar varios minutos)</div>
                     </div>
                     <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
-                    <button class="btn btn-sm btn-primary" onclick="executeAction('/repair/api/dism-scan', this)">Run</button>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/repair/api/dism-scan', this)">Ejecutar</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
                         <div class="action-name">DISM RestoreHealth</div>
-                        <div class="action-desc">Repair component store (may download from Windows Update)</div>
+                        <div class="action-desc">Reparar almacén de componentes (puede descargar de Windows Update)</div>
                     </div>
                     <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
-                    <button class="btn btn-sm btn-primary" onclick="executeAction('/repair/api/dism-restore', this)">Run</button>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/repair/api/dism-restore', this)">Ejecutar</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
                         <div class="action-name">DISM ComponentCleanup</div>
-                        <div class="action-desc">Remove superseded components</div>
+                        <div class="action-desc">Eliminar componentes obsoletos</div>
                     </div>
                     <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
-                    <button class="btn btn-sm btn-primary" onclick="executeAction('/repair/api/component-cleanup', this)">Run</button>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/repair/api/component-cleanup', this)">Ejecutar</button>
                 </div>
             </div>
             <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border);">
-                <button class="btn btn-lg btn-primary" onclick="executeAction('/repair/api/full-sequence', this, {confirm: true, confirmTitle: 'Full Repair Sequence', confirmMessage: 'This will run SFC, DISM CheckHealth, ScanHealth, RestoreHealth, and ComponentCleanup in sequence. This may take 30+ minutes. Proceed?'})">
-                    Run Full Repair Sequence
+                <button class="btn btn-lg btn-primary" onclick="executeAction('/repair/api/full-sequence', this, {confirm: true, confirmTitle: 'Secuencia completa de reparación', confirmMessage: 'Esto ejecutará SFC, DISM CheckHealth, ScanHealth, RestoreHealth y ComponentCleanup en secuencia. Puede tardar más de 30 minutos. ¿Continuar?'})">
+                    Ejecutar secuencia completa de reparación
                 </button>
             </div>
         </div>
@@ -71,50 +71,50 @@
 
     <div class="card">
         <div class="card-header">
-            <h3>Disk Diagnostics</h3>
+            <h3>Diagnósticos de disco</h3>
         </div>
         <div class="card-body">
             <div class="action-list">
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">CHKDSK Online Scan</div>
-                        <div class="action-desc">Non-destructive disk check (no reboot needed)</div>
+                        <div class="action-name">CHKDSK escaneo en línea</div>
+                        <div class="action-desc">Verificación de disco no destructiva (sin reinicio necesario)</div>
                     </div>
                     <div class="action-badges">
                         <span class="badge badge-admin">Admin</span>
-                        <span class="badge badge-safe">Safe</span>
+                        <span class="badge badge-safe">Seguro</span>
                     </div>
-                    <button class="btn btn-sm btn-primary" onclick="executeAction('/repair/api/chkdsk-scan', this)">Run</button>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/repair/api/chkdsk-scan', this)">Ejecutar</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Schedule Full CHKDSK</div>
-                        <div class="action-desc">Schedule full check on next reboot (can take hours)</div>
+                        <div class="action-name">Programar CHKDSK completo</div>
+                        <div class="action-desc">Programar verificación completa en el próximo reinicio (puede tardar horas)</div>
                     </div>
                     <div class="action-badges">
                         <span class="badge badge-admin">Admin</span>
-                        <span class="badge badge-danger">Reboot</span>
+                        <span class="badge badge-danger">Reinicio</span>
                     </div>
-                    <button class="btn btn-sm btn-warning" onclick="executeAction('/repair/api/chkdsk-schedule', this, {confirm: true, confirmTitle: 'Schedule Full CHKDSK', confirmMessage: 'This schedules a full CHKDSK on next reboot. The check can take 1-3 hours during which the PC cannot be used. It does NOT reboot now. Schedule?', dangerLevel: 'warning'})">Schedule</button>
+                    <button class="btn btn-sm btn-warning" onclick="executeAction('/repair/api/chkdsk-schedule', this, {confirm: true, confirmTitle: 'Programar CHKDSK completo', confirmMessage: 'Esto programa un CHKDSK completo en el próximo reinicio. La verificación puede tardar 1-3 horas durante las cuales el PC no puede usarse. NO reinicia ahora. ¿Programar?', dangerLevel: 'warning'})">Programar</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">WinSAT Disk Benchmark</div>
-                        <div class="action-desc">Benchmark disk performance</div>
+                        <div class="action-name">WinSAT benchmark de disco</div>
+                        <div class="action-desc">Evaluar rendimiento de disco</div>
                     </div>
                     <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
-                    <button class="btn btn-sm btn-primary" onclick="executeAction('/repair/api/winsat', this)">Run</button>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/repair/api/winsat', this)">Ejecutar</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Memory Diagnostic</div>
-                        <div class="action-desc">Schedule Windows Memory Diagnostic (requires reboot)</div>
+                        <div class="action-name">Diagnóstico de memoria</div>
+                        <div class="action-desc">Programar diagnóstico de memoria de Windows (requiere reinicio)</div>
                     </div>
                     <div class="action-badges">
                         <span class="badge badge-admin">Admin</span>
-                        <span class="badge badge-danger">Reboot</span>
+                        <span class="badge badge-danger">Reinicio</span>
                     </div>
-                    <button class="btn btn-sm btn-warning" onclick="executeAction('/repair/api/memory-diagnostic', this, {confirm: true, confirmTitle: 'Memory Diagnostic', confirmMessage: 'This opens the Windows Memory Diagnostic tool which will test your RAM on next reboot. Continue?', dangerLevel: 'warning'})">Schedule</button>
+                    <button class="btn btn-sm btn-warning" onclick="executeAction('/repair/api/memory-diagnostic', this, {confirm: true, confirmTitle: 'Diagnóstico de memoria', confirmMessage: 'Esto abre el Diagnóstico de memoria de Windows que probará su RAM en el próximo reinicio. ¿Continuar?', dangerLevel: 'warning'})">Programar</button>
                 </div>
             </div>
         </div>
@@ -123,11 +123,11 @@
 
 <div class="card">
     <div class="card-header">
-        <h3>Output</h3>
-        <button class="btn btn-sm btn-outline" onclick="document.getElementById('output-console').innerHTML = ''">Clear</button>
+        <h3>Salida</h3>
+        <button class="btn btn-sm btn-outline" onclick="document.getElementById('output-console').innerHTML = ''">Limpiar</button>
     </div>
     <div class="card-body">
-        <div id="output-console" class="console" style="min-height: 200px;">Ready. Results will appear here.</div>
+        <div id="output-console" class="console" style="min-height: 200px;">Listo. Los resultados aparecerán aquí.</div>
     </div>
 </div>
 {% endblock %}

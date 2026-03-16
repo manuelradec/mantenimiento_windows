@@ -1,36 +1,36 @@
 {% extends "base.html" %}
-{% block title %}CleanCPU - Advanced{% endblock %}
-{% block page_title %}Advanced Tools{% endblock %}
-{% block page_desc %}System restore, display diagnostics, and advanced operations{% endblock %}
+{% block title %}CleanCPU - Avanzado{% endblock %}
+{% block page_title %}Herramientas avanzadas{% endblock %}
+{% block page_desc %}Restauración del sistema, diagnósticos de pantalla y operaciones avanzadas{% endblock %}
 
 {% block content %}
 <div class="alert alert-warning">
-    Advanced tools section. Some operations here can affect system stability.
-    Always create a restore point before performing advanced operations.
+    Sección de herramientas avanzadas. Algunas operaciones aquí pueden afectar la estabilidad del sistema.
+    Siempre cree un punto de restauración antes de realizar operaciones avanzadas.
 </div>
 
-<div class="grid grid-2" style="margin-bottom: 16px;">
+<div class="grid grid-2" style="margin-bottom: 20px;">
     <div class="card">
         <div class="card-header">
-            <h3>System Restore</h3>
+            <h3>Restauración del sistema</h3>
         </div>
         <div class="card-body">
             <div class="action-list">
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Create Restore Point</div>
-                        <div class="action-desc">Create a system restore point now</div>
+                        <div class="action-name">Crear punto de restauración</div>
+                        <div class="action-desc">Crear un punto de restauración del sistema ahora</div>
                     </div>
                     <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
-                    <button class="btn btn-sm btn-success" onclick="executeAction('/advanced/api/create-restore-point', this)">Create</button>
+                    <button class="btn btn-sm btn-success" onclick="executeAction('/advanced/api/create-restore-point', this)">Crear</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">List Restore Points</div>
-                        <div class="action-desc">Show existing system restore points</div>
+                        <div class="action-name">Listar puntos de restauración</div>
+                        <div class="action-desc">Mostrar puntos de restauración existentes</div>
                     </div>
                     <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
-                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/advanced/api/list-restore-points', 'output-area')">List</button>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/advanced/api/list-restore-points', 'output-area')">Listar</button>
                 </div>
             </div>
         </div>
@@ -38,67 +38,67 @@
 
     <div class="card">
         <div class="card-header">
-            <h3>Display / Graphics Diagnostics</h3>
+            <h3>Diagnósticos de pantalla / gráficos</h3>
         </div>
         <div class="card-body">
             <div class="action-list">
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Display Events (DWM/GPU)</div>
-                        <div class="action-desc">Recent display-related events from Event Log</div>
+                        <div class="action-name">Eventos de pantalla (DWM/GPU)</div>
+                        <div class="action-desc">Eventos recientes de pantalla del registro de eventos</div>
                     </div>
                     <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
-                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/advanced/api/display-events', 'output-area')">View</button>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/advanced/api/display-events', 'output-area')">Ver</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">GPU Driver Info</div>
-                        <div class="action-desc">Video controller details</div>
+                        <div class="action-name">Info de controlador GPU</div>
+                        <div class="action-desc">Detalles del controlador de video</div>
                     </div>
-                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/advanced/api/gpu-drivers', 'output-area')">View</button>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/advanced/api/gpu-drivers', 'output-area')">Ver</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Panel Self Refresh Check</div>
-                        <div class="action-desc">Check for Intel PSR related display issues</div>
+                        <div class="action-name">Verificación Panel Self Refresh</div>
+                        <div class="action-desc">Verificar problemas relacionados con Intel PSR</div>
                     </div>
                     <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
-                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/advanced/api/psr-check', 'output-area')">Check</button>
+                    <button class="btn btn-sm btn-primary" onclick="fetchDiagnostic('/advanced/api/psr-check', 'output-area')">Verificar</button>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<div class="card" style="margin-bottom: 16px;">
+<div class="card" style="margin-bottom: 20px;">
     <div class="card-header">
-        <h3>Quick Access</h3>
+        <h3>Acceso rápido</h3>
     </div>
     <div class="card-body">
-        <p style="font-size: 12px; color: var(--text-light); margin-bottom: 12px;">
-            These open native Windows tools. They must be run directly on the Windows desktop.
+        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
+            Estas herramientas abren aplicaciones nativas de Windows. Deben ejecutarse directamente en el escritorio de Windows.
         </p>
         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <span class="badge badge-info" style="padding: 6px 12px; font-size: 12px;">taskmgr - Task Manager</span>
-            <span class="badge badge-info" style="padding: 6px 12px; font-size: 12px;">resmon - Resource Monitor</span>
-            <span class="badge badge-info" style="padding: 6px 12px; font-size: 12px;">msconfig - System Configuration</span>
-            <span class="badge badge-info" style="padding: 6px 12px; font-size: 12px;">devmgmt.msc - Device Manager</span>
-            <span class="badge badge-info" style="padding: 6px 12px; font-size: 12px;">diskmgmt.msc - Disk Management</span>
-            <span class="badge badge-info" style="padding: 6px 12px; font-size: 12px;">services.msc - Services</span>
-            <span class="badge badge-info" style="padding: 6px 12px; font-size: 12px;">eventvwr.msc - Event Viewer</span>
-            <span class="badge badge-info" style="padding: 6px 12px; font-size: 12px;">SystemPropertiesPerformance - Visual Effects</span>
+            <span class="badge badge-info" style="padding: 6px 12px; font-size: 12px;">taskmgr — Administrador de tareas</span>
+            <span class="badge badge-info" style="padding: 6px 12px; font-size: 12px;">resmon — Monitor de recursos</span>
+            <span class="badge badge-info" style="padding: 6px 12px; font-size: 12px;">msconfig — Configuración del sistema</span>
+            <span class="badge badge-info" style="padding: 6px 12px; font-size: 12px;">devmgmt.msc — Administrador de dispositivos</span>
+            <span class="badge badge-info" style="padding: 6px 12px; font-size: 12px;">diskmgmt.msc — Administración de discos</span>
+            <span class="badge badge-info" style="padding: 6px 12px; font-size: 12px;">services.msc — Servicios</span>
+            <span class="badge badge-info" style="padding: 6px 12px; font-size: 12px;">eventvwr.msc — Visor de eventos</span>
+            <span class="badge badge-info" style="padding: 6px 12px; font-size: 12px;">SystemPropertiesPerformance — Efectos visuales</span>
         </div>
     </div>
 </div>
 
 <div class="card">
     <div class="card-header">
-        <h3>Output</h3>
-        <button class="btn btn-sm btn-outline" onclick="var a=document.getElementById('output-area');var c=document.getElementById('output-console');if(a)a.innerHTML='';if(c)c.innerHTML='Ready.'">Clear</button>
+        <h3>Salida</h3>
+        <button class="btn btn-sm btn-outline" onclick="var a=document.getElementById('output-area');var c=document.getElementById('output-console');if(a)a.innerHTML='';if(c)c.innerHTML='Listo.'">Limpiar</button>
     </div>
     <div class="card-body">
         <div id="output-area"></div>
-        <div id="output-console" class="console" style="min-height: 150px;">Ready.</div>
+        <div id="output-console" class="console" style="min-height: 150px;">Listo.</div>
     </div>
 </div>
 {% endblock %}

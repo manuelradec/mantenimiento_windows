@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="CleanCPU - Professional Windows Maintenance Tool">
+    <meta name="description" content="CleanCPU - Herramienta profesional de mantenimiento Windows">
     <meta name="robots" content="noindex, nofollow">
     <title>{% block title %}CleanCPU{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
@@ -16,35 +16,35 @@
     <nav class="sidebar">
         <div class="sidebar-header">
             <h1>CLEANCPU</h1>
-            <div class="version">v{{ config.get('APP_VERSION', '2.1.0') }}</div>
+            <div class="version">v{{ config.get('APP_VERSION', '2.1.0') }} — RADEC</div>
         </div>
         <div class="sidebar-nav">
-            <a href="/"><span class="icon">&#9881;</span> <span>Dashboard</span></a>
+            <a href="/"><span class="icon">&#9881;</span> <span>Panel principal</span></a>
 
-            <div class="section-title">Diagnostics</div>
-            <a href="/diagnostics"><span class="icon">&#128269;</span> <span>Diagnostics</span></a>
-            <a href="/drivers"><span class="icon">&#128190;</span> <span>Drivers</span></a>
+            <div class="section-title">Diagnóstico</div>
+            <a href="/diagnostics"><span class="icon">&#128269;</span> <span>Diagnósticos</span></a>
+            <a href="/drivers"><span class="icon">&#128190;</span> <span>Controladores</span></a>
 
-            <div class="section-title">Maintenance</div>
-            <a href="/cleanup"><span class="icon">&#128465;</span> <span>Cleanup</span></a>
-            <a href="/repair"><span class="icon">&#128295;</span> <span>Repair</span></a>
-            <a href="/network"><span class="icon">&#127760;</span> <span>Network</span></a>
+            <div class="section-title">Mantenimiento</div>
+            <a href="/cleanup"><span class="icon">&#128465;</span> <span>Limpieza</span></a>
+            <a href="/repair"><span class="icon">&#128295;</span> <span>Reparación</span></a>
+            <a href="/network"><span class="icon">&#127760;</span> <span>Red</span></a>
             <a href="/update"><span class="icon">&#128259;</span> <span>Windows Update</span></a>
 
-            <div class="section-title">System</div>
-            <a href="/power"><span class="icon">&#9889;</span> <span>Power</span></a>
-            <a href="/security"><span class="icon">&#128737;</span> <span>Security</span></a>
+            <div class="section-title">Sistema</div>
+            <a href="/power"><span class="icon">&#9889;</span> <span>Energía</span></a>
+            <a href="/security"><span class="icon">&#128737;</span> <span>Seguridad</span></a>
 
-            <div class="section-title">Tools</div>
-            <a href="/reports"><span class="icon">&#128196;</span> <span>Reports</span></a>
-            <a href="/advanced"><span class="icon">&#128736;</span> <span>Advanced</span></a>
+            <div class="section-title">Herramientas</div>
+            <a href="/reports"><span class="icon">&#128196;</span> <span>Reportes</span></a>
+            <a href="/advanced"><span class="icon">&#128736;</span> <span>Avanzado</span></a>
         </div>
         <div class="sidebar-footer">
-            <div class="mode-indicator" id="mode-badge" title="Operation Mode">
+            <div class="mode-indicator" id="mode-badge" title="Modo de operación">
                 {{ policy_mode | upper }}
             </div>
             <span class="admin-badge {{ 'yes' if elevation.is_admin else 'no' }}">
-                {{ 'ADMIN' if elevation.is_admin else 'NO ADMIN' }}
+                {{ 'ADMIN' if elevation.is_admin else 'SIN ADMIN' }}
             </span>
         </div>
     </nav>
@@ -52,14 +52,14 @@
     <!-- Main content -->
     <div class="main-content">
         <div class="page-header">
-            <h2>{% block page_title %}Dashboard{% endblock %}</h2>
+            <h2>{% block page_title %}Panel principal{% endblock %}</h2>
             <p>{% block page_desc %}{% endblock %}</p>
         </div>
         <div class="page-body">
             {% block content %}{% endblock %}
         </div>
         <div class="page-footer">
-            CleanCPU v{{ config.get('APP_VERSION', '2.1.0') }} &mdash; Local only. No data is transmitted externally.
+            CleanCPU v{{ config.get('APP_VERSION', '2.1.0') }} &mdash; Solo uso local. No se transmiten datos externamente.
         </div>
     </div>
 
@@ -67,21 +67,21 @@
     <div id="job-status-bar" class="job-status-bar" style="display:none;">
         <div class="job-status-content">
             <span class="spinner"></span>
-            <span id="job-status-text">Running...</span>
+            <span id="job-status-text">Ejecutando...</span>
             <span id="job-status-name"></span>
-            <button id="cancel-job-btn" class="btn btn-sm btn-outline" style="margin-left:12px;font-size:11px;">Cancel</button>
+            <button id="cancel-job-btn" class="btn btn-sm btn-outline" style="margin-left:12px;font-size:11px;">Cancelar</button>
         </div>
     </div>
 
     <!-- Confirmation modal -->
     <div class="modal-overlay" id="confirm-modal">
         <div class="modal-box">
-            <h3 class="modal-title">Confirm</h3>
-            <p class="modal-message">Are you sure?</p>
+            <h3 class="modal-title">Confirmar</h3>
+            <p class="modal-message">¿Está seguro?</p>
             <div class="modal-warnings" id="modal-warnings" style="display:none;"></div>
             <div class="modal-actions">
-                <button class="btn btn-outline modal-cancel">Cancel</button>
-                <button class="btn btn-primary modal-confirm">Confirm</button>
+                <button class="btn btn-outline modal-cancel">Cancelar</button>
+                <button class="btn btn-primary modal-confirm">Confirmar</button>
             </div>
         </div>
     </div>

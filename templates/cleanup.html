@@ -1,60 +1,60 @@
 {% extends "base.html" %}
-{% block title %}CleanCPU - Cleanup{% endblock %}
-{% block page_title %}Cleanup & Optimization{% endblock %}
-{% block page_desc %}Clean temporary files, caches, and optimize storage{% endblock %}
+{% block title %}CleanCPU - Limpieza{% endblock %}
+{% block page_title %}Limpieza y optimización{% endblock %}
+{% block page_desc %}Limpiar archivos temporales, cachés y optimizar almacenamiento{% endblock %}
 
 {% block content %}
-<div class="grid grid-2" style="margin-bottom: 16px;">
+<div class="grid grid-2" style="margin-bottom: 20px;">
     <div class="card">
         <div class="card-header">
-            <h3>Safe Cleanup</h3>
-            <span class="badge badge-safe">Safe</span>
+            <h3>Limpieza segura</h3>
+            <span class="badge badge-safe">Seguro</span>
         </div>
         <div class="card-body">
             <div class="action-list">
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Clean User Temp</div>
-                        <div class="action-desc">Delete user temporary files (%TEMP%)</div>
+                        <div class="action-name">Limpiar Temp de usuario</div>
+                        <div class="action-desc">Eliminar archivos temporales del usuario (%TEMP%)</div>
                     </div>
-                    <button class="btn btn-sm btn-success" onclick="executeAction('/cleanup/api/user-temp', this)">Run</button>
+                    <button class="btn btn-sm btn-success" onclick="executeAction('/cleanup/api/user-temp', this)">Ejecutar</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Clean Windows Temp</div>
-                        <div class="action-desc">Delete system temporary files</div>
+                        <div class="action-name">Limpiar Temp de Windows</div>
+                        <div class="action-desc">Eliminar archivos temporales del sistema</div>
                     </div>
                     <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
-                    <button class="btn btn-sm btn-success" onclick="executeAction('/cleanup/api/windows-temp', this)">Run</button>
+                    <button class="btn btn-sm btn-success" onclick="executeAction('/cleanup/api/windows-temp', this)">Ejecutar</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Clean WU Download Cache</div>
+                        <div class="action-name">Limpiar caché de WU</div>
                         <div class="action-desc">SoftwareDistribution\Download</div>
                     </div>
                     <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
-                    <button class="btn btn-sm btn-success" onclick="executeAction('/cleanup/api/software-distribution', this)">Run</button>
+                    <button class="btn btn-sm btn-success" onclick="executeAction('/cleanup/api/software-distribution', this)">Ejecutar</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Clean Internet Cache</div>
-                        <div class="action-desc">INetCache files</div>
+                        <div class="action-name">Limpiar caché de Internet</div>
+                        <div class="action-desc">Archivos INetCache</div>
                     </div>
-                    <button class="btn btn-sm btn-success" onclick="executeAction('/cleanup/api/inet-cache', this)">Run</button>
+                    <button class="btn btn-sm btn-success" onclick="executeAction('/cleanup/api/inet-cache', this)">Ejecutar</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Empty Recycle Bin</div>
-                        <div class="action-desc">Permanently delete recycle bin contents</div>
+                        <div class="action-name">Vaciar papelera de reciclaje</div>
+                        <div class="action-desc">Eliminar permanentemente el contenido de la papelera</div>
                     </div>
-                    <button class="btn btn-sm btn-success" onclick="executeAction('/cleanup/api/recycle-bin', this)">Run</button>
+                    <button class="btn btn-sm btn-success" onclick="executeAction('/cleanup/api/recycle-bin', this)">Ejecutar</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Flush DNS Cache</div>
-                        <div class="action-desc">Clear DNS resolver cache</div>
+                        <div class="action-name">Vaciar caché DNS</div>
+                        <div class="action-desc">Limpiar caché del resolutor DNS</div>
                     </div>
-                    <button class="btn btn-sm btn-success" onclick="executeAction('/cleanup/api/dns-cache', this)">Run</button>
+                    <button class="btn btn-sm btn-success" onclick="executeAction('/cleanup/api/dns-cache', this)">Ejecutar</button>
                 </div>
             </div>
         </div>
@@ -62,99 +62,99 @@
 
     <div class="card">
         <div class="card-header">
-            <h3>Storage Optimization</h3>
+            <h3>Optimización de almacenamiento</h3>
         </div>
         <div class="card-body">
             <div class="action-list">
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Disk Cleanup (cleanmgr)</div>
-                        <div class="action-desc">Run Windows Disk Cleanup utility</div>
+                        <div class="action-name">Limpieza de disco (cleanmgr)</div>
+                        <div class="action-desc">Ejecutar utilidad nativa de limpieza de disco</div>
                     </div>
                     <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
-                    <button class="btn btn-sm btn-primary" onclick="executeAction('/cleanup/api/cleanmgr', this)">Run</button>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/cleanup/api/cleanmgr', this)">Ejecutar</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">DISM Component Cleanup</div>
-                        <div class="action-desc">Remove superseded Windows components</div>
+                        <div class="action-name">Limpieza de componentes DISM</div>
+                        <div class="action-desc">Eliminar componentes obsoletos de Windows</div>
                     </div>
                     <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
-                    <button class="btn btn-sm btn-primary" onclick="executeAction('/cleanup/api/component-cleanup', this)">Run</button>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/cleanup/api/component-cleanup', this)">Ejecutar</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
                         <div class="action-name">ReTrim SSD</div>
-                        <div class="action-desc">Optimize SSD (only if SSD detected)</div>
+                        <div class="action-desc">Optimizar SSD (solo si se detecta SSD)</div>
                     </div>
                     <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
-                    <button class="btn btn-sm btn-primary" onclick="executeAction('/cleanup/api/retrim', this)">Run</button>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/cleanup/api/retrim', this)">Ejecutar</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Defragment HDD</div>
-                        <div class="action-desc">Only runs on HDD, never on SSD</div>
+                        <div class="action-name">Desfragmentar HDD</div>
+                        <div class="action-desc">Solo se ejecuta en HDD, nunca en SSD</div>
                     </div>
                     <div class="action-badges"><span class="badge badge-admin">Admin</span></div>
-                    <button class="btn btn-sm btn-primary" onclick="executeAction('/cleanup/api/defrag', this, {confirm: true, confirmTitle: 'Defragment HDD', confirmMessage: 'This will only run if an HDD is detected. Continue?'})">Run</button>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/cleanup/api/defrag', this, {confirm: true, confirmTitle: 'Desfragmentar HDD', confirmMessage: 'Esto solo se ejecutará si se detecta un HDD. ¿Continuar?'})">Ejecutar</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Scan Duplicate Files</div>
-                        <div class="action-desc">Find duplicates in Downloads folder</div>
+                        <div class="action-name">Buscar archivos duplicados</div>
+                        <div class="action-desc">Buscar duplicados en carpeta Descargas</div>
                     </div>
-                    <button class="btn btn-sm btn-primary" onclick="executeAction('/cleanup/api/scan-duplicates', this)">Scan</button>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/cleanup/api/scan-duplicates', this)">Buscar</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Restart Explorer</div>
-                        <div class="action-desc">Restart Windows Explorer (taskbar refresh)</div>
+                        <div class="action-name">Reiniciar Explorador</div>
+                        <div class="action-desc">Reiniciar Explorador de Windows (actualizar barra de tareas)</div>
                     </div>
-                    <button class="btn btn-sm btn-primary" onclick="executeAction('/cleanup/api/restart-explorer', this, {confirm: true, confirmTitle: 'Restart Explorer', confirmMessage: 'The taskbar will briefly disappear. Continue?'})">Run</button>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/cleanup/api/restart-explorer', this, {confirm: true, confirmTitle: 'Reiniciar Explorador', confirmMessage: 'La barra de tareas desaparecerá brevemente. ¿Continuar?'})">Ejecutar</button>
                 </div>
                 <div class="action-item">
                     <div class="action-info">
-                        <div class="action-name">Reset Store Cache</div>
-                        <div class="action-desc">Reset Microsoft Store cache (wsreset)</div>
+                        <div class="action-name">Limpiar caché de Store</div>
+                        <div class="action-desc">Restablecer caché de Microsoft Store (wsreset)</div>
                     </div>
-                    <button class="btn btn-sm btn-primary" onclick="executeAction('/cleanup/api/store-cache', this)">Run</button>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/cleanup/api/store-cache', this)">Ejecutar</button>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<div class="card" style="margin-bottom: 16px;">
+<div class="card" style="margin-bottom: 20px;">
     <div class="card-header">
-        <h3>Advanced Optimization</h3>
-        <span class="badge badge-warning">Use with caution</span>
+        <h3>Optimización avanzada</h3>
+        <span class="badge badge-warning">Usar con precaución</span>
     </div>
     <div class="card-body">
         <div class="alert alert-warning">
-            These actions can affect system functionality. Only use if you understand the implications.
+            Estas acciones pueden afectar la funcionalidad del sistema. Solo utilice si comprende las implicaciones.
         </div>
         <div class="action-list">
             <div class="action-item">
                 <div class="action-info">
-                    <div class="action-name">Disable SysMain (Superfetch)</div>
-                    <div class="action-desc">May degrade performance on HDD systems. Recommended only for SSD-only machines with low RAM.</div>
+                    <div class="action-name">Deshabilitar SysMain (Superfetch)</div>
+                    <div class="action-desc">Puede degradar el rendimiento en sistemas con HDD. Solo recomendado para máquinas con SSD y poca RAM.</div>
                 </div>
                 <div class="action-badges">
                     <span class="badge badge-admin">Admin</span>
-                    <span class="badge badge-warning">Caution</span>
+                    <span class="badge badge-warning">Precaución</span>
                 </div>
-                <button class="btn btn-sm btn-warning" onclick="executeAction('/cleanup/api/disable-sysmain', this, {confirm: true, confirmTitle: 'Disable SysMain', confirmMessage: 'WARNING: Disabling SysMain may degrade performance on systems with HDD. Only recommended for SSD-only systems. Proceed?', dangerLevel: 'warning'})">Disable</button>
+                <button class="btn btn-sm btn-warning" onclick="executeAction('/cleanup/api/disable-sysmain', this, {confirm: true, confirmTitle: 'Deshabilitar SysMain', confirmMessage: 'ADVERTENCIA: Deshabilitar SysMain puede degradar el rendimiento en sistemas con HDD. Solo recomendado para sistemas con SSD. ¿Continuar?', dangerLevel: 'warning'})">Deshabilitar</button>
             </div>
             <div class="action-item">
                 <div class="action-info">
-                    <div class="action-name">Disable Windows Search</div>
-                    <div class="action-desc">WARNING: Breaks Windows file search and indexing functionality.</div>
+                    <div class="action-name">Deshabilitar Windows Search</div>
+                    <div class="action-desc">ADVERTENCIA: Rompe la búsqueda de archivos y la funcionalidad de indexación de Windows.</div>
                 </div>
                 <div class="action-badges">
                     <span class="badge badge-admin">Admin</span>
-                    <span class="badge badge-danger">Risk</span>
+                    <span class="badge badge-danger">Riesgo</span>
                 </div>
-                <button class="btn btn-sm btn-danger" onclick="executeAction('/cleanup/api/disable-wsearch', this, {confirm: true, confirmTitle: 'Disable Windows Search', confirmMessage: 'WARNING: This will completely disable Windows Search and file indexing. File search in Explorer will stop working. Are you sure?', dangerLevel: 'danger'})">Disable</button>
+                <button class="btn btn-sm btn-danger" onclick="executeAction('/cleanup/api/disable-wsearch', this, {confirm: true, confirmTitle: 'Deshabilitar Windows Search', confirmMessage: 'ADVERTENCIA: Esto deshabilitará completamente la búsqueda e indexación de Windows. La búsqueda en el Explorador dejará de funcionar. ¿Está seguro?', dangerLevel: 'danger'})">Deshabilitar</button>
             </div>
         </div>
     </div>
@@ -162,11 +162,11 @@
 
 <div class="card">
     <div class="card-header">
-        <h3>Output</h3>
-        <button class="btn btn-sm btn-outline" onclick="document.getElementById('output-console').innerHTML = ''">Clear</button>
+        <h3>Salida</h3>
+        <button class="btn btn-sm btn-outline" onclick="document.getElementById('output-console').innerHTML = ''">Limpiar</button>
     </div>
     <div class="card-body">
-        <div id="output-console" class="console" style="min-height: 150px;">Ready. Click an action above to see output here.</div>
+        <div id="output-console" class="console" style="min-height: 150px;">Listo. Haga clic en una acción para ver la salida aquí.</div>
     </div>
 </div>
 {% endblock %}
