@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}CleanCPU — Registros{% endblock %}
+{% block page_title %}Visor de registros{% endblock %}
+{% block page_desc %}Registros de actividad de la aplicación{% endblock %}
+
+{% block content %}
+<div class="section-card">
+    <div class="section-header">
+        <h3>Registros del sistema</h3>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <select id="log-level-filter" class="form-select" style="width:auto;min-width:120px;">
+                <option value="all">Todos</option>
+                <option value="INFO">INFO</option>
+                <option value="WARNING">WARNING</option>
+                <option value="ERROR">ERROR</option>
+                <option value="DEBUG">DEBUG</option>
+            </select>
+            <input type="text" id="log-search" class="form-input" placeholder="Buscar en registros..." style="width:220px;">
+            <button class="btn btn-outline btn-sm" onclick="refreshLogs()">Actualizar</button>
+            <a href="/logs/api/download" class="btn btn-outline btn-sm" download>Descargar</a>
+        </div>
+    </div>
+    <div class="log-stats" id="log-stats" style="padding:6px 16px;font-size:12px;opacity:0.7;">
+        Cargando...
+    </div>
+    <div class="table-container" style="max-height:65vh;overflow-y:auto;">
+        <table class="data-table" id="log-table">
+            <thead>
+                <tr>
+                    <th style="width:170px;">Fecha/Hora</th>
+                    <th style="width:80px;">Nivel</th>
+                    <th style="width:160px;">Módulo</th>
+                    <th>Mensaje</th>
+                </tr>
+            </thead>
+            <tbody id="log-tbody">
+                <tr><td colspan="4" style="text-align:center;padding:20px;">Cargando registros...</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <div style="padding:10px 16px;text-align:center;">
+        <button class="btn btn-outline btn-sm" id="load-more-btn" onclick="loadMoreLogs()" style="display:none;">
+            Cargar más registros
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let logOffset = 0;
+const logLimit = 500;
+let autoRefreshInterval = null;
+
+function getLevelClass(level) {
+    switch(level) {
+        case 'ERROR': return 'line-error';
+        case 'WARNING': return 'line-warning';
+        case 'DEBUG': return 'line-info';
+        default: return '';
+    }
+}
+
+function getLevelBadge(level) {
+    const colors = {
+        'ERROR': 'var(--color-danger)',
+        'WARNING': 'var(--color-warning)',
+        'INFO': 'var(--color-success)',
+        'DEBUG': 'var(--text-muted)',
+    };
+    const color = colors[level] || 'var(--text-secondary)';
+    return `<span style="color:${color};font-weight:600;font-size:11px;">${escapeHtml(level)}</span>`;
+}
+
+async function fetchLogs(append) {
+    if (!append) logOffset = 0;
+
+    const level = document.getElementById('log-level-filter').value;
+    const search = document.getElementById('log-search').value;
+    const params = new URLSearchParams({
+        level: level,
+        search: search,
+        offset: logOffset,
+        limit: logLimit,
+    });
+
+    try {
+        const response = await fetch(`/logs/api/entries?${params}`);
+        const data = await response.json();
+        const tbody = document.getElementById('log-tbody');
+        const stats = document.getElementById('log-stats');
+        const loadMore = document.getElementById('load-more-btn');
+
+        if (!append) tbody.innerHTML = '';
+
+        if (data.entries.length === 0 && !append) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;opacity:0.6;">No se encontraron registros.</td></tr>';
+        }
+
+        data.entries.forEach(entry => {
+            const tr = document.createElement('tr');
+            tr.className = getLevelClass(entry.level);
+            tr.innerHTML = `
+                <td style="font-size:12px;white-space:nowrap;">${escapeHtml(entry.timestamp)}</td>
+                <td>${getLevelBadge(entry.level)}</td>
+                <td style="font-size:12px;">${escapeHtml(entry.module)}</td>
+                <td style="font-size:12px;font-family:monospace;">${escapeHtml(entry.message)}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        if (stats) {
+            stats.textContent = `Mostrando ${logOffset + data.entries.length} de ${data.total} registros`;
+        }
+
+        logOffset += data.entries.length;
+        if (loadMore) {
+            loadMore.style.display = (logOffset < data.total) ? 'inline-block' : 'none';
+        }
+    } catch (error) {
+        const tbody = document.getElementById('log-tbody');
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="4" style="color:var(--color-danger);">Error al cargar: ${escapeHtml(error.message)}</td></tr>`;
+        }
+    }
+}
+
+function refreshLogs() { fetchLogs(false); }
+function loadMoreLogs() { fetchLogs(true); }
+
+// Auto-refresh every 5 seconds
+document.addEventListener('DOMContentLoaded', () => {
+    fetchLogs(false);
+    autoRefreshInterval = setInterval(() => fetchLogs(false), 5000);
+
+    // Filter changes trigger refresh
+    document.getElementById('log-level-filter').addEventListener('change', () => fetchLogs(false));
+
+    let searchTimeout;
+    document.getElementById('log-search').addEventListener('input', () => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => fetchLogs(false), 300);
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,318 @@
+{% extends "base.html" %}
+{% block title %}CleanCPU — Mantenimiento Lógico{% endblock %}
+{% block page_title %}Mantenimiento Lógico{% endblock %}
+{% block page_desc %}Ejecutar secuencia completa de mantenimiento preventivo{% endblock %}
+
+{% block content %}
+<!-- Master Progress -->
+<div class="section-card" id="master-progress-card" style="display:none;">
+    <div class="section-header">
+        <h3 id="master-step-label">Preparando...</h3>
+        <button class="btn btn-danger btn-sm" id="cancel-maintenance-btn" onclick="cancelMaintenance()">Cancelar mantenimiento</button>
+    </div>
+    <div class="progress-bar-container" style="height:24px;background:var(--bg-surface-1);border-radius:6px;overflow:hidden;margin:10px 16px;">
+        <div id="master-progress-bar" style="width:0%;height:100%;background:linear-gradient(90deg,var(--brand-blue),var(--brand-teal));transition:width 0.5s ease;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#fff;">
+            0%
+        </div>
+    </div>
+    <div style="padding:4px 16px 10px;font-size:12px;opacity:0.7;">
+        <span id="master-elapsed">Tiempo: 00:00</span> &mdash;
+        <span id="master-stats"></span>
+    </div>
+</div>
+
+<!-- Steps Checklist -->
+<div class="section-card">
+    <div class="section-header">
+        <h3>Pasos del mantenimiento</h3>
+    </div>
+    <div id="steps-list" style="padding:0 16px 16px;">
+        <div style="text-align:center;padding:20px;opacity:0.6;">Cargando pasos...</div>
+    </div>
+</div>
+
+<!-- Start Button -->
+<div id="start-section" style="text-align:center;padding:20px;">
+    <button class="btn btn-primary" id="start-btn" onclick="startMaintenance()" style="font-size:16px;padding:14px 40px;">
+        Iniciar Mantenimiento Lógico
+    </button>
+    <p style="margin-top:10px;font-size:13px;opacity:0.6;">Se ejecutarán 9 pasos de mantenimiento preventivo en secuencia.</p>
+</div>
+
+<!-- Summary Card (shown after completion) -->
+<div class="section-card" id="summary-card" style="display:none;">
+    <div class="section-header">
+        <h3>Resumen del mantenimiento</h3>
+    </div>
+    <div id="summary-content" style="padding:16px;"></div>
+</div>
+
+<!-- Output Console -->
+<div class="section-card">
+    <div class="section-header"><h3>Consola de salida</h3></div>
+    <pre class="console" id="output-console" style="min-height:100px;max-height:300px;overflow-y:auto;"></pre>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let maintenanceSessionId = null;
+let maintenancePollInterval = null;
+let maintenanceStartTime = null;
+
+async function loadSteps() {
+    try {
+        const response = await fetch('/maintenance/api/steps');
+        const data = await response.json();
+        const container = document.getElementById('steps-list');
+        container.innerHTML = '';
+
+        data.steps.forEach((step, i) => {
+            const div = document.createElement('div');
+            div.id = `step-${step.id}`;
+            div.className = 'step-item';
+            div.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border-subtle);';
+            div.innerHTML = `
+                <span class="step-icon" id="icon-${step.id}" style="font-size:18px;width:28px;text-align:center;filter:grayscale(1);opacity:0.5;">&#9203;</span>
+                <div style="flex:1;">
+                    <strong style="font-size:14px;">${i + 1}. ${escapeHtml(step.name)}</strong>
+                    <div style="font-size:12px;opacity:0.7;">${escapeHtml(step.description)}</div>
+                    <div class="step-message" id="msg-${step.id}" style="font-size:11px;margin-top:2px;"></div>
+                </div>
+                <span class="step-elapsed" id="elapsed-${step.id}" style="font-size:12px;opacity:0.6;min-width:50px;text-align:right;"></span>
+            `;
+            container.appendChild(div);
+        });
+    } catch (e) {
+        document.getElementById('steps-list').innerHTML = '<div style="color:var(--color-danger);">Error al cargar pasos.</div>';
+    }
+}
+
+async function startMaintenance() {
+    const btn = document.getElementById('start-btn');
+    btn.disabled = true;
+    btn.textContent = 'Iniciando...';
+
+    try {
+        const response = await fetch('/maintenance/api/start', {
+            method: 'POST',
+            headers: getDefaultHeaders(),
+        });
+        const data = await response.json();
+
+        if (data.session_id) {
+            maintenanceSessionId = data.session_id;
+            maintenanceStartTime = Date.now();
+            document.getElementById('master-progress-card').style.display = 'block';
+            document.getElementById('start-section').style.display = 'none';
+            document.getElementById('summary-card').style.display = 'none';
+
+            maintenancePollInterval = setInterval(pollMaintenance, 2000);
+        }
+    } catch (e) {
+        displayResult({status: 'error', error: `Error al iniciar: ${e.message}`});
+        btn.disabled = false;
+        btn.textContent = 'Iniciar Mantenimiento Lógico';
+    }
+}
+
+async function pollMaintenance() {
+    if (!maintenanceSessionId) return;
+
+    try {
+        const response = await fetch(`/maintenance/api/status/${maintenanceSessionId}`);
+        const session = await response.json();
+
+        if (session.error) {
+            clearInterval(maintenancePollInterval);
+            return;
+        }
+
+        updateStepsUI(session);
+
+        if (session.status === 'completed') {
+            clearInterval(maintenancePollInterval);
+            showSummary(session);
+        }
+    } catch (e) {
+        // Keep polling on network errors
+    }
+}
+
+function updateStepsUI(session) {
+    const steps = session.steps || [];
+    let completed = 0, failed = 0, skipped = 0, running = 0;
+
+    steps.forEach((step, i) => {
+        const icon = document.getElementById(`icon-${step.id}`);
+        const msg = document.getElementById(`msg-${step.id}`);
+        const elapsed = document.getElementById(`elapsed-${step.id}`);
+
+        if (icon) {
+            switch(step.status) {
+                case 'pending':
+                    icon.innerHTML = '&#9203;';
+                    icon.style.filter = 'grayscale(1)';
+                    icon.style.opacity = '0.5';
+                    break;
+                case 'running':
+                    icon.innerHTML = '&#128260;';
+                    icon.style.filter = 'none';
+                    icon.style.opacity = '1';
+                    running++;
+                    break;
+                case 'completed':
+                    icon.innerHTML = '&#9989;';
+                    icon.style.filter = 'none';
+                    icon.style.opacity = '1';
+                    completed++;
+                    break;
+                case 'skipped':
+                    icon.innerHTML = '&#9888;';
+                    icon.style.filter = 'none';
+                    icon.style.opacity = '0.8';
+                    skipped++;
+                    break;
+                case 'failed':
+                    icon.innerHTML = '&#10060;';
+                    icon.style.filter = 'none';
+                    icon.style.opacity = '1';
+                    failed++;
+                    break;
+                case 'cancelled':
+                    icon.innerHTML = '&#128683;';
+                    icon.style.filter = 'grayscale(1)';
+                    icon.style.opacity = '0.6';
+                    break;
+            }
+        }
+
+        if (msg && step.message) {
+            const color = step.status === 'failed' ? 'var(--color-danger)' :
+                         step.status === 'skipped' ? 'var(--color-warning)' :
+                         step.status === 'completed' ? 'var(--color-success)' : '';
+            msg.innerHTML = `<span style="color:${color}">${escapeHtml(step.message)}</span>`;
+        }
+
+        if (elapsed && step.elapsed) {
+            elapsed.textContent = `${step.elapsed}s`;
+        }
+    });
+
+    // Update master progress
+    const total = steps.length;
+    const done = completed + failed + skipped;
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    const bar = document.getElementById('master-progress-bar');
+    if (bar) {
+        bar.style.width = pct + '%';
+        bar.textContent = pct + '%';
+        if (failed > 0) {
+            bar.style.background = 'linear-gradient(90deg,var(--brand-orange),var(--color-danger))';
+        }
+    }
+
+    const currentStep = session.current_step || 0;
+    const label = document.getElementById('master-step-label');
+    if (label && steps[currentStep]) {
+        label.textContent = `Paso ${currentStep + 1} de ${total} — ${steps[currentStep].name}`;
+    }
+
+    // Elapsed time
+    if (maintenanceStartTime) {
+        const elapsed = Math.round((Date.now() - maintenanceStartTime) / 1000);
+        const mins = Math.floor(elapsed / 60);
+        const secs = elapsed % 60;
+        const el = document.getElementById('master-elapsed');
+        if (el) el.textContent = `Tiempo: ${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+    }
+
+    const stats = document.getElementById('master-stats');
+    if (stats) stats.textContent = `Completados: ${completed} | Omitidos: ${skipped} | Fallidos: ${failed}`;
+}
+
+function showSummary(session) {
+    const card = document.getElementById('summary-card');
+    const content = document.getElementById('summary-content');
+    const startSection = document.getElementById('start-section');
+
+    card.style.display = 'block';
+    if (startSection) {
+        startSection.style.display = 'block';
+        const btn = document.getElementById('start-btn');
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Ejecutar de nuevo';
+        }
+    }
+
+    const steps = session.steps || [];
+    const completed = steps.filter(s => s.status === 'completed').length;
+    const skipped = steps.filter(s => s.status === 'skipped').length;
+    const failed = steps.filter(s => s.status === 'failed').length;
+    const totalElapsed = steps.reduce((sum, s) => sum + (s.elapsed || 0), 0);
+
+    content.innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;">
+            <div class="stat-box"><div class="stat-value" style="color:var(--color-success);">${completed}</div><div class="stat-label">Completados</div></div>
+            <div class="stat-box"><div class="stat-value" style="color:var(--color-warning);">${skipped}</div><div class="stat-label">Omitidos</div></div>
+            <div class="stat-box"><div class="stat-value" style="color:var(--color-danger);">${failed}</div><div class="stat-label">Fallidos</div></div>
+            <div class="stat-box"><div class="stat-value">${Math.round(totalElapsed)}s</div><div class="stat-label">Tiempo total</div></div>
+        </div>
+        <div style="text-align:center;">
+            <button class="btn btn-primary btn-sm" onclick="generateReport('${session.id}')">Generar Reporte</button>
+        </div>
+    `;
+}
+
+async function cancelMaintenance() {
+    if (!maintenanceSessionId) return;
+    const confirmed = await showConfirm(
+        'Cancelar mantenimiento',
+        '¿Está seguro de que desea cancelar el mantenimiento? Los pasos restantes no se ejecutarán.',
+        'warning'
+    );
+    if (!confirmed) return;
+
+    try {
+        await fetch(`/maintenance/api/cancel/${maintenanceSessionId}`, {
+            method: 'POST',
+            headers: getDefaultHeaders(),
+        });
+    } catch (e) {
+        displayResult({status: 'error', error: `Error al cancelar: ${e.message}`});
+    }
+}
+
+async function generateReport(sessionId) {
+    displayResult({status: 'info', output: 'Generando reportes (HTML, Excel FO-TI-19, Google Sheets, carpeta de red)...'});
+    try {
+        const response = await fetch(`/maintenance/api/report/${sessionId}`, {
+            method: 'POST',
+            headers: getDefaultHeaders(),
+        });
+        const data = await response.json();
+        if (data.status === 'success') {
+            const r = data.reports || {};
+            let msg = 'Reportes generados:\n';
+            if (r.html_local && r.html_local.status === 'success') msg += `  HTML local: ${r.html_local.path}\n`;
+            if (r.network_share && r.network_share.status === 'success') msg += `  Carpeta de red: ${r.network_share.path}\n`;
+            else if (r.network_share && r.network_share.error) msg += `  Carpeta de red: ${r.network_share.error}\n`;
+            if (r.google_sheets && r.google_sheets.status === 'success') msg += '  Google Sheets: Actualizado\n';
+            else if (r.google_sheets) msg += `  Google Sheets: ${r.google_sheets.reason || r.google_sheets.error || 'Omitido'}\n`;
+            if (r.excel_form && r.excel_form.status === 'success') msg += `  Excel FO-TI-19: ${r.excel_form.local_path}\n`;
+            else if (r.excel_form) msg += `  Excel FO-TI-19: ${r.excel_form.reason || r.excel_form.error || 'Omitido'}\n`;
+            displayResult({status: 'success', output: msg});
+        } else {
+            displayResult({status: 'error', error: data.error || 'Error al generar reportes.'});
+        }
+    } catch (e) {
+        displayResult({status: 'error', error: `Error: ${e.message}`});
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadSteps();
+});
+</script>
+{% endblock %}

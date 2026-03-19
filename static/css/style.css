@@ -920,3 +920,256 @@ textarea::placeholder {
 @media (max-width: 480px) {
     .stat-box .value { font-size: 22px; }
 }
+
+/* --- Global Search Bar --- */
+.global-search-bar {
+    position: fixed;
+    top: 0;
+    left: 220px;
+    right: 0;
+    z-index: 1100;
+    background: var(--bg-surface-2);
+    border-bottom: 1px solid var(--border-subtle);
+    padding: 8px 24px;
+    backdrop-filter: blur(12px);
+}
+.search-wrapper {
+    position: relative;
+    max-width: 600px;
+    margin: 0 auto;
+}
+.search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    opacity: 0.5;
+    pointer-events: none;
+}
+.search-input {
+    width: 100%;
+    padding: 8px 14px 8px 36px;
+    background: var(--bg-surface-1);
+    border: 1px solid var(--border-default);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+.search-input:focus {
+    border-color: var(--brand-blue);
+    box-shadow: 0 0 0 2px var(--brand-blue-glow);
+}
+.search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    max-height: 400px;
+    overflow-y: auto;
+    background: var(--bg-surface-3);
+    border: 1px solid var(--border-default);
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    z-index: 1200;
+}
+.search-result-item {
+    padding: 10px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-subtle);
+    transition: background 0.15s;
+}
+.search-result-item:hover, .search-result-item.active {
+    background: var(--brand-blue-glow);
+}
+.search-result-item .result-name {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+.search-result-item .result-section {
+    font-size: 11px;
+    color: var(--brand-blue-light);
+    margin-left: 8px;
+}
+.search-result-item .result-desc {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+/* Adjust main content for search bar height */
+.main-content { padding-top: 50px; }
+
+@media (max-width: 768px) {
+    .global-search-bar { left: 60px; padding: 6px 12px; }
+}
+
+/* --- Permission Denied Modal --- */
+.permission-denied-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    background: rgba(0,0,0,0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+}
+.permission-denied-overlay.active {
+    opacity: 1;
+    pointer-events: all;
+}
+.permission-denied-box {
+    background: var(--bg-surface-3);
+    border: 3px solid var(--brand-red);
+    border-radius: 16px;
+    padding: 40px;
+    max-width: 520px;
+    width: 90%;
+    text-align: center;
+    animation: none;
+}
+.permission-denied-overlay.active .permission-denied-box {
+    animation: permDeniedPulse 0.5s ease 3;
+}
+@keyframes permDeniedPulse {
+    0%, 100% { border-color: var(--brand-red); box-shadow: 0 0 0 0 rgba(227,59,20,0); }
+    50% { border-color: var(--brand-orange); box-shadow: 0 0 30px 5px rgba(227,59,20,0.4); }
+}
+.permission-denied-icon {
+    font-size: 64px;
+    margin-bottom: 16px;
+    display: block;
+}
+.permission-denied-title {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--brand-red);
+    margin-bottom: 12px;
+    letter-spacing: 2px;
+}
+.permission-denied-message {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 8px;
+}
+.permission-denied-role {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+}
+.permission-denied-btn {
+    padding: 10px 40px;
+    font-size: 14px;
+    font-weight: 600;
+    background: var(--brand-red);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+.permission-denied-btn:hover {
+    background: var(--brand-orange);
+}
+
+/* --- Progress Bar (task execution) --- */
+.task-progress-container {
+    margin: 8px 0;
+    background: var(--bg-surface-1);
+    border-radius: 6px;
+    overflow: hidden;
+    height: 22px;
+    position: relative;
+}
+.task-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--brand-blue), var(--brand-teal));
+    border-radius: 6px;
+    transition: width 0.5s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: #fff;
+    min-width: 30px;
+}
+.task-progress-bar.indeterminate {
+    width: 100% !important;
+    background: linear-gradient(90deg, var(--bg-surface-1), var(--brand-blue), var(--bg-surface-1));
+    background-size: 200% 100%;
+    animation: indeterminate 1.5s ease-in-out infinite;
+}
+@keyframes indeterminate {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+.task-progress-bar.completed {
+    background: linear-gradient(90deg, var(--brand-teal), var(--brand-green));
+}
+.task-progress-bar.failed {
+    background: linear-gradient(90deg, var(--brand-orange), var(--brand-red));
+}
+.task-progress-timing {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    padding: 0 2px;
+}
+
+/* --- Inline Mini-Terminal --- */
+.mini-terminal {
+    background: #1a1d23;
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    margin: 8px 0;
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.3s ease;
+}
+.mini-terminal.expanded {
+    max-height: 350px;
+}
+.mini-terminal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px;
+    background: var(--bg-surface-2);
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: 12px;
+}
+.mini-terminal-body {
+    padding: 10px 12px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 12px;
+    color: var(--text-secondary);
+    max-height: 280px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+.mini-terminal .badge-success { color: var(--color-success); }
+.mini-terminal .badge-warning { color: var(--color-warning); }
+.mini-terminal .badge-error { color: var(--color-danger); }
+.mini-terminal .copy-btn {
+    background: transparent;
+    border: 1px solid var(--border-default);
+    color: var(--text-muted);
+    padding: 2px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+}
+.mini-terminal .copy-btn:hover {
+    color: var(--text-primary);
+    border-color: var(--brand-blue);
+}

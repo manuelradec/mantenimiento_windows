@@ -7,7 +7,6 @@ For production execution, use server.py (Waitress).
 For development, use server.py --dev.
 """
 import os
-import sys
 import logging
 import webbrowser
 import threading
@@ -161,32 +160,33 @@ def _register_core_routes(app):
 
 
 def _setup_logging(app):
-    """Configure application logging."""
+    """Configure application logging with rotating file handler (no console output)."""
+    from logging.handlers import RotatingFileHandler
+
     log_format = '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
 
-    # Console handler
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(logging.Formatter(log_format))
-    console_handler.setLevel(logging.INFO)
-
-    # File handler (skip gracefully if log dir is not writable)
+    # File handler with rotation: 10 MB max, keep 5 backups
     file_handler = None
     try:
         log_file = os.path.join(Config.LOG_DIR, 'app.log')
-        file_handler = logging.FileHandler(log_file, encoding='utf-8')
+        file_handler = RotatingFileHandler(
+            log_file, maxBytes=10 * 1024 * 1024, backupCount=5,
+            encoding='utf-8',
+        )
         file_handler.setFormatter(logging.Formatter(log_format))
         file_handler.setLevel(logging.DEBUG)
     except (PermissionError, OSError):
         pass
 
-    # Root logger
+    # Root logger — file only (no console output for packaged exe)
     root_logger = logging.getLogger()
-    # Avoid adding duplicate handlers
     if not root_logger.handlers:
         root_logger.setLevel(logging.DEBUG)
-        root_logger.addHandler(console_handler)
         if file_handler:
             root_logger.addHandler(file_handler)
+        else:
+            # Fallback: NullHandler to avoid "No handlers could be found" warnings
+            root_logger.addHandler(logging.NullHandler())
 
     # Suppress noisy Flask/Werkzeug logs
     logging.getLogger('werkzeug').setLevel(logging.WARNING)

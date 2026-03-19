@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-# PyInstaller spec for CleanCPU v2.1
+# PyInstaller spec for CleanCPU v3.0.0
 #
 # Build:
 #   pip install -r requirements-build.txt
@@ -21,6 +21,10 @@ a = Analysis(
         # Only non-Python files go here. Flask reads these at runtime from disk.
         (templates_dir, 'templates'),
         (static_dir, 'static'),
+        # Excel template for RADEC form
+        ('templates_data', 'templates_data'),
+        # Google credentials (if present)
+        ('credentials', 'credentials'),
     ],
     hiddenimports=[
         # Flask and WSGI server
@@ -58,8 +62,18 @@ a = Analysis(
         'services.restore_tools',
         'services.drivers',
         'services.reports',
+        'services.event_viewer',
+        'services.smart_app_control',
+        # Core infrastructure (additional)
+        'core.governance',
+        'core.snapshots',
+        # Maintenance and reporting
+        'services.maintenance_report',
         # Route modules
         'routes',
+        'routes.logs',
+        'routes.scheduled_restart',
+        'routes.maintenance',
         'routes.dashboard',
         'routes.diagnostics',
         'routes.cleanup',
@@ -102,7 +116,7 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=True,           # Show console with server URL
+    console=False,          # No console window (--windowed)
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

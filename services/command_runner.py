@@ -390,6 +390,8 @@ def run_cmd(command, timeout=120, requires_admin=False, shell=False,
             stdout=subprocess.PIPE if capture_output else None,
             stderr=subprocess.PIPE if capture_output else None,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             shell=use_shell,
             creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
         )

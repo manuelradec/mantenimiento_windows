@@ -296,6 +296,15 @@ def get_time_sync_status():
         'w32tm /query /status',
         description='Get time sync status',
     )
+    # Error code 0x80070426 means W32Time service is not running
+    if result.return_code and (result.return_code == 2147943462 or
+                               result.return_code == 0x80070426):
+        result.status = CommandStatus.WARNING
+        result.output = (
+            'El servicio de Hora de Windows (W32Time) no está en ejecución.\n'
+            'Use la función "Sincronizar hora" para iniciarlo.'
+        )
+        result.error = ''
     return result
 
 

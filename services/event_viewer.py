@@ -52,7 +52,9 @@ def collect_events(log_name: str, provider: str = '', level: str = '',
 
     result = run_powershell_json(script, timeout=30, description=f'Collect {log_name} events')
 
-    if not result.is_success:
+    # rc=1 from Get-WinEvent is common (no events matching filter, or partial read)
+    # — treat as acceptable and process any data returned
+    if not result.is_success and result.return_code != 1:
         return []
 
     data = result.details.get('data', [])

@@ -25,10 +25,41 @@ def create_restore_point(description=None):
     Create a system restore point.
     Should be called before any potentially destructive operation.
     """
+    from services.command_runner import CommandResult
+
     if description is None:
         description = f'CleanCPU - {datetime.now().strftime("%Y-%m-%d %H:%M")}'
 
-    # First ensure System Restore is enabled
+    # Check if System Restore service (srservice) is enabled
+    svc_check = run_powershell(
+        "(Get-Service srservice -ErrorAction SilentlyContinue).StartType",
+        description='Check System Restore service status',
+    )
+    svc_start_type = (svc_check.output or '').strip().lower()
+
+    if svc_start_type == 'disabled':
+        # Attempt to enable the service
+        logger.info("System Restore service is disabled, attempting to enable...")
+        enable_svc = run_powershell(
+            "Set-Service -Name srservice -StartupType Manual; "
+            "Start-Service srservice",
+            requires_admin=True,
+            timeout=30,
+            description='Enable System Restore service',
+        )
+        if enable_svc.status == CommandStatus.ERROR:
+            logger.warning(f"Could not enable System Restore service: {enable_svc.error}")
+            return CommandResult(
+                status=CommandStatus.ERROR,
+                error=(
+                    'El servicio de Restauración del Sistema está deshabilitado en este equipo. '
+                    'No se pudo habilitar automáticamente. Contacte al administrador del sistema '
+                    'para habilitarlo.'
+                ),
+                details={'service_status': 'disabled', 'auto_enable_failed': True},
+            )
+
+    # Ensure System Restore is enabled on the drive
     enable_result = enable_system_restore()
     if enable_result.status == CommandStatus.ERROR:
         logger.warning(f"Could not enable System Restore: {enable_result.error}")
@@ -39,6 +70,15 @@ def create_restore_point(description=None):
         timeout=120,
         description='Create system restore point',
     )
+
+    # Handle service-disabled errors gracefully
+    if result.status == CommandStatus.ERROR and 'deshabilitado' in (result.error or '').lower():
+        result.error = (
+            'El servicio de Restauración del Sistema está deshabilitado en este equipo. '
+            'Contacte al administrador del sistema para habilitarlo.'
+        )
+        result.details['service_disabled'] = True
+
     return result
 
 

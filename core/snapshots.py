@@ -114,7 +114,7 @@ def snapshot_network(action_id: str) -> dict:
         r = run_powershell_json(
             "Get-NetAdapter | Select-Object Name, Status, LinkSpeed, "
             "InterfaceDescription",
-            timeout=10, description='Snapshot: network adapters'
+            timeout=30, description='Snapshot: network adapters'
         )
         if r.is_success and r.details.get('data'):
             data = r.details['data']

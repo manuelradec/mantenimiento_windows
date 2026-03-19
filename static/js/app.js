@@ -124,6 +124,16 @@ async function executeAction(url, buttonEl, options = {}) {
 
         // 3. Rejected by policy
         if (data.status === 'rejected') {
+            const reason = data.reason || '';
+            // Show permission denied modal for mode/admin rejections
+            if (reason.includes('not allowed in current mode') ||
+                reason.includes('requires admin') ||
+                reason.includes('no permitid')) {
+                showPermissionDenied(
+                    data.action_name || data.action_id || url,
+                    data.current_mode || '—'
+                );
+            }
             displayResult({
                 status: 'error',
                 error: data.reason || 'Acción rechazada por el motor de políticas.',
@@ -337,6 +347,9 @@ function displayResult(data) {
 
     consoleEl.innerHTML += lines;
     consoleEl.scrollTop = consoleEl.scrollHeight;
+
+    // Auto-scroll the page to show the output
+    consoleEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 // ============================================================
@@ -397,6 +410,11 @@ function showConfirm(title, message, dangerLevel = 'safe', warnings = []) {
             } else {
                 warningsEl.style.display = 'none';
             }
+        }
+
+        if (!titleEl || !msgEl || !confirmBtn || !cancelBtn) {
+            resolve(window.confirm(message));
+            return;
         }
 
         if (dangerLevel === 'danger') {
@@ -499,7 +517,7 @@ async function setOperationMode(mode) {
         });
         const data = await response.json();
         const badge = document.getElementById('mode-badge');
-        if (badge) badge.textContent = data.mode.toUpperCase();
+        if (badge && data.mode) badge.textContent = data.mode.toUpperCase();
         displayResult({
             status: 'success',
             output: `Modo de operación cambiado a: ${data.mode}`,
@@ -510,6 +528,251 @@ async function setOperationMode(mode) {
             error: `Error al cambiar modo: ${error.message}`,
         });
     }
+}
+
+// ============================================================
+// Global Search (Client-Side)
+// ============================================================
+
+const SEARCH_INDEX = [
+    // Dashboard
+    {name:'Panel principal', section:'General', desc:'Vista general del sistema', url:'/'},
+    // Diagnostics
+    {name:'Diagnósticos del sistema', section:'Diagnóstico', desc:'Información completa del sistema', url:'/diagnostics'},
+    {name:'Versión de Windows', section:'Diagnóstico', desc:'Build y versión del SO', url:'/diagnostics'},
+    {name:'RAM', section:'Diagnóstico', desc:'Detalles de memoria RAM', url:'/diagnostics'},
+    {name:'Discos', section:'Diagnóstico', desc:'Estado de discos y SMART', url:'/diagnostics'},
+    {name:'Procesos activos', section:'Diagnóstico', desc:'Procesos con mayor consumo', url:'/diagnostics'},
+    {name:'Servicios críticos', section:'Diagnóstico', desc:'Estado de servicios de Windows', url:'/diagnostics'},
+    {name:'Temperatura CPU', section:'Diagnóstico', desc:'Sensor de temperatura del procesador', url:'/diagnostics'},
+    // Drivers
+    {name:'Controladores', section:'Diagnóstico', desc:'Lista de drivers instalados', url:'/drivers'},
+    {name:'Dispositivos con problemas', section:'Diagnóstico', desc:'Dispositivos con errores', url:'/drivers'},
+    // Cleanup
+    {name:'Limpieza de temporales', section:'Limpieza', desc:'Eliminar archivos temporales del usuario', url:'/cleanup'},
+    {name:'Limpieza Windows Temp', section:'Limpieza', desc:'Eliminar temporales del sistema', url:'/cleanup'},
+    {name:'Vaciar papelera', section:'Limpieza', desc:'Vaciar la Papelera de reciclaje', url:'/cleanup'},
+    {name:'Limpiar caché DNS', section:'Limpieza', desc:'Vaciar caché del resolver DNS', url:'/cleanup'},
+    {name:'Limpiar caché Internet', section:'Limpieza', desc:'Eliminar caché del navegador', url:'/cleanup'},
+    {name:'Limpiar caché WU', section:'Limpieza', desc:'Eliminar caché de Windows Update', url:'/cleanup'},
+    {name:'Limpiar Prefetch', section:'Limpieza', desc:'Vaciar carpeta Prefetch', url:'/cleanup'},
+    {name:'Reiniciar Explorer', section:'Limpieza', desc:'Reiniciar el shell de Windows', url:'/cleanup'},
+    {name:'Limpieza de disco', section:'Limpieza', desc:'Ejecutar cleanmgr', url:'/cleanup'},
+    {name:'TRIM SSD', section:'Limpieza', desc:'Ejecutar TRIM en discos SSD', url:'/cleanup'},
+    {name:'Desfragmentar HDD', section:'Limpieza', desc:'Optimizar disco duro mecánico', url:'/cleanup'},
+    // Repair
+    {name:'SFC /scannow', section:'Reparación', desc:'Verificar integridad de archivos del sistema', url:'/repair'},
+    {name:'DISM CheckHealth', section:'Reparación', desc:'Verificación rápida de componentes', url:'/repair'},
+    {name:'DISM ScanHealth', section:'Reparación', desc:'Escaneo profundo de componentes', url:'/repair'},
+    {name:'DISM RestoreHealth', section:'Reparación', desc:'Reparar almacén de componentes', url:'/repair'},
+    {name:'CHKDSK', section:'Reparación', desc:'Verificar integridad del disco', url:'/repair'},
+    {name:'WinSAT', section:'Reparación', desc:'Benchmark de rendimiento de disco', url:'/repair'},
+    // Network
+    {name:'Flush DNS', section:'Red', desc:'Vaciar caché DNS', url:'/network'},
+    {name:'Renovar IP', section:'Red', desc:'Renovar dirección IP por DHCP', url:'/network'},
+    {name:'Reparación de red', section:'Red', desc:'Secuencia completa de reparación de red', url:'/network'},
+    {name:'Reset TCP/IP', section:'Red', desc:'Reiniciar pila TCP/IP', url:'/network'},
+    {name:'Reset Winsock', section:'Red', desc:'Reiniciar catálogo Winsock', url:'/network'},
+    {name:'Test de conectividad', section:'Red', desc:'Probar conexión a host remoto', url:'/network'},
+    // Update
+    {name:'Buscar actualizaciones', section:'Windows Update', desc:'Escanear actualizaciones disponibles', url:'/update'},
+    {name:'Descargar actualizaciones', section:'Windows Update', desc:'Descargar actualizaciones pendientes', url:'/update'},
+    {name:'Instalar actualizaciones', section:'Windows Update', desc:'Instalar actualizaciones descargadas', url:'/update'},
+    {name:'Sincronizar hora', section:'Windows Update', desc:'Resincronizar reloj del sistema', url:'/update'},
+    {name:'Reset Windows Update', section:'Windows Update', desc:'Reinicio completo de componentes WU', url:'/update'},
+    // Power
+    {name:'Plan de energía', section:'Energía', desc:'Ver y cambiar plan de energía activo', url:'/power'},
+    {name:'Alto rendimiento', section:'Energía', desc:'Activar plan de alto rendimiento', url:'/power'},
+    {name:'Reporte de batería', section:'Energía', desc:'Generar informe de salud de batería', url:'/power'},
+    {name:'Hibernación', section:'Energía', desc:'Habilitar o deshabilitar hibernación', url:'/power'},
+    // Security
+    {name:'Windows Defender', section:'Seguridad', desc:'Estado y configuración del antivirus', url:'/security'},
+    {name:'Escaneo rápido', section:'Seguridad', desc:'Escaneo rápido de malware', url:'/security'},
+    {name:'Escaneo completo', section:'Seguridad', desc:'Escaneo completo del sistema', url:'/security'},
+    {name:'Smart App Control', section:'Seguridad', desc:'Control Inteligente de Aplicaciones', url:'/security'},
+    // Reports
+    {name:'Reportes', section:'Herramientas', desc:'Generar y exportar reportes', url:'/reports'},
+    // Advanced
+    {name:'Punto de restauración', section:'Avanzado', desc:'Crear punto de restauración del sistema', url:'/advanced'},
+    {name:'GPU/Display', section:'Avanzado', desc:'Diagnósticos de pantalla y GPU', url:'/advanced'},
+    // New pages
+    {name:'Mantenimiento Lógico', section:'Herramientas', desc:'Secuencia completa de mantenimiento preventivo (9 pasos)', url:'/maintenance'},
+    {name:'Reinicio Programado', section:'Herramientas', desc:'Administrar tarea de reinicio automático', url:'/scheduled-restart'},
+    {name:'Registros', section:'Herramientas', desc:'Visor de registros de la aplicación', url:'/logs'},
+];
+
+let searchSelectedIndex = -1;
+
+function initGlobalSearch() {
+    const input = document.getElementById('global-search-input');
+    const results = document.getElementById('search-results');
+    if (!input || !results) return;
+
+    input.addEventListener('input', () => {
+        const query = input.value.trim().toLowerCase();
+        if (query.length < 2) {
+            results.style.display = 'none';
+            searchSelectedIndex = -1;
+            return;
+        }
+
+        const matches = SEARCH_INDEX.filter(item =>
+            item.name.toLowerCase().includes(query) ||
+            item.desc.toLowerCase().includes(query) ||
+            item.section.toLowerCase().includes(query)
+        ).slice(0, 10);
+
+        if (matches.length === 0) {
+            results.innerHTML = '<div style="padding:12px;text-align:center;opacity:0.5;font-size:13px;">Sin resultados</div>';
+            results.style.display = 'block';
+            return;
+        }
+
+        results.innerHTML = matches.map((item, i) =>
+            `<div class="search-result-item" data-index="${i}" data-url="${item.url}" onclick="window.location='${item.url}'">
+                <span class="result-name">${escapeHtml(item.name)}</span>
+                <span class="result-section">${escapeHtml(item.section)}</span>
+                <div class="result-desc">${escapeHtml(item.desc)}</div>
+            </div>`
+        ).join('');
+
+        results.style.display = 'block';
+        searchSelectedIndex = -1;
+    });
+
+    input.addEventListener('keydown', (e) => {
+        const items = results.querySelectorAll('.search-result-item');
+        if (!items.length) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            searchSelectedIndex = Math.min(searchSelectedIndex + 1, items.length - 1);
+            items.forEach((el, i) => el.classList.toggle('active', i === searchSelectedIndex));
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            searchSelectedIndex = Math.max(searchSelectedIndex - 1, 0);
+            items.forEach((el, i) => el.classList.toggle('active', i === searchSelectedIndex));
+        } else if (e.key === 'Enter' && searchSelectedIndex >= 0) {
+            e.preventDefault();
+            const url = items[searchSelectedIndex].dataset.url;
+            if (url) window.location = url;
+        } else if (e.key === 'Escape') {
+            results.style.display = 'none';
+            searchSelectedIndex = -1;
+            input.blur();
+        }
+    });
+
+    // Close on click outside
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.search-wrapper')) {
+            results.style.display = 'none';
+        }
+    });
+}
+
+// ============================================================
+// Permission Denied Notification (Task 5)
+// ============================================================
+
+function showPermissionDenied(toolName, userRole) {
+    // Create overlay if it doesn't exist
+    let overlay = document.getElementById('permission-denied-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'permission-denied-overlay';
+        overlay.className = 'permission-denied-overlay';
+        overlay.innerHTML = `
+            <div class="permission-denied-box">
+                <span class="permission-denied-icon">&#128683;</span>
+                <div class="permission-denied-title">ACCESO DENEGADO</div>
+                <p class="permission-denied-message" id="perm-denied-msg"></p>
+                <p class="permission-denied-role" id="perm-denied-role"></p>
+                <button class="permission-denied-btn" onclick="closePermissionDenied()">Aceptar</button>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+    }
+
+    const msg = document.getElementById('perm-denied-msg');
+    const role = document.getElementById('perm-denied-role');
+    if (msg) msg.textContent = `No tiene los permisos necesarios para ejecutar "${toolName}". Contacte al administrador para solicitar acceso.`;
+    if (role) role.textContent = `Perfil actual: ${userRole || 'Desconocido'}`;
+
+    overlay.classList.add('active');
+
+    // Play system alert sound
+    try { new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH+Jj4+Jh4F8d3V5foSIi4qJiIV/e3h3eX2Ag4WHiIiHhYJ+e3l4eXyAg4WHiImIhoN/').play(); } catch(e) {}
+
+    // Log the access attempt
+    console.warn(`[PERMISSION DENIED] Tool: ${toolName}, Role: ${userRole}`);
+}
+
+function closePermissionDenied() {
+    const overlay = document.getElementById('permission-denied-overlay');
+    if (overlay) overlay.classList.remove('active');
+}
+
+// ============================================================
+// Auto-scroll to Output (Task 7 — Option B: inline mini-terminal)
+// ============================================================
+
+function scrollToOutput() {
+    const consoleEl = document.getElementById('output-console') || document.getElementById('output-area');
+    if (consoleEl) {
+        consoleEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+
+// ============================================================
+// Progress Bar Helper (Task 6)
+// ============================================================
+
+function createProgressBar(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return null;
+
+    container.innerHTML = `
+        <div class="task-progress-container">
+            <div class="task-progress-bar indeterminate" id="${containerId}-bar">Estimando...</div>
+        </div>
+        <div class="task-progress-timing">
+            <span id="${containerId}-elapsed">Transcurrido: 00:00</span>
+            <span id="${containerId}-remaining"></span>
+        </div>
+    `;
+
+    const startTime = Date.now();
+    const interval = setInterval(() => {
+        const elapsed = Math.round((Date.now() - startTime) / 1000);
+        const mins = Math.floor(elapsed / 60);
+        const secs = elapsed % 60;
+        const el = document.getElementById(`${containerId}-elapsed`);
+        if (el) el.textContent = `Transcurrido: ${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+    }, 1000);
+
+    return {
+        update(pct, status) {
+            const bar = document.getElementById(`${containerId}-bar`);
+            if (!bar) return;
+            bar.classList.remove('indeterminate');
+            bar.style.width = pct + '%';
+            bar.textContent = pct + '%';
+            if (status === 'completed') bar.classList.add('completed');
+            if (status === 'failed') bar.classList.add('failed');
+        },
+        complete(status) {
+            clearInterval(interval);
+            const bar = document.getElementById(`${containerId}-bar`);
+            if (!bar) return;
+            bar.classList.remove('indeterminate');
+            bar.style.width = '100%';
+            bar.textContent = status === 'failed' ? 'Error' : 'Completado';
+            if (status === 'failed') bar.classList.add('failed');
+            else bar.classList.add('completed');
+        },
+        destroy() { clearInterval(interval); }
+    };
 }
 
 // ============================================================
@@ -531,4 +794,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (cancelBtn) {
         cancelBtn.addEventListener('click', cancelActiveJob);
     }
+
+    // Initialize global search
+    initGlobalSearch();
 });
