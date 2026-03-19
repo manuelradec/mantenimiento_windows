@@ -47,7 +47,7 @@ def _translate_wu_error(rc):
 
 def download_updates():
     """Download pending Windows Updates."""
-    from services.command_runner import CommandStatus, CommandResult
+    from services.command_runner import CommandStatus
 
     result = run_cmd(
         'UsoClient StartDownload',

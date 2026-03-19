@@ -5,10 +5,9 @@ import threading
 import uuid
 from datetime import datetime
 
-from flask import Blueprint, render_template, jsonify, request
+from flask import Blueprint, render_template, jsonify
 
-from services.command_runner import run_powershell, run_cmd, CommandStatus, CommandResult
-from config import Config
+from services.command_runner import run_powershell, run_cmd
 
 maintenance_bp = Blueprint('maintenance', __name__)
 logger = logging.getLogger('cleancpu.maintenance')
@@ -239,7 +238,7 @@ def _step_malwarebytes():
     if not exe:
         return {'status': 'skipped', 'message': 'MalwareBytes no está instalado.'}
 
-    result = run_cmd(
+    run_cmd(
         f'start "" "{exe}"',
         shell=True, timeout=10,
         description='Launch MalwareBytes',
@@ -267,7 +266,6 @@ def _step_ccleaner():
 
 
 def _step_advancedsystemcare():
-    import os
     paths = [
         r'C:\Program Files (x86)\IObit\Advanced SystemCare\ASC.exe',
         r'C:\Program Files\IObit\Advanced SystemCare\ASC.exe',
@@ -276,7 +274,7 @@ def _step_advancedsystemcare():
     if not exe:
         return {'status': 'skipped', 'message': 'Advanced SystemCare no está instalado.'}
 
-    result = run_cmd(
+    run_cmd(
         f'start "" "{exe}"',
         shell=True, timeout=10,
         description='Launch Advanced SystemCare',
@@ -316,9 +314,11 @@ def _step_defrag():
 def _step_temp_cleanup():
     from services.cleanup import clean_user_temp, clean_windows_temp, clean_prefetch
     results = []
-    for name, func in [('User Temp', clean_user_temp),
-                        ('Windows Temp', clean_windows_temp),
-                        ('Prefetch', clean_prefetch)]:
+    for name, func in [
+        ('User Temp', clean_user_temp),
+        ('Windows Temp', clean_windows_temp),
+        ('Prefetch', clean_prefetch),
+    ]:
         try:
             r = func()
             results.append(f"{name}: {r.status.value if hasattr(r, 'status') else 'ok'}")
@@ -352,11 +352,11 @@ def _step_sfc():
         return {'status': 'completed', 'message': 'SFC: No se encontraron problemas de integridad.'}
     elif 'reparó correctamente' in output.lower() or 'successfully repaired' in output.lower():
         return {'status': 'completed', 'message': 'SFC: Se repararon archivos del sistema.'}
-    return {'status': 'completed', 'message': f'SFC completado. Revise los detalles en el registro.'}
+    return {'status': 'completed', 'message': 'SFC completado. Revise los detalles en el registro.'}
 
 
 def _step_windows_update():
-    result = run_cmd(
+    run_cmd(
         'UsoClient StartScan',
         requires_admin=True, timeout=120,
         description='Scan for updates',
@@ -381,7 +381,7 @@ def _step_lenovo_update():
     if not exe:
         return {'status': 'skipped', 'message': 'Lenovo Vantage/System Update no está instalado.'}
 
-    result = run_cmd(
+    run_cmd(
         f'start "" "{exe}"',
         shell=True, timeout=10,
         description='Launch Lenovo Update',

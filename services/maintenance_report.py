@@ -9,7 +9,6 @@ Handles:
 """
 import os
 import sys
-import json
 import shutil
 import logging
 from datetime import datetime
@@ -191,9 +190,7 @@ def update_google_sheets(system_info, steps):
         gc = gspread.authorize(creds)
         sheet = gc.open_by_key(GOOGLE_SHEET_ID).sheet1
 
-        completed = sum(1 for s in steps if s.get('status') == 'completed')
         failed = sum(1 for s in steps if s.get('status') == 'failed')
-        skipped = sum(1 for s in steps if s.get('status') == 'skipped')
         status_text = 'COMPLETADO' if failed == 0 else 'PARCIAL'
 
         details = '; '.join(
@@ -229,7 +226,6 @@ def generate_radec_excel(system_info, steps):
     """
     try:
         import openpyxl
-        from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
     except ImportError:
         logger.warning("openpyxl not installed. Skipping Excel form generation.")
         return {'status': 'skipped', 'reason': 'openpyxl no está instalado.'}

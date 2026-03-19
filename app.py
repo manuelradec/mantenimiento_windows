@@ -7,7 +7,6 @@ For production execution, use server.py (Waitress).
 For development, use server.py --dev.
 """
 import os
-import sys
 import logging
 import webbrowser
 import threading
