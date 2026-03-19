@@ -24,14 +24,52 @@ def scan_updates():
     )
 
 
+_WU_ERROR_CODES = {
+    0x80070057: 'E_INVALIDARG — Argumento no válido. Ejecute primero un escaneo de actualizaciones.',
+    0x80240022: 'No se encontraron actualizaciones para descargar.',
+    0x80070005: 'Acceso denegado. Ejecute como administrador.',
+    0x80240024: 'No hay conexión a Internet disponible.',
+    0x80244019: 'El servidor de actualizaciones no está disponible.',
+}
+
+
+def _translate_wu_error(rc):
+    """Translate a Windows Update error code to a human-readable message."""
+    # Convert signed to unsigned 32-bit
+    if rc and rc > 0x7FFFFFFF:
+        unsigned = rc
+    elif rc and rc < 0:
+        unsigned = rc + (1 << 32)
+    else:
+        unsigned = rc
+    return _WU_ERROR_CODES.get(unsigned, f'Error desconocido (código: {rc}, hex: 0x{unsigned:08X})')
+
+
 def download_updates():
     """Download pending Windows Updates."""
-    return run_cmd(
+    from services.command_runner import CommandStatus, CommandResult
+
+    result = run_cmd(
         'UsoClient StartDownload',
         requires_admin=True,
         timeout=300,
         description='Download Windows Updates',
     )
+
+    if result.status == CommandStatus.ERROR and result.return_code:
+        translated = _translate_wu_error(result.return_code)
+        result.error = (
+            f'Error al descargar actualizaciones: {translated}\n'
+            'Sugerencia: Abra Windows Update manualmente (Configuración > Actualización de Windows) '
+            'e intente desde allí.'
+        )
+        result.details['error_translated'] = translated
+        result.details['rollback_hint'] = (
+            'Los archivos parcialmente descargados se pueden limpiar '
+            'desde la carpeta SoftwareDistribution.'
+        )
+
+    return result
 
 
 def install_updates():

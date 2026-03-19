@@ -65,20 +65,17 @@ def run_production(app, port: int):
     try:
         from waitress import serve
     except ImportError:
-        print("\n[ERROR] Waitress is not installed.")
-        print("Install it with: pip install waitress")
-        print("Falling back to Flask development server...\n")
+        logging.getLogger('cleancpu.server').error(
+            "Waitress is not installed. Falling back to Flask dev server."
+        )
         run_development(app, port)
         return
 
-    print(f"\n{'='*60}")
-    print(f"  CleanCPU v{Config.APP_VERSION} - Production Mode")
-    print(f"  Server: Waitress (WSGI)")
-    print(f"  URL: http://127.0.0.1:{port}")
-    print(f"  Admin: {get_elevation_info()['is_admin']}")
-    print(f"  Logs: {Config.LOG_DIR}")
-    print(f"  Press Ctrl+C to stop")
-    print(f"{'='*60}\n")
+    logger = logging.getLogger('cleancpu.server')
+    logger.info(f"CleanCPU v{Config.APP_VERSION} - Production Mode")
+    logger.info(f"URL: http://127.0.0.1:{port}")
+    logger.info(f"Admin: {get_elevation_info()['is_admin']}")
+    logger.info(f"Logs: {Config.LOG_DIR}")
 
     open_browser(port)
 
@@ -98,13 +95,11 @@ def run_production(app, port: int):
 
 def run_development(app, port: int):
     """Run the application using Flask's development server."""
-    print(f"\n{'='*60}")
-    print(f"  CleanCPU v{Config.APP_VERSION} - Development Mode")
-    print(f"  Server: Flask (development)")
-    print(f"  URL: http://127.0.0.1:{port}")
-    print(f"  Admin: {get_elevation_info()['is_admin']}")
-    print(f"  Logs: {Config.LOG_DIR}")
-    print(f"{'='*60}\n")
+    logger = logging.getLogger('cleancpu.server')
+    logger.info(f"CleanCPU v{Config.APP_VERSION} - Development Mode")
+    logger.info(f"URL: http://127.0.0.1:{port}")
+    logger.info(f"Admin: {get_elevation_info()['is_admin']}")
+    logger.info(f"Logs: {Config.LOG_DIR}")
 
     open_browser(port)
 
@@ -162,7 +157,7 @@ def main():
 
     # Graceful shutdown handler
     def shutdown_handler(signum, frame):
-        print("\n[CleanCPU] Shutting down...")
+        logging.getLogger('cleancpu.server').info("Shutting down...")
         SessionStore.close(session_id)
         job_runner.shutdown()
         sys.exit(0)

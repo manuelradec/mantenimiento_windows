@@ -12,6 +12,9 @@ from routes.drivers import drivers_bp
 from routes.security import security_bp
 from routes.reports import reports_bp
 from routes.advanced import advanced_bp
+from routes.logs import logs_bp
+from routes.scheduled_restart import scheduled_restart_bp
+from routes.maintenance import maintenance_bp
 
 
 def register_blueprints(app):
@@ -27,3 +30,6 @@ def register_blueprints(app):
     app.register_blueprint(security_bp, url_prefix='/security')
     app.register_blueprint(reports_bp, url_prefix='/reports')
     app.register_blueprint(advanced_bp, url_prefix='/advanced')
+    app.register_blueprint(logs_bp, url_prefix='/logs')
+    app.register_blueprint(scheduled_restart_bp, url_prefix='/scheduled-restart')
+    app.register_blueprint(maintenance_bp, url_prefix='/maintenance')

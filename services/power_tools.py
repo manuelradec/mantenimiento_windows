@@ -101,8 +101,16 @@ def enable_hibernation():
 
 def get_processor_power_info():
     """Get current processor power management counters."""
-    return run_powershell(
+    result = run_powershell(
         "Get-Counter '\\Processor(_Total)\\% Processor Time' -SampleInterval 2 -MaxSamples 3",
         timeout=15,
         description='Get processor power counters',
     )
+    # rc=1 means some counters may be unavailable on this machine — treat as non-critical
+    if result.return_code == 1 and result.output:
+        result.status = CommandStatus.SUCCESS
+        result.output += (
+            '\n\nNota: Algunos contadores de rendimiento pueden no estar '
+            'disponibles en este equipo.'
+        )
+    return result

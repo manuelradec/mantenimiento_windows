@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}CleanCPU — Reinicio Programado{% endblock %}
+{% block page_title %}Reinicio Programado{% endblock %}
+{% block page_desc %}Administrar tarea de reinicio automático del sistema{% endblock %}
+
+{% block content %}
+<!-- Current Task Status -->
+<div class="section-card" id="task-status-card">
+    <div class="section-header">
+        <h3>Estado actual</h3>
+        <button class="btn btn-outline btn-sm" onclick="checkStatus()">Actualizar</button>
+    </div>
+    <div id="task-status" style="padding:16px;">
+        <span class="spinner-dark"></span> Verificando...
+    </div>
+</div>
+
+<!-- Create/Update Form -->
+<div class="section-card">
+    <div class="section-header">
+        <h3 id="form-title">Programar reinicio</h3>
+    </div>
+    <div style="padding:16px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:16px;">
+            <div>
+                <label style="display:block;font-size:13px;margin-bottom:4px;font-weight:600;">Fecha</label>
+                <input type="date" id="restart-date" class="form-input" style="width:100%;">
+            </div>
+            <div>
+                <label style="display:block;font-size:13px;margin-bottom:4px;font-weight:600;">Hora (24h)</label>
+                <input type="time" id="restart-time" class="form-input" style="width:100%;">
+            </div>
+            <div>
+                <label style="display:block;font-size:13px;margin-bottom:4px;font-weight:600;">Recurrencia</label>
+                <select id="restart-recurrence" class="form-select" style="width:100%;">
+                    <option value="Once">Una vez</option>
+                    <option value="Daily">Diario</option>
+                    <option value="Weekly">Semanal</option>
+                    <option value="Monthly">Mensual</option>
+                </select>
+            </div>
+        </div>
+        <div style="display:flex;gap:10px;">
+            <button class="btn btn-primary" id="save-btn" onclick="saveTask()">Guardar tarea</button>
+            <button class="btn btn-danger" id="delete-btn" onclick="deleteTask()" style="display:none;">Eliminar tarea</button>
+        </div>
+    </div>
+</div>
+
+<!-- Output Console -->
+<div class="section-card">
+    <div class="section-header"><h3>Consola de salida</h3></div>
+    <pre class="console" id="output-console" style="min-height:80px;max-height:200px;overflow-y:auto;"></pre>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function checkStatus() {
+    const statusDiv = document.getElementById('task-status');
+    const deleteBtn = document.getElementById('delete-btn');
+    const formTitle = document.getElementById('form-title');
+    statusDiv.innerHTML = '<span class="spinner-dark"></span> Verificando...';
+
+    try {
+        const response = await fetch('/scheduled-restart/api/status');
+        const data = await response.json();
+
+        if (data.exists) {
+            statusDiv.innerHTML = `
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;">
+                    <div class="stat-box"><div class="stat-label">Estado</div><div class="stat-value" style="font-size:16px;">${escapeHtml(data.state || 'Desconocido')}</div></div>
+                    <div class="stat-box"><div class="stat-label">Próxima ejecución</div><div class="stat-value" style="font-size:16px;">${escapeHtml(data.nextRun || 'N/A')}</div></div>
+                </div>
+            `;
+            deleteBtn.style.display = 'inline-block';
+            formTitle.textContent = 'Modificar reinicio programado';
+        } else {
+            statusDiv.innerHTML = '<div style="opacity:0.7;">No hay tarea de reinicio programada. Cree una a continuación.</div>';
+            deleteBtn.style.display = 'none';
+            formTitle.textContent = 'Programar reinicio';
+        }
+    } catch (e) {
+        statusDiv.innerHTML = `<div style="color:var(--color-danger);">Error: ${escapeHtml(e.message)}</div>`;
+    }
+}
+
+async function saveTask() {
+    const date = document.getElementById('restart-date').value;
+    const time = document.getElementById('restart-time').value;
+    const recurrence = document.getElementById('restart-recurrence').value;
+
+    if (!date || !time) {
+        displayResult({status: 'error', error: 'Debe especificar fecha y hora.'});
+        return;
+    }
+
+    const btn = document.getElementById('save-btn');
+    btn.disabled = true;
+    btn.textContent = 'Guardando...';
+
+    try {
+        const response = await fetch('/scheduled-restart/api/create', {
+            method: 'POST',
+            headers: getDefaultHeaders(),
+            body: JSON.stringify({date, time, recurrence}),
+        });
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            displayResult({status: 'success', output: data.message});
+            checkStatus();
+        } else {
+            displayResult({status: 'error', error: data.error});
+        }
+    } catch (e) {
+        displayResult({status: 'error', error: e.message});
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Guardar tarea';
+    }
+}
+
+async function deleteTask() {
+    const confirmed = await showConfirm(
+        'Eliminar reinicio programado',
+        '¿Está seguro de que desea eliminar la tarea de reinicio programado?',
+        'danger'
+    );
+    if (!confirmed) return;
+
+    try {
+        const response = await fetch('/scheduled-restart/api/delete', {
+            method: 'POST',
+            headers: getDefaultHeaders(),
+        });
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            displayResult({status: 'success', output: data.message});
+            checkStatus();
+        } else {
+            displayResult({status: 'error', error: data.error});
+        }
+    } catch (e) {
+        displayResult({status: 'error', error: e.message});
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    checkStatus();
+    // Set default date to today
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('restart-date').value = today;
+    document.getElementById('restart-date').min = today;
+});
+</script>
+{% endblock %}
