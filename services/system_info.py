@@ -308,6 +308,193 @@ def get_time_sync_status():
     return result
 
 
+def get_upgrade_opportunities():
+    """
+    Detect hardware upgrade opportunities:
+    - Available RAM slots (empty DIMM slots)
+    - Current RAM type and speed
+    - NVMe M.2 slots available
+    - HDD that could be upgraded to SSD
+    - Maximum supported RAM
+    """
+    opportunities = {
+        'ram': {},
+        'storage': {},
+        'expansion': {},
+        'recommendations': [],
+    }
+
+    # --- RAM Analysis ---
+    # Get all memory slots (occupied and empty)
+    ram_slots_result = run_powershell_json(
+        'Get-CimInstance Win32_PhysicalMemory | '
+        'Select-Object BankLabel, DeviceLocator, '
+        '@{N="CapacityGB";E={[math]::Round($_.Capacity/1GB,2)}}, '
+        'Manufacturer, PartNumber, Speed, '
+        '@{N="MemoryType";E={$_.SMBIOSMemoryType}}, '
+        'ConfiguredClockSpeed',
+        description='Get RAM module details for upgrade analysis',
+    )
+
+    # Get total slots including empty ones
+    total_slots_result = run_powershell_json(
+        'Get-CimInstance Win32_PhysicalMemoryArray | '
+        'Select-Object MemoryDevices, '
+        '@{N="MaxCapacityGB";E={[math]::Round($_.MaxCapacity/1MB,0)}}',
+        description='Get memory array info (total slots)',
+    )
+
+    occupied_slots = []
+    if ram_slots_result.status == CommandStatus.SUCCESS and ram_slots_result.details:
+        data = ram_slots_result.details
+        if isinstance(data, dict):
+            data = [data]
+        occupied_slots = data
+
+    total_slots = 0
+    max_capacity_gb = 0
+    if total_slots_result.status == CommandStatus.SUCCESS and total_slots_result.details:
+        arr = total_slots_result.details
+        if isinstance(arr, dict):
+            arr = [arr]
+        if arr:
+            total_slots = arr[0].get('MemoryDevices', 0) or 0
+            max_capacity_gb = arr[0].get('MaxCapacityGB', 0) or 0
+
+    current_ram_gb = sum(m.get('CapacityGB', 0) or 0 for m in occupied_slots)
+    empty_slots = max(0, total_slots - len(occupied_slots))
+
+    opportunities['ram'] = {
+        'total_slots': total_slots,
+        'occupied_slots': len(occupied_slots),
+        'empty_slots': empty_slots,
+        'current_capacity_gb': current_ram_gb,
+        'max_capacity_gb': max_capacity_gb,
+        'modules': occupied_slots,
+    }
+
+    if empty_slots > 0:
+        # Determine RAM type from existing modules
+        ram_type = ''
+        ram_speed = 0
+        if occupied_slots:
+            ram_speed = occupied_slots[0].get('ConfiguredClockSpeed', 0) or 0
+            smbios_type = occupied_slots[0].get('MemoryType', 0) or 0
+            type_map = {20: 'DDR', 21: 'DDR2', 24: 'DDR3', 26: 'DDR4', 34: 'DDR5'}
+            ram_type = type_map.get(smbios_type, f'Tipo {smbios_type}')
+
+        opportunities['recommendations'].append(
+            f'RAM: {empty_slots} slot(s) disponible(s). '
+            f'Actualmente {current_ram_gb:.0f} GB de {max_capacity_gb} GB max. '
+            f'Puede agregar módulos {ram_type}-{ram_speed} para mejorar rendimiento.'
+        )
+
+    # --- Storage Analysis ---
+    disk_result = run_powershell_json(
+        'Get-PhysicalDisk | Select-Object FriendlyName, MediaType, BusType, '
+        '@{N="SizeGB";E={[math]::Round($_.Size/1GB,2)}}, HealthStatus',
+        description='Get disk details for upgrade analysis',
+    )
+
+    disks = []
+    if disk_result.status == CommandStatus.SUCCESS and disk_result.details:
+        data = disk_result.details
+        if isinstance(data, dict):
+            data = [data]
+        disks = data
+
+    has_hdd = False
+    has_ssd = False
+    has_nvme = False
+    for d in disks:
+        media = str(d.get('MediaType', '')).upper()
+        bus = str(d.get('BusType', '')).upper()
+        if 'HDD' in media or media == '3':
+            has_hdd = True
+        if 'SSD' in media or media == '4':
+            has_ssd = True
+        if 'NVME' in bus or 'NVM' in bus:
+            has_nvme = True
+
+    opportunities['storage'] = {
+        'disks': disks,
+        'has_hdd': has_hdd,
+        'has_ssd': has_ssd,
+        'has_nvme': has_nvme,
+    }
+
+    if has_hdd:
+        opportunities['recommendations'].append(
+            'ALMACENAMIENTO: Se detectó disco duro mecánico (HDD). '
+            'Se recomienda actualizar a SSD/NVMe para mejorar '
+            'significativamente los tiempos de arranque y rendimiento general.'
+        )
+
+    # --- NVMe/M.2 Slots ---
+    # Check for available M.2 slots via disk controller enumeration
+    m2_result = run_powershell_json(
+        'Get-PhysicalDisk | Where-Object { $_.BusType -eq "NVMe" } | '
+        'Select-Object FriendlyName, '
+        '@{N="SizeGB";E={[math]::Round($_.Size/1GB,2)}}, BusType',
+        description='Get NVMe disks',
+    )
+
+    nvme_disks = []
+    if m2_result.status == CommandStatus.SUCCESS and m2_result.details:
+        data = m2_result.details
+        if isinstance(data, dict):
+            data = [data]
+        nvme_disks = data
+
+    # Check motherboard for M.2 slot info
+    m2_slots_result = run_powershell(
+        'Get-CimInstance Win32_SystemSlot | Where-Object { '
+        '$_.SlotDesignation -match "M.2|M2|NVME|NVMe|SSD" -or '
+        '$_.Description -match "M.2|M2" } | '
+        'Select-Object SlotDesignation, CurrentUsage, Description | '
+        'ConvertTo-Json',
+        timeout=15,
+        description='Detect M.2 slots on motherboard',
+    )
+
+    m2_available = 0
+    m2_total = 0
+    if m2_slots_result.status == CommandStatus.SUCCESS and m2_slots_result.output:
+        try:
+            import json
+            slots_data = json.loads(m2_slots_result.output.strip())
+            if isinstance(slots_data, dict):
+                slots_data = [slots_data]
+            m2_total = len(slots_data)
+            for slot in slots_data:
+                usage = str(slot.get('CurrentUsage', '')).lower()
+                if 'available' in usage or usage == '' or usage == '0':
+                    m2_available += 1
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    opportunities['expansion'] = {
+        'nvme_disks_installed': len(nvme_disks),
+        'm2_slots_total': m2_total,
+        'm2_slots_available': m2_available,
+    }
+
+    if m2_available > 0:
+        opportunities['recommendations'].append(
+            f'NVMe M.2: {m2_available} slot(s) M.2 disponible(s). '
+            'Puede instalar un disco NVMe adicional para más almacenamiento '
+            'de alto rendimiento.'
+        )
+
+    if not has_nvme and has_ssd:
+        opportunities['recommendations'].append(
+            'NVMe: El equipo usa SSD SATA. Si la placa base tiene slot M.2, '
+            'considere migrar a NVMe para mayor velocidad de lectura/escritura.'
+        )
+
+    return opportunities
+
+
 def run_full_diagnostics():
     """Run all diagnostic checks and return combined results."""
     results = {}
