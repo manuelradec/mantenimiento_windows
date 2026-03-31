@@ -390,7 +390,7 @@ def _step_lenovo_update():
 
 
 def _collect_system_info():
-    """Collect system hardware info for reporting."""
+    """Collect comprehensive system hardware info for RADEC reports."""
     import sys
     info = {}
     if sys.platform != 'win32':
@@ -416,6 +416,23 @@ def _collect_system_info():
     except (ValueError, TypeError):
         info['ram_gb'] = info.get('ram_bytes', 'N/A')
 
+    # Detailed RAM info (type and speed)
+    r = run_powershell(
+        "Get-CimInstance Win32_PhysicalMemory | Select-Object -First 1 "
+        "Speed, ConfiguredClockSpeed, SMBIOSMemoryType | "
+        "ForEach-Object { "
+        "$type = switch($_.SMBIOSMemoryType) { "
+        "20 {'DDR'} 21 {'DDR2'} 24 {'DDR3'} 26 {'DDR4'} 34 {'DDR5'} "
+        "default {'DDR'} }; "
+        "\"$type-$($_.ConfiguredClockSpeed)\" }",
+        timeout=10, description='Get RAM type',
+    )
+    ram_type = (r.output or '').strip() if r.output else ''
+    if ram_type:
+        info['ram_detail'] = f"{info['ram_gb']} {ram_type}"
+    else:
+        info['ram_detail'] = info['ram_gb']
+
     # IP address
     r = run_powershell(
         "(Get-NetIPAddress -AddressFamily IPv4 | "
@@ -428,18 +445,120 @@ def _collect_system_info():
     # Hard drive
     r = run_powershell(
         "Get-PhysicalDisk | Select-Object -First 1 FriendlyName, MediaType, "
-        "@{N='SizeGB';E={[math]::Round($_.Size/1GB,1)}} | "
-        "ForEach-Object { \"$($_.FriendlyName) ($($_.MediaType), $($_.SizeGB) GB)\" }",
+        "BusType, @{N='SizeGB';E={[math]::Round($_.Size/1GB,0)}} | "
+        "ForEach-Object { \"$($_.SizeGB) GB $($_.BusType) $($_.MediaType)\" }",
         timeout=10, description='Get disk info',
     )
     info['hard_drive'] = (r.output or '').strip() if r.output else 'N/A'
 
     # OS version
     r = run_powershell(
-        "(Get-WmiObject Win32_OperatingSystem).Caption + ' Build ' + "
-        "(Get-WmiObject Win32_OperatingSystem).BuildNumber",
+        "(Get-WmiObject Win32_OperatingSystem).Caption",
         timeout=10, description='Get OS version',
     )
     info['os_version'] = (r.output or '').strip() if r.output else 'N/A'
+
+    # OS build (display version like 25H2)
+    r = run_powershell(
+        "(Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion').DisplayVersion",
+        timeout=10, description='Get OS display version',
+    )
+    os_display = (r.output or '').strip() if r.output else ''
+    if os_display:
+        info['os_version_full'] = f"{info['os_version']} {os_display}"
+    else:
+        info['os_version_full'] = info['os_version']
+
+    # Monitor info
+    r = run_powershell(
+        "Get-CimInstance WmiMonitorID -Namespace root/wmi -ErrorAction SilentlyContinue | "
+        "Select-Object -First 1 | ForEach-Object { "
+        "$mfr = ($_.ManufacturerName | Where-Object {$_ -ne 0} | "
+        "ForEach-Object {[char]$_}) -join ''; "
+        "$model = ($_.UserFriendlyName | Where-Object {$_ -ne 0} | "
+        "ForEach-Object {[char]$_}) -join ''; "
+        "$serial = ($_.SerialNumberID | Where-Object {$_ -ne 0} | "
+        "ForEach-Object {[char]$_}) -join ''; "
+        "\"$mfr|$model|$serial\" }",
+        timeout=15, description='Get monitor info',
+    )
+    monitor_raw = (r.output or '').strip() if r.output else ''
+    if monitor_raw and '|' in monitor_raw:
+        parts = monitor_raw.split('|')
+        info['monitor_manufacturer'] = parts[0] if len(parts) > 0 else 'N/A'
+        info['monitor_model'] = parts[1] if len(parts) > 1 else 'N/A'
+        info['monitor_serial'] = parts[2] if len(parts) > 2 else 'N/A'
+        info['monitor_info'] = f"{parts[0]} MOD:{parts[1]} S/N: {parts[2]}"
+    else:
+        info['monitor_info'] = 'N/A'
+        info['monitor_manufacturer'] = 'N/A'
+        info['monitor_model'] = 'N/A'
+        info['monitor_serial'] = 'N/A'
+
+    # System serial with additional IDs (asset tags)
+    r = run_powershell(
+        "$bios = Get-WmiObject Win32_BIOS; "
+        "$cs = Get-WmiObject Win32_ComputerSystem; "
+        "$enc = Get-WmiObject Win32_SystemEnclosure; "
+        "\"$($bios.SerialNumber), $($enc.SMBIOSAssetTag), $($cs.DNSHostName)\"",
+        timeout=10, description='Get serial and asset info',
+    )
+    info['serial_full'] = (r.output or '').strip() if r.output else info.get('serial', 'N/A')
+
+    # Equipment description (model + serial for FO-TI-19)
+    info['equipment_description'] = (
+        f"{info.get('model', 'N/A')}, N/S: {info.get('serial', 'N/A')}"
+    )
+
+    # Detect optical drives
+    r = run_powershell(
+        "Get-CimInstance Win32_CDROMDrive -ErrorAction SilentlyContinue | "
+        "Select-Object Name, MediaType | ConvertTo-Json",
+        timeout=10, description='Get optical drives',
+    )
+    info['has_cdrom'] = False
+    info['has_dvdrom'] = False
+    if r.output and r.output.strip():
+        cd_raw = r.output.strip().lower()
+        info['has_cdrom'] = 'cd' in cd_raw
+        info['has_dvdrom'] = 'dvd' in cd_raw
+
+    # Detect USB ports
+    info['has_usb'] = True  # Practically all PCs have USB
+    info['has_micro_sd'] = False  # Will be detected if card reader present
+    r = run_powershell(
+        "Get-PnpDevice -Class 'SDHost' -Status OK -ErrorAction SilentlyContinue | "
+        "Measure-Object | Select-Object -ExpandProperty Count",
+        timeout=10, description='Detect SD card reader',
+    )
+    sd_count = (r.output or '').strip()
+    if sd_count and sd_count.isdigit() and int(sd_count) > 0:
+        info['has_micro_sd'] = True
+
+    # Logged-in user full name
+    r = run_powershell(
+        "try { (Get-CimInstance Win32_UserAccount | "
+        "Where-Object { $_.Name -eq $env:USERNAME } | "
+        "Select-Object -First 1).FullName } catch { $env:USERNAME }",
+        timeout=10, description='Get user full name',
+    )
+    info['user_fullname'] = (r.output or '').strip() if r.output else 'N/A'
+
+    # User email from Active Directory (if domain joined)
+    r = run_powershell(
+        "try { ([adsisearcher]\"(&(objectCategory=User)"
+        "(samAccountName=$env:USERNAME))\").FindOne().Properties.mail } "
+        "catch { 'N/A' }",
+        timeout=10, description='Get user email',
+    )
+    info['user_email'] = (r.output or '').strip() if r.output else 'N/A'
+
+    # Get upgrade opportunities
+    try:
+        from services.system_info import get_upgrade_opportunities
+        info['upgrade_opportunities'] = get_upgrade_opportunities()
+    except Exception as e:
+        logger.warning(f"Failed to get upgrade opportunities: {e}")
+        info['upgrade_opportunities'] = {'recommendations': []}
 
     return info

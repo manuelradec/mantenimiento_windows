@@ -395,6 +395,556 @@ def _fill_form_fields(ws, system_info, steps, date_display):
                     ws.cell(row=cell.row, column=next_col, value=field_map[val])
 
 
+def generate_fo_ti_19_html(system_info, steps, session_data,
+                           sucursal='', technician_name=''):
+    """
+    Generate FO-TI-19 Hoja de Servicio Mantenimiento de Equipo de Cómputo.
+    Matches the official RADEC format with all fields.
+    """
+    from html import escape as he
+
+    date_display = datetime.now().strftime('%d/%m/%Y')
+
+    # Service type checkmarks
+    svc_preventivo = 'checked'
+
+    # Determine accessories
+    accessories = 'MOUSE, TECLADO Y NO-BREAK'
+
+    # Unidades (drives) checkmarks
+    has_cdrom = system_info.get('has_cdrom', False)
+    has_dvdrom = system_info.get('has_dvdrom', False)
+    has_usb = system_info.get('has_usb', True)
+    has_micro_sd = system_info.get('has_micro_sd', False)
+
+    # Otros text
+    otros_text = ''
+    otros_parts = []
+    if has_usb:
+        otros_parts.append('USB')
+    if has_micro_sd:
+        otros_parts.append('MICRO SD')
+    if otros_parts:
+        otros_text = ', '.join(otros_parts)
+
+    # Activities text
+    activities = (
+        'SE REALIZO LA LIMPIEZA INTERNA COMO EXTERNA, ASI COMO EL '
+        'MANTENIMIENTO LOGICO, SE ENTREGA EQUIPO FUNCIONANDO CORRECTAMENTE.'
+    )
+
+    # Physical observations
+    observations_physical = 'EQUIPO FUNCIONAL'
+
+    # Comments
+    comments = 'MANTENIMIENTO ANUAL PREVENTIVO'
+
+    # Technician observations
+    tech_observations = ''
+    if steps:
+        step_details = []
+        for s in steps:
+            if s.get('status') == 'failed':
+                step_details.append(f"{s.get('name', '')}: FALLIDO - {s.get('message', '')}")
+            elif s.get('status') == 'skipped':
+                step_details.append(f"{s.get('name', '')}: OMITIDO - {s.get('message', '')}")
+        if step_details:
+            tech_observations = '; '.join(step_details)
+        else:
+            tech_observations = 'TODOS LOS PASOS COMPLETADOS EXITOSAMENTE'
+
+    # Upgrade opportunities / Mejoras section
+    upgrades = system_info.get('upgrade_opportunities', {})
+    mejoras_html = _build_mejoras_section(upgrades)
+
+    html = f'''<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>FO-TI-19 - {he(system_info.get('hostname', 'EQUIPO'))}</title>
+    <style>
+        @page {{ size: letter; margin: 15mm; }}
+        @media print {{ body {{ margin: 0; }} .no-print {{ display: none; }} }}
+        body {{ font-family: Arial, sans-serif; font-size: 11px; color: #000; margin: 20px; }}
+        .form-container {{ max-width: 800px; margin: 0 auto; border: 2px solid #000; }}
+        .header {{ display: flex; align-items: center; border-bottom: 2px solid #000; }}
+        .header-logo {{ width: 150px; padding: 8px 12px; border-right: 1px solid #000;
+                        font-weight: bold; font-size: 18px; color: #C00; text-align: center; }}
+        .header-logo .sub {{ font-size: 8px; color: #666; letter-spacing: 2px; }}
+        .header-title {{ flex: 1; text-align: center; padding: 8px; }}
+        .header-title h2 {{ margin: 0; font-size: 14px; }}
+        .header-title .doc-type {{ font-size: 9px; color: #666; }}
+        .header-code {{ width: 130px; border-left: 1px solid #000; padding: 6px 10px;
+                        font-size: 10px; }}
+        .header-code div {{ margin: 2px 0; }}
+        .row {{ display: flex; border-bottom: 1px solid #000; }}
+        .cell {{ padding: 6px 10px; border-right: 1px solid #000; }}
+        .cell:last-child {{ border-right: none; }}
+        .cell-label {{ font-weight: bold; background: #f5f5f5; min-width: 140px; font-size: 10px; }}
+        .cell-value {{ flex: 1; font-size: 11px; }}
+        .section-title {{ background: #e8e8e8; font-weight: bold; padding: 6px 10px;
+                          border-bottom: 1px solid #000; font-size: 11px; }}
+        .checkbox {{ display: inline-block; width: 14px; height: 14px; border: 1.5px solid #000;
+                     text-align: center; line-height: 14px; font-size: 10px; margin-right: 4px;
+                     vertical-align: middle; }}
+        .checkbox.checked {{ background: #000; color: #fff; }}
+        .radio {{ display: inline-block; width: 14px; height: 14px; border: 1.5px solid #000;
+                  border-radius: 50%; text-align: center; line-height: 14px; font-size: 8px;
+                  margin-right: 4px; vertical-align: middle; }}
+        .radio.checked {{ background: #000; color: #fff; }}
+        .signature-area {{ display: flex; border-bottom: 1px solid #000; min-height: 70px; }}
+        .signature-box {{ flex: 1; border-right: 1px solid #000; padding: 10px; text-align: center;
+                          display: flex; flex-direction: column; justify-content: flex-end; }}
+        .signature-box:last-child {{ border-right: none; }}
+        .signature-line {{ border-top: 1px solid #000; margin-top: auto; padding-top: 4px;
+                           font-size: 10px; font-weight: bold; }}
+        .mejoras-section {{ margin-top: 0; border-top: 2px solid #000; }}
+        .mejoras-section h3 {{ background: #274C9B; color: #fff; margin: 0; padding: 8px 10px;
+                               font-size: 12px; }}
+        .mejora-item {{ padding: 6px 10px; border-bottom: 1px solid #ddd; font-size: 11px; }}
+        .mejora-item .tag {{ display: inline-block; background: #0AAE6B; color: #fff;
+                             padding: 1px 6px; border-radius: 3px; font-size: 9px;
+                             font-weight: bold; margin-right: 6px; }}
+        .mejora-item .tag.storage {{ background: #D6814A; }}
+        .mejora-item .tag.nvme {{ background: #274C9B; }}
+        .footer-version {{ text-align: right; font-size: 9px; color: #999; padding: 4px 10px; }}
+    </style>
+</head>
+<body>
+<div class="form-container">
+    <!-- Header -->
+    <div class="header">
+        <div class="header-logo">
+            RADEC<br><span class="sub">AUTOPARTES</span>
+        </div>
+        <div class="header-title">
+            <h2>Hoja de Servicio Mantenimiento de Equipo de C&oacute;mputo</h2>
+            <div class="doc-type">Tipo de Documento<br>Formato</div>
+        </div>
+        <div class="header-code">
+            <div><strong>C&oacute;digo</strong></div>
+            <div>FO-TI-19</div>
+            <div><strong>Fecha de Emisi&oacute;n</strong></div>
+            <div>10/01/2025</div>
+        </div>
+    </div>
+
+    <!-- Fecha de Solicitud -->
+    <div class="row">
+        <div class="cell cell-label" style="flex:1;">
+            <strong>Fecha de Solicitud:</strong>
+        </div>
+        <div class="cell cell-value" style="flex:1;text-align:center;font-weight:bold;">
+            {he(date_display)}
+        </div>
+    </div>
+
+    <!-- Sucursal -->
+    <div class="row">
+        <div class="cell cell-label">Sucursal:</div>
+        <div class="cell cell-value">{he(sucursal)}</div>
+    </div>
+
+    <!-- Nombre del Solicitante -->
+    <div class="row">
+        <div class="cell cell-label">Nombre del Solicitante:</div>
+        <div class="cell cell-value" style="text-align:center;font-weight:bold;">
+            {he(system_info.get('user_fullname', system_info.get('username', 'N/A'))).upper()}
+        </div>
+    </div>
+
+    <!-- Direccion -->
+    <div class="row">
+        <div class="cell cell-label">Direcci&oacute;n:</div>
+        <div class="cell cell-value">&nbsp;</div>
+    </div>
+
+    <!-- Telefono / Correo -->
+    <div class="row">
+        <div class="cell cell-label" style="width:100px;">Tel&eacute;fono:</div>
+        <div class="cell cell-value" style="flex:1;">&nbsp;</div>
+        <div class="cell cell-label" style="width:130px;">Correo Electr&oacute;nico:</div>
+        <div class="cell cell-value" style="flex:1;">
+            {he(system_info.get('user_email', 'N/A'))}
+        </div>
+    </div>
+
+    <!-- Descripcion del Equipo -->
+    <div class="row">
+        <div class="cell cell-label">Descripci&oacute;n del Equipo:</div>
+        <div class="cell cell-value">
+            {he(system_info.get('equipment_description',
+                system_info.get('model', 'N/A')))}
+        </div>
+    </div>
+
+    <!-- Datos del Monitor -->
+    <div class="row">
+        <div class="cell cell-label">Datos del Monitor:</div>
+        <div class="cell cell-value">{he(system_info.get('monitor_info', 'N/A'))}</div>
+    </div>
+
+    <!-- Procesador, Velocidad -->
+    <div class="row">
+        <div class="cell cell-label">Procesador, Velocidad:</div>
+        <div class="cell cell-value">{he(system_info.get('processor', 'N/A'))}</div>
+    </div>
+
+    <!-- Capacidad de RAM / Discos de Sistema -->
+    <div class="row">
+        <div class="cell cell-label" style="width:140px;">Capacidad de RAM:</div>
+        <div class="cell cell-value" style="flex:1;">
+            {he(system_info.get('ram_detail', system_info.get('ram_gb', 'N/A')))}
+        </div>
+        <div class="cell cell-label" style="width:130px;">Discos de Sistema:</div>
+        <div class="cell cell-value" style="width:80px;">
+            <span class="radio checked">&#8226;</span> S&iacute;
+            &nbsp;&nbsp;
+            <span class="radio">&#8226;</span> No
+        </div>
+    </div>
+
+    <!-- Capacidad de HD / Sistema Operativo -->
+    <div class="row">
+        <div class="cell cell-label" style="width:140px;">Capacidad de HD:</div>
+        <div class="cell cell-value" style="flex:1;">
+            {he(system_info.get('hard_drive', 'N/A'))}
+        </div>
+        <div class="cell cell-label" style="width:130px;">Sistema Operativo:</div>
+        <div class="cell cell-value" style="flex:1;">
+            {he(system_info.get('os_version_full', system_info.get('os_version', 'N/A')))}
+        </div>
+    </div>
+
+    <!-- Unidades -->
+    <div class="row">
+        <div class="cell cell-label" style="width:140px;">Unidades:</div>
+        <div class="cell cell-value" style="flex:1;">
+            <div style="margin-bottom:4px;">
+                <span class="checkbox {'checked' if has_cdrom else ''}">{('X' if has_cdrom else '&nbsp;')}</span> CD-ROM
+                &nbsp;&nbsp;&nbsp;
+                <span class="checkbox">{'X' if False else '&nbsp;'}</span> Quemador CD
+                &nbsp;&nbsp;&nbsp;
+                <span class="checkbox">{'X' if False else '&nbsp;'}</span> Flopy
+                &nbsp;&nbsp;&nbsp;
+                <span class="checkbox {'checked' if otros_text else ''}">{('X' if otros_text else '&nbsp;')}</span> Otros
+                &nbsp; <span style="font-size:10px;">{he(otros_text)}</span>
+            </div>
+            <div>
+                <span class="checkbox {'checked' if has_dvdrom else ''}">{('X' if has_dvdrom else '&nbsp;')}</span> DVD-ROM
+                &nbsp;&nbsp;&nbsp;
+                <span class="checkbox">{'X' if False else '&nbsp;'}</span> Quemador DVD
+            </div>
+        </div>
+    </div>
+
+    <!-- Accesorios -->
+    <div class="row">
+        <div class="cell cell-label">Accesorios:</div>
+        <div class="cell cell-value" style="text-align:center;">{he(accessories)}</div>
+    </div>
+
+    <!-- Tipo de Servicio Solicitado -->
+    <div class="row">
+        <div class="cell cell-label" style="width:140px;">Tipo de Servicio<br>Solicitado:</div>
+        <div class="cell cell-value" style="flex:1;display:flex;justify-content:space-around;align-items:center;">
+            <span><span class="radio"></span> Revisi&oacute;n</span>
+            <span><span class="radio {'checked' if svc_preventivo else ''}">&#8226;</span> Preventivo</span>
+            <span><span class="radio"></span> Correctivo</span>
+        </div>
+    </div>
+
+    <!-- Comentarios sobre la falla -->
+    <div class="row">
+        <div class="cell cell-label">Comentarios sobre la<br>falla:</div>
+        <div class="cell cell-value" style="text-align:center;min-height:40px;display:flex;align-items:center;justify-content:center;">
+            {he(comments)}
+        </div>
+    </div>
+
+    <!-- Observaciones Estado Fisico -->
+    <div class="row">
+        <div class="cell cell-label">Observaciones Estado<br>F&iacute;sico:</div>
+        <div class="cell cell-value" style="text-align:center;min-height:40px;display:flex;align-items:center;justify-content:center;">
+            {he(observations_physical)}
+        </div>
+    </div>
+
+    <!-- Signatures -->
+    <div class="signature-area">
+        <div class="signature-box">
+            <div style="min-height:40px;"></div>
+            <div class="signature-line">
+                {he(system_info.get('user_fullname', '').upper())}<br>
+                Nombre y Firma del Solicitante
+            </div>
+        </div>
+        <div class="signature-box">
+            <div style="min-height:40px;"></div>
+            <div class="signature-line">
+                {he(technician_name.upper()) if technician_name else '&nbsp;'}<br>
+                Nombre y Firma de quien Recibe
+            </div>
+        </div>
+    </div>
+
+    <!-- Actividades Realizadas -->
+    <div class="row" style="min-height:60px;">
+        <div class="cell cell-label">Actividades Realizadas:</div>
+        <div class="cell cell-value" style="text-align:center;display:flex;align-items:center;justify-content:center;">
+            {he(activities)}
+        </div>
+    </div>
+
+    <!-- Observaciones del Tecnico -->
+    <div class="row" style="min-height:40px;">
+        <div class="cell cell-label">Observaciones del<br>T&eacute;cnico:</div>
+        <div class="cell cell-value" style="text-align:center;display:flex;align-items:center;justify-content:center;">
+            {he(tech_observations)}
+        </div>
+    </div>
+
+    <!-- MEJORAS Section -->
+    {mejoras_html}
+
+</div>
+
+<div class="footer-version">
+    Versi&oacute;n 07 &mdash; P&aacute;gina 1 de 1 &mdash;
+    Generado por CleanCPU v{Config.APP_VERSION}
+</div>
+
+<div class="no-print" style="text-align:center;margin-top:20px;">
+    <button onclick="window.print()" style="padding:10px 30px;font-size:14px;cursor:pointer;">
+        Imprimir / Guardar PDF
+    </button>
+</div>
+</body>
+</html>'''
+    return html
+
+
+def generate_fo_ti_20_html(entries, sucursal=''):
+    """
+    Generate FO-TI-20 Bitacora de mantenimiento de equipo de computo.
+    entries: list of dicts with keys: fecha, usuario, equipo, reporte_final
+    Matches the official RADEC summary table format.
+    """
+    from html import escape as he
+
+    date_display = datetime.now().strftime('%d/%m/%Y')
+
+    rows_html = ''
+    for i, entry in enumerate(entries, 1):
+        rows_html += f'''
+        <tr>
+            <td style="text-align:center;">{i}</td>
+            <td style="text-align:center;">{he(str(entry.get('fecha', '')))}</td>
+            <td style="text-align:center;">{he(str(entry.get('usuario', '')).upper())}</td>
+            <td style="text-align:center;">{he(str(entry.get('equipo', '')).upper())}</td>
+            <td style="text-align:center;">{he(str(entry.get('reporte_final', 'MANTENIMIENTO PREVENTIVO')).upper())}</td>
+            <td style="text-align:center;min-width:80px;">&nbsp;</td>
+        </tr>'''
+
+    # Fill remaining empty rows to reach at least 20
+    for j in range(len(entries) + 1, 21):
+        rows_html += f'''
+        <tr>
+            <td style="text-align:center;">{j}</td>
+            <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
+        </tr>'''
+
+    html = f'''<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>FO-TI-20 Bit&aacute;cora de Mantenimiento - {he(sucursal)}</title>
+    <style>
+        @page {{ size: letter landscape; margin: 15mm; }}
+        @media print {{ body {{ margin: 0; }} .no-print {{ display: none; }} }}
+        body {{ font-family: Arial, sans-serif; font-size: 11px; color: #000; margin: 20px; }}
+        .form-container {{ max-width: 1000px; margin: 0 auto; border: 2px solid #000; }}
+        .header {{ display: flex; align-items: center; border-bottom: 2px solid #000; }}
+        .header-logo {{ width: 150px; padding: 8px 12px; border-right: 1px solid #000;
+                        font-weight: bold; font-size: 18px; color: #C00; text-align: center; }}
+        .header-logo .sub {{ font-size: 8px; color: #666; letter-spacing: 2px; }}
+        .header-title {{ flex: 1; text-align: center; padding: 8px; }}
+        .header-title h2 {{ margin: 0; font-size: 14px; }}
+        .header-title .doc-type {{ font-size: 9px; color: #666; }}
+        .header-code {{ width: 130px; border-left: 1px solid #000; padding: 6px 10px;
+                        font-size: 10px; }}
+        .header-code div {{ margin: 2px 0; }}
+        .sucursal-row {{ display: flex; border-bottom: 2px solid #000; }}
+        .sucursal-label {{ padding: 8px 12px; font-weight: bold; font-size: 12px; flex: 1; }}
+        .sucursal-value {{ padding: 8px 12px; font-weight: bold; font-size: 12px; flex: 1;
+                           text-align: right; }}
+        table {{ width: 100%; border-collapse: collapse; }}
+        th {{ background: #e8e8e8; border: 1px solid #000; padding: 8px 6px; font-size: 11px;
+              font-weight: bold; }}
+        td {{ border: 1px solid #000; padding: 6px; font-size: 11px; }}
+        .footer-version {{ text-align: right; font-size: 9px; color: #999; padding: 4px 10px; }}
+    </style>
+</head>
+<body>
+<div class="form-container">
+    <!-- Header -->
+    <div class="header">
+        <div class="header-logo">
+            RADEC<br><span class="sub">AUTOPARTES</span>
+        </div>
+        <div class="header-title">
+            <h2>Bit&aacute;cora de mantenimiento de equipo de computo</h2>
+            <div class="doc-type">Tipo de Documento<br>Formato</div>
+        </div>
+        <div class="header-code">
+            <div><strong>C&oacute;digo</strong></div>
+            <div>FO-TI-20</div>
+            <div><strong>Fecha de Emisi&oacute;n</strong></div>
+            <div>10/01/2025</div>
+        </div>
+    </div>
+
+    <!-- Sucursal -->
+    <div class="sucursal-row">
+        <div class="sucursal-label">Sucursal</div>
+        <div class="sucursal-value">{he(sucursal.upper())}</div>
+    </div>
+
+    <!-- Table -->
+    <table>
+        <thead>
+            <tr>
+                <th style="width:30px;">#</th>
+                <th style="width:100px;">Fecha</th>
+                <th style="width:200px;">Usuario</th>
+                <th style="width:200px;">Equipo</th>
+                <th style="width:200px;">Reporte Final</th>
+                <th style="width:100px;">Firma</th>
+            </tr>
+        </thead>
+        <tbody>
+            {rows_html}
+        </tbody>
+    </table>
+</div>
+
+<div class="footer-version">
+    Generado por CleanCPU v{Config.APP_VERSION} &mdash; {he(date_display)}
+</div>
+
+<div class="no-print" style="text-align:center;margin-top:20px;">
+    <button onclick="window.print()" style="padding:10px 30px;font-size:14px;cursor:pointer;">
+        Imprimir / Guardar PDF
+    </button>
+</div>
+</body>
+</html>'''
+    return html
+
+
+def _build_mejoras_section(upgrades):
+    """Build the Mejoras (Improvements) HTML section for FO-TI-19."""
+    from html import escape as he
+
+    if not upgrades:
+        return ''
+
+    recommendations = upgrades.get('recommendations', [])
+    ram_info = upgrades.get('ram', {})
+    storage_info = upgrades.get('storage', {})
+    expansion_info = upgrades.get('expansion', {})
+
+    items_html = ''
+
+    # RAM details
+    if ram_info.get('empty_slots', 0) > 0:
+        items_html += f'''
+        <div class="mejora-item">
+            <span class="tag">RAM</span>
+            <strong>Slots disponibles:</strong> {ram_info.get('empty_slots', 0)} de
+            {ram_info.get('total_slots', 0)} total.
+            Capacidad actual: {ram_info.get('current_capacity_gb', 0):.0f} GB /
+            M&aacute;ximo soportado: {ram_info.get('max_capacity_gb', 0)} GB.
+        </div>'''
+        # Show installed modules
+        for mod in ram_info.get('modules', []):
+            cap = mod.get('CapacityGB', 0) or 0
+            mfr = mod.get('Manufacturer', 'N/A') or 'N/A'
+            speed = mod.get('ConfiguredClockSpeed', 0) or mod.get('Speed', 0) or 0
+            bank = mod.get('BankLabel', '') or mod.get('DeviceLocator', '') or ''
+            items_html += f'''
+            <div class="mejora-item" style="padding-left:30px;font-size:10px;">
+                Slot {he(str(bank))}: {cap:.0f} GB - {he(str(mfr).strip())} @ {speed} MHz
+            </div>'''
+    elif ram_info.get('total_slots', 0) > 0:
+        items_html += f'''
+        <div class="mejora-item">
+            <span class="tag">RAM</span>
+            Todos los slots ocupados ({ram_info.get('occupied_slots', 0)} de
+            {ram_info.get('total_slots', 0)}).
+            Capacidad actual: {ram_info.get('current_capacity_gb', 0):.0f} GB.
+            {'Se pueden reemplazar m&oacute;dulos por unos de mayor capacidad.' if ram_info.get('current_capacity_gb', 0) < ram_info.get('max_capacity_gb', 0) else 'Capacidad m&aacute;xima alcanzada.'}
+        </div>'''
+
+    # Storage details
+    if storage_info.get('has_hdd', False):
+        items_html += '''
+        <div class="mejora-item">
+            <span class="tag storage">HDD</span>
+            <strong>Disco mec&aacute;nico detectado.</strong>
+            Se recomienda actualizar a SSD/NVMe para mejorar rendimiento.
+        </div>'''
+
+    for disk in storage_info.get('disks', []):
+        name = disk.get('FriendlyName', 'N/A') or 'N/A'
+        media = disk.get('MediaType', 'N/A') or 'N/A'
+        bus = disk.get('BusType', '') or ''
+        size = disk.get('SizeGB', 0) or 0
+        health = disk.get('HealthStatus', 'N/A') or 'N/A'
+        items_html += f'''
+        <div class="mejora-item" style="padding-left:30px;font-size:10px;">
+            {he(str(name))} - {size:.0f} GB - Tipo: {he(str(media))}
+            {f'({he(str(bus))})' if bus else ''} - Salud: {he(str(health))}
+        </div>'''
+
+    # NVMe/M.2 expansion
+    if expansion_info.get('m2_slots_available', 0) > 0:
+        items_html += f'''
+        <div class="mejora-item">
+            <span class="tag nvme">M.2</span>
+            <strong>{expansion_info.get('m2_slots_available', 0)} slot(s) M.2 disponible(s)</strong>
+            de {expansion_info.get('m2_slots_total', 0)} total.
+            Se puede instalar almacenamiento NVMe adicional.
+        </div>'''
+    elif expansion_info.get('m2_slots_total', 0) == 0 and not storage_info.get('has_nvme', False):
+        items_html += '''
+        <div class="mejora-item">
+            <span class="tag nvme">M.2</span>
+            No se detectaron slots M.2/NVMe disponibles.
+        </div>'''
+
+    # General recommendations
+    for rec in recommendations:
+        if rec not in items_html:  # Avoid duplicates
+            items_html += f'''
+            <div class="mejora-item">
+                &#9679; {he(rec)}
+            </div>'''
+
+    if not items_html:
+        items_html = '''
+        <div class="mejora-item">
+            No se detectaron oportunidades de mejora de hardware.
+            El equipo est&aacute; en su capacidad &oacute;ptima.
+        </div>'''
+
+    return f'''
+    <div class="mejoras-section">
+        <h3>MEJORAS DE HARDWARE DETECTADAS</h3>
+        {items_html}
+    </div>'''
+
+
 def generate_full_report(session_data):
     """
     Generate all reports after maintenance completion.
@@ -409,7 +959,10 @@ def generate_full_report(session_data):
     # 1. HTML report
     html = generate_html_report(system_info, steps, session_data)
     local_path = save_report_locally(html, system_info)
-    results['html_local'] = {'status': 'success', 'path': local_path} if local_path else {'status': 'error'}
+    results['html_local'] = (
+        {'status': 'success', 'path': local_path} if local_path
+        else {'status': 'error'}
+    )
 
     # 2. Network share
     results['network_share'] = save_to_network_share(html, system_info)
@@ -419,5 +972,23 @@ def generate_full_report(session_data):
 
     # 4. RADEC Excel form
     results['excel_form'] = generate_radec_excel(system_info, steps)
+
+    # 5. FO-TI-19 HTML (Hoja de Servicio)
+    try:
+        fo_ti_19_html = generate_fo_ti_19_html(
+            system_info, steps, session_data
+        )
+        hostname = system_info.get('hostname', 'UNKNOWN')
+        date_str = datetime.now().strftime('%Y-%m-%d')
+        filename = f'FO-TI-19_{hostname}_{date_str}.html'
+        filepath = os.path.join(Config.REPORT_DIR, filename)
+        os.makedirs(Config.REPORT_DIR, exist_ok=True)
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(fo_ti_19_html)
+        results['fo_ti_19'] = {'status': 'success', 'path': filepath}
+        logger.info(f"FO-TI-19 HTML saved: {filepath}")
+    except Exception as e:
+        logger.error(f"FO-TI-19 generation failed: {e}")
+        results['fo_ti_19'] = {'status': 'error', 'error': str(e)}
 
     return results

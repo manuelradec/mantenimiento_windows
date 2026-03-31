@@ -144,6 +144,160 @@ def _build_incident_bundle() -> dict:
     }
 
 
+@reports_bp.route('/api/export/fo-ti-19', methods=['POST'])
+def api_export_fo_ti_19():
+    """Export FO-TI-19 Hoja de Servicio HTML report for current equipment."""
+    from flask import request
+    from services.maintenance_report import generate_fo_ti_19_html
+
+    data = request.get_json(silent=True) or {}
+    sucursal = data.get('sucursal', '')
+    technician_name = data.get('technician_name', '')
+
+    # Collect system info
+    from routes.maintenance import _collect_system_info
+    system_info = _collect_system_info()
+
+    # Build steps from audit log
+    session_id = current_app.config.get('SESSION_ID', 'unknown')
+    audit_entries = AuditStore.get_all(session_id, limit=200)
+    steps = []
+    for entry in audit_entries:
+        steps.append({
+            'name': entry.get('action', ''),
+            'status': 'completed' if entry.get('status') == 'success' else entry.get('status', ''),
+            'elapsed': (entry.get('duration_ms', 0) or 0) / 1000.0,
+            'message': entry.get('stdout_preview', '') or entry.get('stderr_preview', '') or '',
+        })
+
+    html = generate_fo_ti_19_html(
+        system_info, steps, {},
+        sucursal=sucursal,
+        technician_name=technician_name,
+    )
+
+    filename = f'FO-TI-19_{system_info.get("hostname", "EQUIPO")}_{datetime.now().strftime("%Y-%m-%d")}.html'
+    filepath = os.path.join(Config.REPORT_DIR, filename)
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    with open(filepath, 'w', encoding='utf-8') as f:
+        f.write(html)
+
+    return jsonify({'status': 'success', 'path': filepath})
+
+
+@reports_bp.route('/api/download/fo-ti-19')
+def api_download_fo_ti_19():
+    """Download FO-TI-19 HTML report."""
+    from flask import request
+    from services.maintenance_report import generate_fo_ti_19_html
+
+    sucursal = request.args.get('sucursal', '')
+    technician_name = request.args.get('technician_name', '')
+
+    from routes.maintenance import _collect_system_info
+    system_info = _collect_system_info()
+
+    session_id = current_app.config.get('SESSION_ID', 'unknown')
+    audit_entries = AuditStore.get_all(session_id, limit=200)
+    steps = []
+    for entry in audit_entries:
+        steps.append({
+            'name': entry.get('action', ''),
+            'status': 'completed' if entry.get('status') == 'success' else entry.get('status', ''),
+            'elapsed': (entry.get('duration_ms', 0) or 0) / 1000.0,
+            'message': entry.get('stdout_preview', '') or '',
+        })
+
+    html = generate_fo_ti_19_html(
+        system_info, steps, {},
+        sucursal=sucursal,
+        technician_name=technician_name,
+    )
+
+    filename = f'FO-TI-19_{system_info.get("hostname", "EQUIPO")}_{datetime.now().strftime("%Y-%m-%d")}.html'
+    filepath = os.path.join(Config.REPORT_DIR, filename)
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    with open(filepath, 'w', encoding='utf-8') as f:
+        f.write(html)
+
+    return send_file(filepath, as_attachment=True)
+
+
+@reports_bp.route('/api/export/fo-ti-20', methods=['POST'])
+def api_export_fo_ti_20():
+    """Export FO-TI-20 Bitacora de mantenimiento HTML report."""
+    from flask import request
+    from services.maintenance_report import generate_fo_ti_20_html
+
+    data = request.get_json(silent=True) or {}
+    sucursal = data.get('sucursal', '')
+    entries = data.get('entries', [])
+
+    # If no entries provided, build from current session audit log
+    if not entries:
+        from routes.maintenance import _collect_system_info
+        system_info = _collect_system_info()
+        username = current_app.config.get('USERNAME', 'unknown')
+
+        entries = [{
+            'fecha': datetime.now().strftime('%d/%m/%Y'),
+            'usuario': username,
+            'equipo': system_info.get('model', 'N/A'),
+            'reporte_final': 'MANTENIMIENTO PREVENTIVO',
+        }]
+
+    html = generate_fo_ti_20_html(entries, sucursal=sucursal)
+
+    filename = f'FO-TI-20_{sucursal or "SUCURSAL"}_{datetime.now().strftime("%Y-%m-%d")}.html'
+    filepath = os.path.join(Config.REPORT_DIR, filename)
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    with open(filepath, 'w', encoding='utf-8') as f:
+        f.write(html)
+
+    return jsonify({'status': 'success', 'path': filepath})
+
+
+@reports_bp.route('/api/download/fo-ti-20')
+def api_download_fo_ti_20():
+    """Download FO-TI-20 Bitacora HTML report."""
+    from flask import request
+    from services.maintenance_report import generate_fo_ti_20_html
+
+    sucursal = request.args.get('sucursal', '')
+
+    from routes.maintenance import _collect_system_info
+    system_info = _collect_system_info()
+    username = current_app.config.get('USERNAME', 'unknown')
+
+    entries = [{
+        'fecha': datetime.now().strftime('%d/%m/%Y'),
+        'usuario': username,
+        'equipo': system_info.get('model', 'N/A'),
+        'reporte_final': 'MANTENIMIENTO PREVENTIVO',
+    }]
+
+    html = generate_fo_ti_20_html(entries, sucursal=sucursal)
+
+    filename = f'FO-TI-20_{sucursal or "SUCURSAL"}_{datetime.now().strftime("%Y-%m-%d")}.html'
+    filepath = os.path.join(Config.REPORT_DIR, filename)
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    with open(filepath, 'w', encoding='utf-8') as f:
+        f.write(html)
+
+    return send_file(filepath, as_attachment=True)
+
+
+@reports_bp.route('/api/hardware-upgrades')
+def api_hardware_upgrades():
+    """Get hardware upgrade opportunities for current equipment."""
+    from services.system_info import get_upgrade_opportunities
+    try:
+        opportunities = get_upgrade_opportunities()
+        return jsonify({'status': 'success', 'data': opportunities})
+    except Exception as e:
+        return jsonify({'status': 'error', 'error': str(e)})
+
+
 def _generate_recommendations(entries, jobs, reboot_required) -> list[str]:
     """Auto-generate recommendations based on session data."""
     recs = []

@@ -285,7 +285,7 @@ async function cancelMaintenance() {
 }
 
 async function generateReport(sessionId) {
-    displayResult({status: 'info', output: 'Generando reportes (HTML, Excel FO-TI-19, Google Sheets, carpeta de red)...'});
+    displayResult({status: 'info', output: 'Generando reportes (HTML, FO-TI-19, Excel, Google Sheets, carpeta de red)...'});
     try {
         const response = await fetch(`/maintenance/api/report/${sessionId}`, {
             method: 'POST',
@@ -296,6 +296,8 @@ async function generateReport(sessionId) {
             const r = data.reports || {};
             let msg = 'Reportes generados:\n';
             if (r.html_local && r.html_local.status === 'success') msg += `  HTML local: ${r.html_local.path}\n`;
+            if (r.fo_ti_19 && r.fo_ti_19.status === 'success') msg += `  FO-TI-19 (Hoja de Servicio): ${r.fo_ti_19.path}\n`;
+            else if (r.fo_ti_19 && r.fo_ti_19.error) msg += `  FO-TI-19: Error - ${r.fo_ti_19.error}\n`;
             if (r.network_share && r.network_share.status === 'success') msg += `  Carpeta de red: ${r.network_share.path}\n`;
             else if (r.network_share && r.network_share.error) msg += `  Carpeta de red: ${r.network_share.error}\n`;
             if (r.google_sheets && r.google_sheets.status === 'success') msg += '  Google Sheets: Actualizado\n';

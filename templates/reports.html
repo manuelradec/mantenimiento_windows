@@ -1,9 +1,94 @@
 {% extends "base.html" %}
 {% block title %}CleanCPU - Reportes{% endblock %}
 {% block page_title %}Reportes y registros{% endblock %}
-{% block page_desc %}Registro de sesión, opciones de exportación y resumen de mantenimiento{% endblock %}
+{% block page_desc %}Registro de sesión, reportes RADEC FO-TI-19/20 y mejoras de hardware{% endblock %}
 
 {% block content %}
+<!-- RADEC Reports Section -->
+<div class="card" style="margin-bottom: 20px; border-left: 4px solid #274C9B;">
+    <div class="card-header">
+        <h3>Reportes RADEC</h3>
+    </div>
+    <div class="card-body">
+        <!-- Sucursal & Technician inputs -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+            <div>
+                <label style="font-size:12px;font-weight:bold;display:block;margin-bottom:4px;">Sucursal:</label>
+                <input type="text" id="input-sucursal" placeholder="Ej: CN PUEBLA"
+                       style="width:100%;padding:8px;border:1px solid var(--border-subtle);border-radius:4px;
+                              background:var(--bg-surface-1);color:var(--text-primary);font-size:13px;">
+            </div>
+            <div>
+                <label style="font-size:12px;font-weight:bold;display:block;margin-bottom:4px;">Nombre del Técnico:</label>
+                <input type="text" id="input-technician" placeholder="Ej: PABLO MEDINA MELITON"
+                       style="width:100%;padding:8px;border:1px solid var(--border-subtle);border-radius:4px;
+                              background:var(--bg-surface-1);color:var(--text-primary);font-size:13px;">
+            </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <!-- FO-TI-19 -->
+            <div style="background:var(--bg-surface-1);border-radius:8px;padding:16px;border:1px solid var(--border-subtle);">
+                <h4 style="margin:0 0 8px;color:#274C9B;">FO-TI-19 — Hoja de Servicio</h4>
+                <p style="font-size:12px;opacity:0.7;margin:0 0 12px;">
+                    Reporte detallado por equipo con datos de hardware, monitor, procesador, RAM, disco,
+                    tipo de servicio, actividades realizadas y mejoras detectadas.
+                </p>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn btn-sm btn-primary" onclick="exportFoTi19()">Generar FO-TI-19</button>
+                    <button class="btn btn-sm btn-outline" onclick="downloadFoTi19()">Descargar HTML</button>
+                </div>
+            </div>
+
+            <!-- FO-TI-20 -->
+            <div style="background:var(--bg-surface-1);border-radius:8px;padding:16px;border:1px solid var(--border-subtle);">
+                <h4 style="margin:0 0 8px;color:#274C9B;">FO-TI-20 — Bitácora de Mantenimiento</h4>
+                <p style="font-size:12px;opacity:0.7;margin:0 0 12px;">
+                    Tabla resumen de equipos mantenidos en la sucursal con fecha, usuario, equipo,
+                    reporte final y espacio para firma.
+                </p>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn btn-sm btn-primary" onclick="exportFoTi20()">Generar FO-TI-20</button>
+                    <button class="btn btn-sm btn-outline" onclick="downloadFoTi20()">Descargar HTML</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bitacora entries editor -->
+        <div style="margin-top:16px;background:var(--bg-surface-1);border-radius:8px;padding:16px;border:1px solid var(--border-subtle);">
+            <h4 style="margin:0 0 8px;">Entradas para Bitácora FO-TI-20</h4>
+            <p style="font-size:11px;opacity:0.7;margin:0 0 8px;">
+                Agregue las entradas de equipos mantenidos para generar la bitácora completa de la sucursal.
+            </p>
+            <div id="bitacora-entries">
+                <div class="bitacora-entry" style="display:grid;grid-template-columns:120px 1fr 1fr 1fr 30px;gap:6px;margin-bottom:6px;align-items:center;">
+                    <input type="date" class="entry-fecha" style="padding:4px;border:1px solid var(--border-subtle);border-radius:3px;background:var(--bg-surface-2);color:var(--text-primary);font-size:11px;">
+                    <input type="text" class="entry-usuario" placeholder="Usuario" style="padding:4px;border:1px solid var(--border-subtle);border-radius:3px;background:var(--bg-surface-2);color:var(--text-primary);font-size:11px;">
+                    <input type="text" class="entry-equipo" placeholder="Equipo (modelo)" style="padding:4px;border:1px solid var(--border-subtle);border-radius:3px;background:var(--bg-surface-2);color:var(--text-primary);font-size:11px;">
+                    <input type="text" class="entry-reporte" placeholder="MANTENIMIENTO PREVENTIVO" value="MANTENIMIENTO PREVENTIVO" style="padding:4px;border:1px solid var(--border-subtle);border-radius:3px;background:var(--bg-surface-2);color:var(--text-primary);font-size:11px;">
+                    <button onclick="removeEntry(this)" style="background:none;border:none;color:var(--color-danger);cursor:pointer;font-size:16px;" title="Eliminar">&times;</button>
+                </div>
+            </div>
+            <button class="btn btn-sm btn-outline" onclick="addEntry()" style="margin-top:6px;">+ Agregar entrada</button>
+        </div>
+    </div>
+</div>
+
+<!-- Hardware Upgrades / Mejoras Section -->
+<div class="card" style="margin-bottom: 20px; border-left: 4px solid #0AAE6B;">
+    <div class="card-header">
+        <h3>Mejoras de Hardware Detectadas</h3>
+        <button class="btn btn-sm btn-primary" onclick="scanHardwareUpgrades()">Escanear Mejoras</button>
+    </div>
+    <div class="card-body" id="hardware-upgrades-content">
+        <div class="alert alert-info">
+            Haga clic en "Escanear Mejoras" para detectar oportunidades de mejora de hardware
+            (slots de RAM disponibles, slots M.2/NVMe, discos HDD actualizables a SSD, etc.)
+        </div>
+    </div>
+</div>
+
+<!-- Session Summary -->
 <div class="card" style="margin-bottom: 20px;">
     <div class="card-header">
         <h3>Resumen de sesión</h3>
@@ -35,6 +120,7 @@
     </div>
 </div>
 
+<!-- Activity Log -->
 <div class="card">
     <div class="card-header">
         <h3>Registro de actividad</h3>
@@ -89,6 +175,243 @@
 
 {% block scripts %}
 <script>
+// ============================================================
+// FO-TI-19 Hoja de Servicio
+// ============================================================
+async function exportFoTi19() {
+    const sucursal = document.getElementById('input-sucursal').value;
+    const technician = document.getElementById('input-technician').value;
+
+    displayResult({status: 'info', output: 'Generando reporte FO-TI-19...'});
+    try {
+        const response = await fetch('/reports/api/export/fo-ti-19', {
+            method: 'POST',
+            headers: { ...getDefaultHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sucursal, technician_name: technician }),
+        });
+        const data = await response.json();
+        if (data.status === 'success') {
+            displayResult({status: 'success', output: `FO-TI-19 generado: ${data.path}`});
+        } else {
+            displayResult({status: 'error', error: data.error || 'Error al generar FO-TI-19.'});
+        }
+    } catch (e) {
+        displayResult({status: 'error', error: `Error: ${e.message}`});
+    }
+}
+
+function downloadFoTi19() {
+    const sucursal = encodeURIComponent(document.getElementById('input-sucursal').value);
+    const technician = encodeURIComponent(document.getElementById('input-technician').value);
+    window.open(`/reports/api/download/fo-ti-19?sucursal=${sucursal}&technician_name=${technician}`, '_blank');
+}
+
+// ============================================================
+// FO-TI-20 Bitacora
+// ============================================================
+async function exportFoTi20() {
+    const sucursal = document.getElementById('input-sucursal').value;
+    const entries = collectBitacoraEntries();
+
+    displayResult({status: 'info', output: 'Generando bitácora FO-TI-20...'});
+    try {
+        const response = await fetch('/reports/api/export/fo-ti-20', {
+            method: 'POST',
+            headers: { ...getDefaultHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sucursal, entries }),
+        });
+        const data = await response.json();
+        if (data.status === 'success') {
+            displayResult({status: 'success', output: `FO-TI-20 generado: ${data.path}`});
+        } else {
+            displayResult({status: 'error', error: data.error || 'Error al generar FO-TI-20.'});
+        }
+    } catch (e) {
+        displayResult({status: 'error', error: `Error: ${e.message}`});
+    }
+}
+
+function downloadFoTi20() {
+    const sucursal = encodeURIComponent(document.getElementById('input-sucursal').value);
+    window.open(`/reports/api/download/fo-ti-20?sucursal=${sucursal}`, '_blank');
+}
+
+// ============================================================
+// Bitacora entries management
+// ============================================================
+function addEntry() {
+    const container = document.getElementById('bitacora-entries');
+    const div = document.createElement('div');
+    div.className = 'bitacora-entry';
+    div.style.cssText = 'display:grid;grid-template-columns:120px 1fr 1fr 1fr 30px;gap:6px;margin-bottom:6px;align-items:center;';
+    div.innerHTML = `
+        <input type="date" class="entry-fecha" style="padding:4px;border:1px solid var(--border-subtle);border-radius:3px;background:var(--bg-surface-2);color:var(--text-primary);font-size:11px;">
+        <input type="text" class="entry-usuario" placeholder="Usuario" style="padding:4px;border:1px solid var(--border-subtle);border-radius:3px;background:var(--bg-surface-2);color:var(--text-primary);font-size:11px;">
+        <input type="text" class="entry-equipo" placeholder="Equipo (modelo)" style="padding:4px;border:1px solid var(--border-subtle);border-radius:3px;background:var(--bg-surface-2);color:var(--text-primary);font-size:11px;">
+        <input type="text" class="entry-reporte" placeholder="MANTENIMIENTO PREVENTIVO" value="MANTENIMIENTO PREVENTIVO" style="padding:4px;border:1px solid var(--border-subtle);border-radius:3px;background:var(--bg-surface-2);color:var(--text-primary);font-size:11px;">
+        <button onclick="removeEntry(this)" style="background:none;border:none;color:var(--color-danger);cursor:pointer;font-size:16px;" title="Eliminar">&times;</button>
+    `;
+    container.appendChild(div);
+}
+
+function removeEntry(btn) {
+    const entries = document.querySelectorAll('.bitacora-entry');
+    if (entries.length > 1) {
+        btn.closest('.bitacora-entry').remove();
+    }
+}
+
+function collectBitacoraEntries() {
+    const entries = [];
+    document.querySelectorAll('.bitacora-entry').forEach(row => {
+        const fechaInput = row.querySelector('.entry-fecha').value;
+        const usuario = row.querySelector('.entry-usuario').value;
+        const equipo = row.querySelector('.entry-equipo').value;
+        const reporte = row.querySelector('.entry-reporte').value;
+
+        if (usuario || equipo) {
+            // Format date from YYYY-MM-DD to DD/MM/YYYY
+            let fecha = fechaInput;
+            if (fechaInput && fechaInput.includes('-')) {
+                const parts = fechaInput.split('-');
+                fecha = `${parts[2]}/${parts[1]}/${parts[0]}`;
+            }
+            entries.push({ fecha, usuario, equipo, reporte_final: reporte });
+        }
+    });
+    return entries;
+}
+
+// ============================================================
+// Hardware Upgrades / Mejoras
+// ============================================================
+async function scanHardwareUpgrades() {
+    const container = document.getElementById('hardware-upgrades-content');
+    container.innerHTML = '<div style="text-align:center;padding:20px;"><span class="spinner"></span> Escaneando hardware...</div>';
+
+    try {
+        const response = await fetch('/reports/api/hardware-upgrades');
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            renderUpgradeResults(data.data);
+        } else {
+            container.innerHTML = `<div class="alert alert-danger">Error: ${escapeHtml(data.error || 'Error desconocido')}</div>`;
+        }
+    } catch (e) {
+        container.innerHTML = `<div class="alert alert-danger">Error de conexión: ${escapeHtml(e.message)}</div>`;
+    }
+}
+
+function renderUpgradeResults(upgrades) {
+    const container = document.getElementById('hardware-upgrades-content');
+    let html = '';
+
+    // RAM Section
+    const ram = upgrades.ram || {};
+    if (ram.total_slots) {
+        const pct = ram.max_capacity_gb > 0 ? Math.round((ram.current_capacity_gb / ram.max_capacity_gb) * 100) : 100;
+        const barColor = ram.empty_slots > 0 ? '#0AAE6B' : '#274C9B';
+        html += `
+        <div style="margin-bottom:16px;padding:12px;background:var(--bg-surface-1);border-radius:6px;border-left:4px solid ${barColor};">
+            <h4 style="margin:0 0 8px;">Memoria RAM</h4>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+                <div><strong>Slots:</strong> ${ram.occupied_slots} de ${ram.total_slots} ocupados</div>
+                <div><strong>Actual:</strong> ${Math.round(ram.current_capacity_gb)} GB</div>
+                <div><strong>Máximo:</strong> ${ram.max_capacity_gb} GB</div>
+            </div>
+            <div style="height:8px;background:var(--bg-surface-2);border-radius:4px;overflow:hidden;">
+                <div style="width:${pct}%;height:100%;background:${barColor};border-radius:4px;"></div>
+            </div>
+            ${ram.empty_slots > 0 ? `<p style="color:#0AAE6B;font-weight:bold;margin:8px 0 0;font-size:12px;">${ram.empty_slots} slot(s) disponible(s) para expansión</p>` : ''}
+        </div>`;
+
+        // Module details
+        if (ram.modules && ram.modules.length > 0) {
+            html += '<div style="margin-bottom:12px;padding-left:16px;">';
+            ram.modules.forEach(mod => {
+                const cap = mod.CapacityGB || 0;
+                const mfr = (mod.Manufacturer || 'N/A').trim();
+                const speed = mod.ConfiguredClockSpeed || mod.Speed || 0;
+                const bank = mod.BankLabel || mod.DeviceLocator || '';
+                html += `<div style="font-size:11px;padding:2px 0;">${escapeHtml(bank)}: ${Math.round(cap)} GB - ${escapeHtml(mfr)} @ ${speed} MHz</div>`;
+            });
+            html += '</div>';
+        }
+    }
+
+    // Storage Section
+    const storage = upgrades.storage || {};
+    const disks = storage.disks || [];
+    if (disks.length > 0) {
+        const borderColor = storage.has_hdd ? '#D6814A' : '#0AAE6B';
+        html += `
+        <div style="margin-bottom:16px;padding:12px;background:var(--bg-surface-1);border-radius:6px;border-left:4px solid ${borderColor};">
+            <h4 style="margin:0 0 8px;">Almacenamiento</h4>`;
+
+        disks.forEach(d => {
+            const name = d.FriendlyName || 'N/A';
+            const media = d.MediaType || 'N/A';
+            const bus = d.BusType || '';
+            const size = d.SizeGB || 0;
+            const health = d.HealthStatus || 'N/A';
+            const isHDD = String(media).toUpperCase().includes('HDD') || media === '3';
+            const icon = isHDD ? '&#128191;' : '&#128190;';
+            html += `
+            <div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;">
+                <span style="font-size:18px;">${icon}</span>
+                <div>
+                    <strong>${escapeHtml(String(name))}</strong> — ${Math.round(size)} GB — ${escapeHtml(String(media))} ${bus ? '(' + escapeHtml(String(bus)) + ')' : ''}
+                    <span style="margin-left:8px;color:${health === 'Healthy' ? '#0AAE6B' : '#E33B14'};">${escapeHtml(String(health))}</span>
+                </div>
+            </div>`;
+        });
+
+        if (storage.has_hdd) {
+            html += `<p style="color:#D6814A;font-weight:bold;margin:8px 0 0;font-size:12px;">Se recomienda actualizar disco HDD a SSD/NVMe</p>`;
+        }
+        html += '</div>';
+    }
+
+    // NVMe/M.2 Section
+    const expansion = upgrades.expansion || {};
+    if (expansion.m2_slots_total > 0 || expansion.nvme_disks_installed > 0) {
+        const hasAvailable = expansion.m2_slots_available > 0;
+        html += `
+        <div style="margin-bottom:16px;padding:12px;background:var(--bg-surface-1);border-radius:6px;border-left:4px solid ${hasAvailable ? '#274C9B' : '#666'};">
+            <h4 style="margin:0 0 8px;">Slots M.2 / NVMe</h4>
+            <div style="font-size:12px;">
+                <div><strong>Discos NVMe instalados:</strong> ${expansion.nvme_disks_installed}</div>
+                <div><strong>Slots M.2 totales:</strong> ${expansion.m2_slots_total}</div>
+                <div><strong>Slots M.2 disponibles:</strong> ${expansion.m2_slots_available}</div>
+            </div>
+            ${hasAvailable ? `<p style="color:#274C9B;font-weight:bold;margin:8px 0 0;font-size:12px;">Puede instalar almacenamiento NVMe adicional</p>` : ''}
+        </div>`;
+    }
+
+    // Recommendations
+    const recs = upgrades.recommendations || [];
+    if (recs.length > 0) {
+        html += `
+        <div style="padding:12px;background:var(--bg-surface-1);border-radius:6px;border-left:4px solid #274C9B;">
+            <h4 style="margin:0 0 8px;">Recomendaciones</h4>
+            <ul style="margin:0;padding-left:20px;font-size:12px;">`;
+        recs.forEach(r => {
+            html += `<li style="margin-bottom:4px;">${escapeHtml(r)}</li>`;
+        });
+        html += '</ul></div>';
+    }
+
+    if (!html) {
+        html = '<div class="alert alert-info">No se detectaron oportunidades de mejora. El equipo está en su capacidad óptima.</div>';
+    }
+
+    container.innerHTML = html;
+}
+
+// ============================================================
+// Existing functionality
+// ============================================================
 async function refreshLog() {
     try {
         const response = await fetch('/reports/api/entries');
