@@ -4,13 +4,47 @@ Network and connectivity module.
 Handles: DNS flush, IP reset, network stack, TCP settings, connectivity tests,
 SMB sessions, network adapters, proxy settings, service status.
 """
+import re
+import ipaddress
 import logging
+from typing import Optional
 
 from services.command_runner import (
     run_cmd, run_powershell, run_powershell_json, CommandStatus, CommandResult
 )
 
 logger = logging.getLogger('maintenance.network')
+
+# RFC 952 / 1123 hostname pattern — compiled once at module load
+_HOSTNAME_RE = re.compile(
+    r'^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?'
+    r'(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$'
+)
+
+
+def _validate_connection_params(host: str, port) -> Optional[str]:
+    """
+    Validate host and port for test_connectivity.
+
+    Returns an error message string if invalid, or None if both are valid.
+    Separated from business logic so it can be tested independently.
+    """
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        # Not an IP — validate as RFC 1123 hostname
+        if not _HOSTNAME_RE.match(host) or len(host) > 253:
+            return 'Invalid host. Must be a valid IP address or hostname.'
+
+    try:
+        port_int = int(port)
+    except (ValueError, TypeError):
+        return 'Invalid port. Must be an integer.'
+
+    if not (1 <= port_int <= 65535):
+        return 'Invalid port. Must be between 1 and 65535.'
+
+    return None
 
 
 def flush_dns():
@@ -68,33 +102,11 @@ def set_autotuning_normal():
 
 def test_connectivity(host='8.8.8.8', port=443):
     """Test network connectivity to a specific host and port."""
-    import re
-    import ipaddress
     host = str(host).strip()
-    # Validate host: must be a valid IP address or a safe hostname
-    try:
-        ipaddress.ip_address(host)
-    except ValueError:
-        # Not an IP, validate as hostname (RFC 952/1123)
-        if not re.match(r'^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?'
-                        r'(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$',
-                        host) or len(host) > 253:
-            return CommandResult(
-                status=CommandStatus.ERROR,
-                error='Invalid host. Must be a valid IP address or hostname.',
-            )
-    try:
-        port = int(port)
-    except (ValueError, TypeError):
-        return CommandResult(
-            status=CommandStatus.ERROR,
-            error='Invalid port. Must be an integer.',
-        )
-    if not (1 <= port <= 65535):
-        return CommandResult(
-            status=CommandStatus.ERROR,
-            error='Invalid port. Must be between 1 and 65535.',
-        )
+    error = _validate_connection_params(host, port)
+    if error:
+        return CommandResult(status=CommandStatus.ERROR, error=error)
+    port = int(port)  # Safe after validation
     return run_powershell(
         f'Test-NetConnection -ComputerName {host} -Port {port}',
         timeout=30,

@@ -134,6 +134,12 @@ ALLOWED_COMMANDS = {
                                        '-ExecutionPolicy', '-Command']},
 }
 
+# Normalized allowlist built once at import time for O(1) lookup.
+# Keys are lower-cased and stripped of .exe so matching is case-insensitive.
+_NORMALIZED_ALLOWLIST: dict = {
+    k.lower().replace('.exe', ''): v for k, v in ALLOWED_COMMANDS.items()
+}
+
 # Commands that require shell=True with justification
 SHELL_REQUIRED_COMMANDS = {
     # 'start explorer.exe' requires shell because 'start' is a shell builtin
@@ -179,13 +185,7 @@ def _validate_command(cmd_parts: list) -> bool:
         return False
 
     base_cmd = os.path.basename(cmd_parts[0]).lower().replace('.exe', '')
-
-    # Find matching allowlist entry (case-insensitive)
-    entry = None
-    for allowed_name, allowed_spec in ALLOWED_COMMANDS.items():
-        if allowed_name.lower().replace('.exe', '') == base_cmd:
-            entry = allowed_spec
-            break
+    entry = _NORMALIZED_ALLOWLIST.get(base_cmd)
 
     if entry is None:
         return False
@@ -210,8 +210,7 @@ def _validate_command(cmd_parts: list) -> bool:
         return False
 
     # Check denied_args (substring match in full args string)
-    denied = entry.get('denied_args', [])
-    for denied_arg in denied:
+    for denied_arg in entry.get('denied_args', []):
         if denied_arg.lower() in args_str:
             logger.warning(f"Denied argument '{denied_arg}' for command '{base_cmd}'")
             return False
@@ -220,26 +219,21 @@ def _validate_command(cmd_parts: list) -> bool:
     denied_first = entry.get('denied_first_arg', [])
     if denied_first and len(cmd_parts) > 1:
         first_arg = cmd_parts[1].lower()
-        if first_arg in [d.lower() for d in denied_first]:
+        if first_arg in {d.lower() for d in denied_first}:
             logger.warning(f"Denied first argument '{first_arg}' for command '{base_cmd}'")
             return False
 
-    # Check allowed_patterns (regex)
+    # Check allowed_patterns (regex) — if patterns exist, one must match; none matching blocks
     patterns = entry.get('allowed_patterns', [])
     if patterns:
-        import re as re_mod
-        for pattern in patterns:
-            if re_mod.match(pattern, args_str, re_mod.IGNORECASE):
-                return True
-        if patterns:  # Had patterns but none matched
-            return False
+        if any(re.match(p, args_str, re.IGNORECASE) for p in patterns):
+            return True
+        return False  # Had patterns but none matched
 
     # If subcommands specified, at least one must appear in the args
     subcommands = entry.get('subcommands', [])
-    if subcommands:
-        found = any(sc.lower() in args_str for sc in subcommands)
-        if not found and args_str:
-            # Args were given but don't match any allowed subcommand
+    if subcommands and args_str:
+        if not any(sc.lower() in args_str for sc in subcommands):
             logger.warning(f"No matching subcommand for '{base_cmd}' in: {args_str[:100]}")
             return False
 
@@ -282,6 +276,33 @@ def _redact_command_for_log(cmd_display: str) -> str:
     redacted = re.sub(r'(?i)(password|pwd|key|token|secret)\s*[=:]\s*\S+',
                       r'\1=***REDACTED***', cmd_display)
     return redacted
+
+
+def _prepare_command(command, powershell: bool, shell: bool):
+    """
+    Resolve the actual subprocess command, shell flag, and allowlist-validation parts.
+
+    Returns:
+        (actual_cmd, use_shell, parts_to_validate)
+
+    ``parts_to_validate`` is None when allowlist checking is not applicable
+    (PowerShell path bypasses the allowlist because the wrapper controls the script).
+    """
+    if powershell:
+        ps_cmd = command if isinstance(command, str) else ' '.join(command)
+        actual_cmd = [
+            'powershell.exe', '-NoProfile', '-NonInteractive',
+            '-ExecutionPolicy', 'Bypass', '-Command', ps_cmd,
+        ]
+        return actual_cmd, False, None  # PS wrapper — no allowlist check
+
+    if isinstance(command, list):
+        return command, shell, command
+
+    if isinstance(command, str):
+        return command, True, command.split()  # shell required for string commands
+
+    return command, shell, None  # Unknown type — pass through without validation
 
 
 def run_cmd(command, timeout=120, requires_admin=False, shell=False,
@@ -335,54 +356,24 @@ def run_cmd(command, timeout=120, requires_admin=False, shell=False,
             operation_id=operation_id,
         )
 
-    # Build actual command
-    if powershell:
-        ps_cmd = command if isinstance(command, str) else ' '.join(command)
-        actual_cmd = [
-            'powershell.exe', '-NoProfile', '-NonInteractive',
-            '-ExecutionPolicy', 'Bypass', '-Command', ps_cmd
-        ]
-        use_shell = False
-    elif isinstance(command, list):
-        actual_cmd = command
-        use_shell = shell
-        # Validate against allowlist
-        if not _validate_command(command):
-            logger.warning(
-                f"[{operation_id}] BLOCKED by allowlist: "
-                f"{_redact_command_for_log(cmd_display)}"
-            )
-            return CommandResult(
-                status=CommandStatus.ERROR,
-                command=cmd_display,
-                error=f'Command blocked by allowlist: {command[0]}',
-                duration=time.time() - start_time,
-                operation_id=operation_id,
-                details={'validation': 'blocked_by_allowlist',
-                         'base_command': command[0]},
-            )
-    elif isinstance(command, str):
-        # String command - try to validate the base command
-        parts = command.split()
-        if parts and not _validate_command(parts):
-            logger.warning(
-                f"[{operation_id}] BLOCKED by allowlist: "
-                f"{_redact_command_for_log(cmd_display)}"
-            )
-            return CommandResult(
-                status=CommandStatus.ERROR,
-                command=cmd_display,
-                error=f'Command blocked by allowlist: {parts[0]}',
-                duration=time.time() - start_time,
-                operation_id=operation_id,
-                details={'validation': 'blocked_by_allowlist',
-                         'base_command': parts[0]},
-            )
-        actual_cmd = command
-        use_shell = True  # String commands require shell (documented above)
-    else:
-        actual_cmd = command
-        use_shell = shell
+    # Resolve command form and perform allowlist validation
+    actual_cmd, use_shell, validation_parts = _prepare_command(command, powershell, shell)
+    if validation_parts and not _validate_command(validation_parts):
+        logger.warning(
+            f"[{operation_id}] BLOCKED by allowlist: "
+            f"{_redact_command_for_log(cmd_display)}"
+        )
+        return CommandResult(
+            status=CommandStatus.ERROR,
+            command=cmd_display,
+            error=f'Command blocked by allowlist: {validation_parts[0]}',
+            duration=time.time() - start_time,
+            operation_id=operation_id,
+            details={
+                'validation': 'blocked_by_allowlist',
+                'base_command': validation_parts[0],
+            },
+        )
 
     try:
         process = subprocess.Popen(
@@ -474,12 +465,110 @@ def run_powershell(script, timeout=120, requires_admin=False, description=''):
     )
 
 
+def _format_json_as_readable_text(data, description=''):
+    """
+    Convert parsed JSON data (list of dicts or dict) into a human-readable
+    text block suitable for display in the IT technician console.
+    """
+    lines = []
+    title = description.strip() or 'Resultado'
+    lines.append(f'=== {title} ===')
+    lines.append('')
+
+    # Map common English field names to Spanish labels for IT technicians
+    LABEL_MAP = {
+        'Name': 'Nombre',
+        'DisplayName': 'Nombre completo',
+        'InterfaceDescription': 'Descripcion',
+        'Status': 'Estado',
+        'LinkSpeed': 'Velocidad',
+        'MacAddress': 'Direccion MAC',
+        'DriverVersion': 'Version del driver',
+        'StartType': 'Tipo de inicio',
+        'Command': 'Comando',
+        'Location': 'Ubicacion',
+        'User': 'Usuario',
+        'Caption': 'Descripcion',
+        'Description': 'Descripcion',
+        'DeviceID': 'ID del dispositivo',
+        'Manufacturer': 'Fabricante',
+        'Model': 'Modelo',
+        'Size': 'Tamano',
+        'FreeSpace': 'Espacio libre',
+        'DriveType': 'Tipo de unidad',
+        'FileSystem': 'Sistema de archivos',
+        'VolumeName': 'Nombre del volumen',
+        'OSArchitecture': 'Arquitectura',
+        'Version': 'Version',
+        'BuildNumber': 'Numero de compilacion',
+        'CSName': 'Equipo',
+        'InstallDate': 'Fecha de instalacion',
+        'LastBootUpTime': 'Ultimo inicio',
+        'TotalVisibleMemorySize': 'RAM total',
+        'FreePhysicalMemory': 'RAM libre',
+    }
+
+    STATUS_MAP = {
+        'Up': 'Activo',
+        'Down': 'Inactivo',
+        'Disconnected': 'Desconectado',
+        'Not Present': 'No encontrado',
+        'Running': 'En ejecucion',
+        'Stopped': 'Detenido',
+        'Disabled': 'Deshabilitado',
+        'Automatic': 'Automatico',
+        'Manual': 'Manual',
+        'Boot': 'Inicio del sistema',
+        'System': 'Sistema',
+    }
+
+    def fmt_val(val):
+        if val is None:
+            return '—'
+        s = str(val).strip()
+        return STATUS_MAP.get(s, s) if s else '—'
+
+    def fmt_item(item, index=None):
+        if not isinstance(item, dict):
+            prefix = f'[{index}] ' if index is not None else '  '
+            lines.append(f'{prefix}{fmt_val(item)}')
+            return
+        # Use 'Name' or 'DisplayName' as the header if available
+        header = item.get('DisplayName') or item.get('Name') or (
+            f'Elemento {index}' if index is not None else None
+        )
+        if header:
+            prefix = f'[{index}] ' if index is not None else ''
+            lines.append(f'{prefix}{header}')
+        indent = '    '
+        for key, raw_val in item.items():
+            if key in ('Name', 'DisplayName') and header == (item.get('DisplayName') or item.get('Name')):
+                continue  # Already shown in header
+            label = LABEL_MAP.get(key, key)
+            lines.append(f'{indent}{label:<20}: {fmt_val(raw_val)}')
+        lines.append('')
+
+    if isinstance(data, list):
+        if not data:
+            lines.append('  (sin resultados)')
+        else:
+            for i, item in enumerate(data, start=1):
+                fmt_item(item, index=i)
+    elif isinstance(data, dict):
+        fmt_item(data)
+    else:
+        lines.append(str(data))
+
+    return '\n'.join(lines).rstrip()
+
+
 def run_powershell_json(script, timeout=120, requires_admin=False, description=''):
     """
     Run a PowerShell command and parse JSON output.
 
     Appends '| ConvertTo-Json -Compress' to the script if not already present.
-    Returns CommandResult with parsed JSON in details['data'].
+    Returns CommandResult with parsed JSON in details['data'] and a
+    human-readable formatted string in output.
     """
     import json as json_mod
 
@@ -493,6 +582,7 @@ def run_powershell_json(script, timeout=120, requires_admin=False, description='
         try:
             parsed = json_mod.loads(result.output)
             result.details['data'] = parsed
+            result.output = _format_json_as_readable_text(parsed, description)
         except json_mod.JSONDecodeError:
             # PowerShell output wasn't valid JSON, keep raw output
             pass
