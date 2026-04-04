@@ -72,8 +72,9 @@ def _mask_key(key: str) -> str:
     parts = key.upper().split('-')
     if len(parts) == 5:
         return f'XXXXX-XXXXX-XXXXX-XXXXX-{parts[4]}'
-    # Partial match — mask all but last 5 chars
-    if len(key) >= 5:
+    # Partial match — mask all but last 5 chars.
+    # Must be strictly > 5 so a 5-char input doesn't produce '' + key (unmasked).
+    if len(key) > 5:
         return 'X' * (len(key) - 5) + key[-5:]
     return 'XXXXX'
 
@@ -82,12 +83,15 @@ def _run_ospp(ospp_path: str, flag: str, timeout: int = 60) -> CommandResult:
     """
     Run cscript ospp.vbs <flag> with //nologo.
     Uses run_cmd so it goes through the standard command pipeline and audit trail.
+    The description passed to run_cmd never includes a product key.
     """
+    # Never put the product key in the log description
+    safe_desc = 'ospp.vbs /inpkey:***' if flag.lower().startswith('/inpkey:') else f'ospp.vbs {flag}'
     return run_cmd(
         ['cscript', '//nologo', ospp_path, flag],
         requires_admin=True,
         timeout=timeout,
-        description=f'ospp.vbs {flag}',
+        description=safe_desc,
     )
 
 

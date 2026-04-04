@@ -121,6 +121,8 @@ ALLOWED_COMMANDS = {
                                  '/output']},
     'cscript': {'allowed_patterns': [
         r'^//nologo\s+.*\\slmgr\.vbs\s+/\w+$',
+        r'^//nologo\s+.*\\ospp\.vbs\s+/(?:dstatus|act)$',
+        r'^//nologo\s+.*\\ospp\.vbs\s+/inpkey:[a-z0-9]{5}-[a-z0-9]{5}-[a-z0-9]{5}-[a-z0-9]{5}-[a-z0-9]{5}$',
     ]},
     'fsutil': {'subcommands': ['behavior']},
     'pnputil': {'subcommands': ['/enum-drivers', '/enum-devices'],

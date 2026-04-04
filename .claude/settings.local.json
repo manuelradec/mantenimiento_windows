@@ -14,7 +14,10 @@
       "Bash(venv/Scripts/python.exe -c \"import flask; print\\('venv flask OK'\\)\")",
       "Bash(python -m flake8 routes/maintenance.py services/security_audit.py)",
       "Bash(python -c \"import routes.maintenance, services.security_audit; print\\('imports OK'\\)\")",
-      "Bash(python -m flake8 services/system_inventory.py services/office_tools.py routes/office.py services/maintenance_report.py)"
+      "Bash(python -m flake8 services/system_inventory.py services/office_tools.py routes/office.py services/maintenance_report.py)",
+      "Bash(python -m flake8 services/office_tools.py services/command_runner.py --max-line-length=120)",
+      "Bash(python -)",
+      "Bash(python -m flake8 services/office_tools.py services/command_runner.py services/system_inventory.py services/maintenance_report.py routes/office.py routes/__init__.py --max-line-length=120)"
     ]
   }
 }
