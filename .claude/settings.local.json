@@ -13,7 +13,8 @@
       "Bash(python -c \"import flask; print\\('flask OK'\\)\")",
       "Bash(venv/Scripts/python.exe -c \"import flask; print\\('venv flask OK'\\)\")",
       "Bash(python -m flake8 routes/maintenance.py services/security_audit.py)",
-      "Bash(python -c \"import routes.maintenance, services.security_audit; print\\('imports OK'\\)\")"
+      "Bash(python -c \"import routes.maintenance, services.security_audit; print\\('imports OK'\\)\")",
+      "Bash(python -m flake8 services/system_inventory.py services/office_tools.py routes/office.py services/maintenance_report.py)"
     ]
   }
 }

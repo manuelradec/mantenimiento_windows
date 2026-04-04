@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+{% block title %}CleanCPU — Licencia Office{% endblock %}
+{% block page_title %}Licencia Microsoft Office{% endblock %}
+{% block page_desc %}Inspección y activación oficial de Microsoft Office{% endblock %}
+
+{% block content %}
+
+<!-- Installation Info Card (loads on page open, no admin needed) -->
+<div class="section-card">
+    <div class="section-header">
+        <h3>Instalación detectada</h3>
+        <button class="btn btn-secondary btn-sm" onclick="loadInfo()">Actualizar</button>
+    </div>
+    <div id="info-content" style="padding:16px;">
+        <div style="opacity:0.5;">Cargando información de Office...</div>
+    </div>
+</div>
+
+<!-- License Status Card (requires admin + ospp.vbs) -->
+<div class="section-card">
+    <div class="section-header">
+        <h3>Estado de licencia</h3>
+        <button class="btn btn-primary btn-sm" id="inspect-btn" onclick="inspectLicense()">
+            Inspeccionar licencia
+        </button>
+    </div>
+    <div id="inspect-content" style="padding:16px;opacity:0.5;">
+        Haga clic en "Inspeccionar licencia" para consultar el estado actual.<br>
+        <span style="font-size:12px;">Requiere permisos de Administrador y que Office esté instalado.</span>
+    </div>
+    <pre class="console" id="inspect-raw"
+         style="display:none;min-height:60px;max-height:200px;overflow-y:auto;font-size:11px;"></pre>
+</div>
+
+<!-- Product Key Input + Activation Card -->
+<div class="section-card">
+    <div class="section-header">
+        <h3>Activar con clave de producto</h3>
+    </div>
+    <div style="padding:16px;">
+        <p style="font-size:13px;margin-bottom:12px;">
+            Ingrese una clave legítima de Microsoft Office. La aplicación usará
+            <strong>ospp.vbs</strong> (herramienta oficial de Microsoft) para instalar
+            la clave y solicitar la activación.
+        </p>
+        <p style="font-size:11px;opacity:0.6;margin-bottom:14px;">
+            &#9888; Solo se soporta activación oficial con licencias válidas de Microsoft.
+            La clave no se almacena en logs ni reportes — solo los últimos 5 caracteres son retenidos.
+        </p>
+
+        <div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;">
+            <input
+                type="password"
+                id="key-input"
+                placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX"
+                maxlength="29"
+                autocomplete="off"
+                spellcheck="false"
+                style="font-family:monospace;font-size:14px;letter-spacing:1px;
+                       padding:8px 12px;border-radius:4px;
+                       border:1px solid var(--border-subtle,#444);
+                       background:var(--bg-surface-1,#1e1e2e);
+                       color:var(--color-text,#ddd);width:280px;"
+                oninput="formatKeyInput(this)"
+            >
+            <button class="btn btn-warning" id="activate-btn" onclick="activateOffice()"
+                    style="white-space:nowrap;">
+                Activar Office
+            </button>
+        </div>
+
+        <div id="activation-result" style="display:none;margin-top:14px;"></div>
+    </div>
+</div>
+
+<!-- Output Console -->
+<div class="section-card">
+    <div class="section-header"><h3>Consola de salida</h3></div>
+    <pre class="console" id="output-console" style="min-height:80px;max-height:250px;overflow-y:auto;"></pre>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// -----------------------------------------------------------------------
+// Key formatting helper — auto-inserts dashes as user types
+// -----------------------------------------------------------------------
+function formatKeyInput(input) {
+    let val = input.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    let formatted = '';
+    for (let i = 0; i < val.length && i < 25; i++) {
+        if (i > 0 && i % 5 === 0) formatted += '-';
+        formatted += val[i];
+    }
+    input.value = formatted;
+}
+
+// -----------------------------------------------------------------------
+// Load registry-based installation info (no admin, fires on page load)
+// -----------------------------------------------------------------------
+async function loadInfo() {
+    document.getElementById('info-content').innerHTML =
+        '<div style="opacity:0.5;">Consultando...</div>';
+    try {
+        const r = await fetch('/office/api/info');
+        const d = await r.json();
+        renderInfo(d);
+    } catch (e) {
+        document.getElementById('info-content').innerHTML =
+            `<span style="color:var(--color-danger)">Error al consultar: ${escapeHtml(e.message)}</span>`;
+    }
+}
+
+function renderInfo(d) {
+    const el = document.getElementById('info-content');
+    if (!d.installed && !d.product_name) {
+        el.innerHTML = '<span style="color:var(--color-warning)">&#9888; Microsoft Office no detectado en este equipo.</span>';
+        return;
+    }
+    const rows = [
+        ['Producto',      d.product_name  || '—'],
+        ['Versión',       d.version       || '—'],
+        ['Plataforma',    d.platform      || '—'],
+        ['Canal',         d.channel       || (d.is_c2r ? 'ClickToRun' : 'MSI/Volumen')],
+        ['Release IDs',   d.release_ids   || '—'],
+        ['ospp.vbs',      d.ospp_path     || 'No encontrado'],
+    ];
+    el.innerHTML = `
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            ${rows.map(([k,v]) => `
+                <tr style="border-bottom:1px solid var(--border-subtle,#333);">
+                    <td style="padding:5px 10px;opacity:0.65;width:140px;">${escapeHtml(k)}</td>
+                    <td style="padding:5px 10px;">${escapeHtml(v)}</td>
+                </tr>`).join('')}
+        </table>`;
+}
+
+// -----------------------------------------------------------------------
+// Inspect license via ospp.vbs /dstatus (requires admin)
+// -----------------------------------------------------------------------
+async function inspectLicense() {
+    const btn = document.getElementById('inspect-btn');
+    btn.disabled = true;
+    btn.textContent = 'Inspeccionando...';
+    document.getElementById('inspect-content').style.opacity = '0.5';
+    document.getElementById('inspect-content').innerHTML = 'Ejecutando ospp.vbs /dstatus...';
+    document.getElementById('inspect-raw').style.display = 'none';
+
+    try {
+        const r = await fetch('/office/api/inspect', {
+            method: 'POST',
+            headers: getDefaultHeaders(),
+        });
+        const d = await r.json();
+        renderInspect(d);
+    } catch (e) {
+        document.getElementById('inspect-content').innerHTML =
+            `<span style="color:var(--color-danger)">Error: ${escapeHtml(e.message)}</span>`;
+        document.getElementById('inspect-content').style.opacity = '1';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Inspeccionar licencia';
+    }
+}
+
+function renderInspect(d) {
+    const el = document.getElementById('inspect-content');
+    const rawEl = document.getElementById('inspect-raw');
+    el.style.opacity = '1';
+
+    const statusColors = {
+        success: 'var(--color-success,#0AAE6B)',
+        requires_admin: 'var(--color-warning,#D6814A)',
+        ospp_not_found: 'var(--color-warning,#D6814A)',
+        office_not_found: 'var(--color-warning,#D6814A)',
+        error: 'var(--color-danger,#E33B14)',
+    };
+    const color = statusColors[d.status] || 'inherit';
+
+    let html = `<p style="color:${color};font-weight:600;">${escapeHtml(d.message || '')}</p>`;
+
+    const p = d.parsed || {};
+    if (p.license_status || p.product_name || p.partial_key) {
+        const rows = [
+            ['Nombre del producto', p.product_name],
+            ['Estado de licencia', p.license_status],
+            ['Últimos 5 caracteres', p.partial_key],
+            ['Product ID', p.product_id],
+            ['Gracia restante', p.remaining_grace],
+        ].filter(([, v]) => v);
+        if (rows.length) {
+            html += `<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:8px;">
+                ${rows.map(([k, v]) => `
+                    <tr style="border-bottom:1px solid var(--border-subtle,#333);">
+                        <td style="padding:4px 10px;opacity:0.65;width:180px;">${escapeHtml(k)}</td>
+                        <td style="padding:4px 10px;">${escapeHtml(v)}</td>
+                    </tr>`).join('')}
+            </table>`;
+        }
+    }
+
+    el.innerHTML = html;
+
+    if (d.raw_output) {
+        rawEl.textContent = d.raw_output;
+        rawEl.style.display = 'block';
+    }
+
+    displayResult({status: d.status === 'success' ? 'success' : 'warning', output: d.message});
+}
+
+// -----------------------------------------------------------------------
+// Activate with product key
+// -----------------------------------------------------------------------
+async function activateOffice() {
+    const keyInput = document.getElementById('key-input');
+    const key = keyInput.value.trim();
+    if (key.length < 25) {
+        displayResult({status: 'error', error: 'Ingrese una clave completa de 25 caracteres.'});
+        return;
+    }
+
+    const btn = document.getElementById('activate-btn');
+    btn.disabled = true;
+    btn.textContent = 'Activando...';
+
+    const resultEl = document.getElementById('activation-result');
+    resultEl.style.display = 'none';
+
+    try {
+        const r = await fetch('/office/api/activate', {
+            method: 'POST',
+            headers: getDefaultHeaders(),
+            body: JSON.stringify({ key }),
+        });
+
+        // Immediately clear the key from the input field after sending
+        keyInput.value = '';
+
+        const d = await r.json();
+        renderActivationResult(d, resultEl);
+    } catch (e) {
+        resultEl.innerHTML =
+            `<span style="color:var(--color-danger)">Error de red: ${escapeHtml(e.message)}</span>`;
+        resultEl.style.display = 'block';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Activar Office';
+    }
+}
+
+function renderActivationResult(d, el) {
+    const statusColors = {
+        success: 'var(--color-success,#0AAE6B)',
+        inpkey_failed: 'var(--color-danger,#E33B14)',
+        activation_failed: 'var(--color-danger,#E33B14)',
+        requires_admin: 'var(--color-warning,#D6814A)',
+        invalid_key: 'var(--color-warning,#D6814A)',
+        ospp_not_found: 'var(--color-warning,#D6814A)',
+        error: 'var(--color-danger,#E33B14)',
+    };
+    const color = statusColors[d.status] || 'inherit';
+    const icon = d.status === 'success' ? '&#9989;' : '&#9888;';
+
+    let html = `<div style="padding:10px 12px;border-radius:4px;
+                            border-left:3px solid ${color};
+                            background:rgba(0,0,0,0.15);">
+        <p style="color:${color};font-weight:600;margin:0 0 6px 0;">
+            ${icon} ${escapeHtml(d.message || '')}
+        </p>`;
+
+    if (d.masked_key) {
+        html += `<p style="font-size:11px;opacity:0.65;margin:0;">
+            Clave utilizada: <code>${escapeHtml(d.masked_key)}</code>
+        </p>`;
+    }
+
+    // Show command output for troubleshooting but cap length
+    const details = [d.inpkey_output, d.act_output].filter(Boolean).join('\n---\n');
+    if (details) {
+        html += `<details style="margin-top:8px;">
+            <summary style="font-size:11px;cursor:pointer;opacity:0.7;">
+                Ver salida del comando
+            </summary>
+            <pre style="font-size:10px;margin-top:4px;max-height:120px;overflow-y:auto;
+                        background:rgba(0,0,0,0.2);padding:6px;border-radius:3px;">
+${escapeHtml(details.substring(0, 2000))}</pre>
+        </details>`;
+    }
+
+    html += '</div>';
+    el.innerHTML = html;
+    el.style.display = 'block';
+
+    displayResult({
+        status: d.status === 'success' ? 'success' : 'error',
+        output: d.message,
+    });
+}
+
+// -----------------------------------------------------------------------
+// Init
+// -----------------------------------------------------------------------
+document.addEventListener('DOMContentLoaded', () => {
+    loadInfo();
+});
+</script>
+{% endblock %}

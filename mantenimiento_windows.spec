@@ -70,6 +70,10 @@ a = Analysis(
         # Maintenance and reporting
         'services.maintenance_report',
         'services.security_audit',
+        'services.system_inventory',
+        'services.office_tools',
+        # Routes
+        'routes.office',
         # Route modules
         'routes',
         'routes.logs',
