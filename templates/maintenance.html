@@ -192,6 +192,32 @@ function updateStepsUI(session) {
                          step.status === 'skipped' ? 'var(--color-warning)' :
                          step.status === 'completed' ? 'var(--color-success)' : '';
             msg.innerHTML = `<span style="color:${color}">${escapeHtml(step.message)}</span>`;
+
+            // Compact details line for structured steps (security audit, cleanup, health)
+            const parts = [];
+            if (step.space_freed_mb != null) {
+                parts.push(`<span style="color:var(--color-success)">${step.space_freed_mb} MB liberados</span>`);
+            }
+            if (step.findings && step.findings.length) {
+                const crit = step.findings.filter(f => f.severity === 'critical').length;
+                const warn = step.findings.filter(f => f.severity === 'warning').length;
+                const info = step.findings.filter(f => f.severity === 'info').length;
+                if (crit) parts.push(`<span style="color:var(--color-danger)">${crit} critico(s)</span>`);
+                if (warn) parts.push(`<span style="color:var(--color-warning)">${warn} advertencia(s)</span>`);
+                if (info) parts.push(`<span style="opacity:0.6;">${info} verificacion(es) OK</span>`);
+            }
+            if (step.admin_skipped && step.admin_skipped.length) {
+                parts.push(`<span style="color:var(--color-warning)">Sin admin: ${step.admin_skipped.join(', ')}</span>`);
+            }
+            if (step.errors && step.errors.length) {
+                parts.push(`<span style="color:var(--color-danger)">${step.errors.length} error(es)</span>`);
+            }
+            if (step.recommended_actions && step.recommended_actions.length) {
+                parts.push(`<span style="color:var(--color-warning)">${step.recommended_actions.length} accion(es) recomendada(s)</span>`);
+            }
+            if (parts.length) {
+                msg.innerHTML += `<br><span style="font-size:10px;">${parts.join(' &nbsp;|&nbsp; ')}</span>`;
+            }
         }
 
         if (elapsed && step.elapsed) {

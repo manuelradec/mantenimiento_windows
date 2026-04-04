@@ -38,12 +38,13 @@ _SUSPICIOUS_EXTS = {
     '.scr', '.com', '.pif', '.hta', '.wsf',
 }
 
-# Path fragments that flag a startup/task executable as suspicious
+# Path fragments that flag a startup/task executable as suspicious.
+# Deliberately narrow: only truly risky execution locations.
+# AppData\Roaming and Downloads are NOT included — too broad, causes false
+# positives for common apps (Teams, Slack, Zoom, Discord, Spotify, etc.).
 _SUSPICIOUS_PATHS = (
     '\\temp\\', '\\tmp\\', '%temp%', '%tmp%',
     '\\appdata\\local\\temp',
-    '\\downloads\\',
-    '\\appdata\\roaming\\',
 )
 
 

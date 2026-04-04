@@ -25,7 +25,7 @@ MAINTENANCE_STEPS = [
     {
         'id': 'ccleaner',
         'name': 'Limpieza Interna del Sistema',
-        'description': 'Limpieza nativa: TEMP, Windows Temp, Prefetch, Papelera, caché DNS e Internet',
+        'description': 'Limpieza nativa: TEMP, Windows Temp, Prefetch, cache DNS e Internet',
     },
     {
         'id': 'advancedsystemcare',
@@ -202,7 +202,8 @@ def _run_maintenance(session_id):
                 step_info['message'] = result.get('message', '')
                 # Propagate structured data for reporting (findings, actions, etc.)
                 for key in ('findings', 'actions_executed', 'space_freed_mb',
-                            'repairs', 'errors', 'warnings', 'recommended_actions'):
+                            'repairs', 'errors', 'warnings', 'recommended_actions',
+                            'admin_skipped'):
                     if key in result:
                         step_info[key] = result[key]
             else:
@@ -245,7 +246,7 @@ def _step_ccleaner():
     from datetime import datetime as _dt
     from services.cleanup import (
         clean_user_temp, clean_windows_temp, clean_prefetch,
-        empty_recycle_bin, clean_inet_cache, flush_dns_cache,
+        clean_inet_cache, flush_dns_cache,
     )
 
     started_at = _dt.now()
@@ -257,7 +258,6 @@ def _step_ccleaner():
         ('Temp de usuario (%TEMP%)', clean_user_temp),
         ('Temp de Windows (Win\\Temp)', clean_windows_temp),
         ('Prefetch', clean_prefetch),
-        ('Papelera de reciclaje', empty_recycle_bin),
         ('Cache de Internet (INetCache)', clean_inet_cache),
         ('Cache DNS', flush_dns_cache),
     ]
@@ -326,6 +326,7 @@ def _step_advancedsystemcare():
     errors = []
     warnings = []
     recommended_actions = []
+    admin_skipped = []  # tools that could not run due to missing admin rights
 
     def _finding(title, severity, evidence, action=''):
         return {'title': title, 'severity': severity,
@@ -457,7 +458,16 @@ def _step_advancedsystemcare():
         'status': r.status.value if hasattr(r.status, 'value') else str(r.status),
         'detail': (r.output or r.error or '')[:600],
     })
-    if r.is_error:
+    if r.status.value == 'requires_admin':
+        admin_skipped.append('DISM /CheckHealth')
+        warnings.append('DISM /CheckHealth omitido: se requiere ejecutar como Administrador')
+        findings.append(_finding(
+            'DISM: omitido — se requiere ejecutar como Administrador',
+            'warning',
+            'El proceso actual no tiene privilegios de administrador',
+            'Ejecute el mantenimiento como Administrador para habilitar DISM.',
+        ))
+    elif r.is_error:
         errors.append(f'DISM CheckHealth: {r.error or "error"}')
         findings.append(_finding(
             'DISM: no se pudo ejecutar la verificacion',
@@ -495,7 +505,16 @@ def _step_advancedsystemcare():
         'status': r.status.value if hasattr(r.status, 'value') else str(r.status),
         'detail': (r.output or '')[:600],
     })
-    if r.is_error:
+    if r.status.value == 'requires_admin':
+        admin_skipped.append('SFC /scannow')
+        warnings.append('SFC /scannow omitido: se requiere ejecutar como Administrador')
+        findings.append(_finding(
+            'SFC: omitido — se requiere ejecutar como Administrador',
+            'warning',
+            'El proceso actual no tiene privilegios de administrador',
+            'Ejecute el mantenimiento como Administrador para habilitar SFC /scannow.',
+        ))
+    elif r.is_error:
         errors.append(f'SFC: {r.error or "error"}')
         findings.append(_finding(
             'SFC: error al ejecutar la verificacion',
@@ -631,6 +650,11 @@ def _step_advancedsystemcare():
             f'Salud del sistema: buena. DISM y SFC sin problemas. '
             f'{len(actions_executed)} herramienta(s) ejecutada(s).'
         )
+    if admin_skipped:
+        message += (
+            f' ATENCION: {", ".join(admin_skipped)} no se ejecutaron — '
+            'se requieren permisos de Administrador.'
+        )
     if errors:
         message += f' ({len(errors)} error(es) menores).'
 
@@ -642,6 +666,7 @@ def _step_advancedsystemcare():
         'repairs': repairs,
         'errors': errors,
         'warnings': warnings,
+        'admin_skipped': admin_skipped,
         'started_at': started_at.isoformat(),
         'ended_at': ended_at.isoformat(),
         'duration': round(duration, 1),
@@ -679,19 +704,15 @@ def _step_defrag():
 
 
 def _step_temp_cleanup():
-    from services.cleanup import clean_user_temp, clean_windows_temp, clean_prefetch
-    results = []
-    for name, func in [
-        ('User Temp', clean_user_temp),
-        ('Windows Temp', clean_windows_temp),
-        ('Prefetch', clean_prefetch),
-    ]:
-        try:
-            r = func()
-            results.append(f"{name}: {r.status.value if hasattr(r, 'status') else 'ok'}")
-        except Exception as e:
-            results.append(f"{name}: error ({e})")
-    return {'status': 'completed', 'message': '; '.join(results)}
+    # TEMP, Windows\Temp y Prefetch ya fueron limpiados en _step_ccleaner (paso 2).
+    # Ejecutar de nuevo en la misma sesion no aporta nada y duplica el tiempo.
+    return {
+        'status': 'skipped',
+        'message': (
+            'TEMP, Windows\\Temp y Prefetch ya fueron limpiados en '
+            '"Limpieza Interna del Sistema". Omitido para evitar duplicacion.'
+        ),
+    }
 
 
 def _step_disk_cleanup():
@@ -706,20 +727,15 @@ def _step_disk_cleanup():
 
 
 def _step_sfc():
-    result = run_cmd(
-        ['sfc', '/scannow'],
-        requires_admin=True, timeout=900,
-        description='SFC scan',
-    )
-    if result.is_error:
-        return {'status': 'failed', 'message': result.error or 'Error en SFC.'}
-
-    output = result.output or ''
-    if 'no encontró ninguna infracción' in output.lower() or 'did not find any integrity' in output.lower():
-        return {'status': 'completed', 'message': 'SFC: No se encontraron problemas de integridad.'}
-    elif 'reparó correctamente' in output.lower() or 'successfully repaired' in output.lower():
-        return {'status': 'completed', 'message': 'SFC: Se repararon archivos del sistema.'}
-    return {'status': 'completed', 'message': 'SFC completado. Revise los detalles en el registro.'}
+    # SFC /scannow ya fue ejecutado en _step_advancedsystemcare (paso 3).
+    # Repetirlo en la misma sesion duplica hasta 15 minutos de escaneo innecesario.
+    return {
+        'status': 'skipped',
+        'message': (
+            'SFC /scannow ya fue ejecutado en "Salud y Reparacion del Sistema". '
+            'Omitido para evitar duplicacion.'
+        ),
+    }
 
 
 def _step_windows_update():

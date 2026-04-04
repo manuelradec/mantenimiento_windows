@@ -6,7 +6,9 @@
       "Bash(python -m flake8 services/security_audit.py core/governance.py routes/maintenance.py --select=E241,E272,F401,F841)",
       "Bash(python -m flake8 services/security_audit.py core/governance.py routes/maintenance.py services/command_runner.py services/network_tools.py core/job_runner.py legacy_tkinter_main.py --max-line-length=120 --statistics)",
       "Bash(python -m flake8 routes/maintenance.py)",
-      "Bash(python -m flake8 routes/maintenance.py services/security_audit.py core/governance.py services/network_tools.py core/job_runner.py)"
+      "Bash(python -m flake8 routes/maintenance.py services/security_audit.py core/governance.py services/network_tools.py core/job_runner.py)",
+      "Bash(python -m flake8 services/security_audit.py routes/maintenance.py)",
+      "Bash(python -c \"import routes.maintenance; import services.security_audit; print\\('imports OK'\\)\")"
     ]
   }
 }
