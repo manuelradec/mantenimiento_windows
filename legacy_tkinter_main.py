@@ -18,7 +18,7 @@ LOGFILE = os.path.join(os.environ["USERPROFILE"], "Desktop", f"Optimizacion_Log_
 def is_admin():
     try:
         return ctypes.windll.shell32.IsUserAnAdmin()
-    except:
+    except Exception:
         return False
 
 def run_cmd(command, timeout=None):
@@ -66,12 +66,11 @@ def diagnostico_ram(callback):
         total_ram = sum([mod[1] for mod in ram_modulos])
         max_slots = 2  # Puedes ajustarlo para tu hardware
         if slots < max_slots:
-            recomendacion = f"💡 Hay slots de RAM libres. Recomendado ampliar a {max(8,total_ram*2)}GB para mejor desempeño."
+            recomendacion = f"💡 Hay slots de RAM libres. Recomendado ampliar a {max(8, total_ram * 2)}GB para mejor desempeño."
+        elif total_ram < 8:
+            recomendacion = f"💡 Ampliar RAM a 8GB mínimo. Actualmente: {total_ram}GB ({slots} módulos instalados)."
         else:
-            if total_ram < 8:
-                recomendacion = f"💡 Ampliar RAM a 8GB mínimo. Actualmente: {total_ram}GB ({slots} módulos instalados)."
-            else:
-                recomendacion = f"RAM instalada óptima: {total_ram}GB ({slots} módulos)."
+            recomendacion = f"RAM instalada óptima: {total_ram}GB ({slots} módulos)."
         info.append("Módulos RAM detectados:")
         for m in ram_modulos:
             info.append(f"- Slot: {m[0]}, Tamaño: {m[1]} GB, Marca: {m[2]}, Modelo: {m[3]}, Velocidad: {m[4]}")
@@ -94,7 +93,7 @@ def diagnostico_almacenamiento(callback):
                 model, tipo, size = parts[:3]
                 gb = int(size) // (1024 ** 3) if size.isdigit() else 0
                 info.append(f"- Modelo: {model}, Tipo: {tipo}, Tamaño: {gb} GB")
-                if "HDD" in tipo or "Hard" in tipo or "Fixed" in tipo:
+                if any(indicator in tipo for indicator in ('HDD', 'Hard', 'Fixed')):
                     is_hdd = True
         if is_hdd:
             recomendacion = "💡 El equipo tiene HDD. Migrar a SSD es altamente recomendable para mejorar velocidad."
@@ -171,7 +170,7 @@ def diagnostico_hardware(callback):
 def diagnostico_disco(callback):
     cmd_media_type = 'wmic diskdrive get MediaType'
     result = subprocess.run(cmd_media_type, shell=True, capture_output=True, text=True)
-    if "Fixed hard disk" in result.stdout or "HDD" in result.stdout:
+    if any(indicator in result.stdout for indicator in ('Fixed hard disk', 'HDD')):
         callback("Desfragmentando HDD...")
         out, err = run_cmd('defrag C: /O /U /V', timeout=300)
         add_log(out + "\n" + err)
@@ -222,21 +221,34 @@ def reparar_sistema(app, callback):
             time.sleep(0.2)
         # El log ya está registrado en run_cmd_with_skip
 
+def _parse_ram_gb(wmic_output: str) -> float:
+    """Parse TotalPhysicalMemory bytes from wmic output. Returns 0.0 on failure."""
+    lines = [x for x in wmic_output.split('\n')[1:] if x.strip()]
+    if not lines:
+        return 0.0
+    try:
+        return int(lines[0]) / (1024 ** 3)
+    except ValueError:
+        return 0.0
+
+
 def ajuste_paginacion(callback):
     try:
-        output = subprocess.check_output('wmic computersystem get TotalPhysicalMemory', shell=True, text=True)
-        # El valor puede estar vacío si falla el comando, maneja con try/except
-        try:
-            ram_gb = int([x for x in output.split('\n')[1:] if x.strip()][0]) / (1024 ** 3)
-        except:
-            ram_gb = 0
-        if ram_gb < 8:
-            callback("Ajustando archivo de paginación a 8GB por RAM baja...")
-            run_cmd('wmic computersystem where name="%computername%" set AutomaticManagedPagefile=False')
-            run_cmd('wmic pagefileset where name="C:\\\\pagefile.sys" set InitialSize=8192,MaximumSize=8192')
-            add_log("Paginación fija 8GB aplicada.")
+        output = subprocess.check_output(
+            'wmic computersystem get TotalPhysicalMemory', shell=True, text=True
+        )
     except Exception as e:
         add_log(f"[ERROR] Ajustando paginación: {e}")
+        return
+
+    ram_gb = _parse_ram_gb(output)
+    if ram_gb >= 8:
+        return
+
+    callback("Ajustando archivo de paginación a 8GB por RAM baja...")
+    run_cmd('wmic computersystem where name="%computername%" set AutomaticManagedPagefile=False')
+    run_cmd('wmic pagefileset where name="C:\\\\pagefile.sys" set InitialSize=8192,MaximumSize=8192')
+    add_log("Paginación fija 8GB aplicada.")
 
 def renovar_ip_dns(callback):
     callback("Renovando IP y limpiando DNS...")

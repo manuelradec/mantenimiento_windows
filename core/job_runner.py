@@ -23,6 +23,58 @@ logger = logging.getLogger('cleancpu.jobs')
 # Maximum concurrent background jobs
 MAX_WORKERS = 3
 
+# CommandResult statuses that map to a job 'completed' outcome.
+# All others are treated as 'failed'.
+_COMPLETED_RESULT_STATUSES = frozenset({
+    'success', 'warning', 'not_applicable', 'skipped',
+})
+
+
+def _apply_dict_result(job: 'Job', result: dict, duration_ms: int) -> None:
+    """
+    Apply a multi-step dict result to the job.
+    Any sub-step with status 'error' or 'timeout' sets overall to 'partial_success'.
+    """
+    outputs = []
+    has_error = False
+    for key, val in result.items():
+        if not isinstance(val, dict):
+            continue
+        step_status = val.get('status', 'unknown')
+        if step_status in ('error', 'timeout'):
+            has_error = True
+        step_output = val.get('output', '')
+        step_error = val.get('error', '')
+        outputs.append(f"[{key}] {step_status}: {step_output or step_error}")
+
+    job.output = '\n'.join(outputs)
+    job.status = 'partial_success' if has_error else 'completed'
+    job.duration_ms = duration_ms
+
+
+def _apply_command_result(job: 'Job', result, duration_ms: int) -> None:
+    """
+    Apply a CommandResult (has .to_dict()) to the job.
+    Maps CommandStatus values to job 'completed' or 'failed'.
+    """
+    rd = result.to_dict()
+    job.output = rd.get('output', '')
+    job.error = rd.get('error', '')
+    job.return_code = rd.get('return_code')
+    job.duration_ms = duration_ms
+    status_val = rd.get('status', 'unknown')
+    job.status = 'completed' if status_val in _COMPLETED_RESULT_STATUSES else 'failed'
+    # For non-success completed statuses, echo the status as output when output is absent
+    if job.status == 'completed' and status_val != 'success' and not job.output:
+        job.output = status_val
+
+
+def _apply_generic_result(job: 'Job', result, duration_ms: int) -> None:
+    """Apply a plain (non-dict, non-CommandResult) return value to the job."""
+    job.output = str(result) if result else ''
+    job.status = 'completed'
+    job.duration_ms = duration_ms
+
 
 class Job:
     """Represents a single background job."""
@@ -201,45 +253,13 @@ class JobRunner:
 
             duration_ms = int((time.time() - start_time) * 1000)
 
-            # Process result
+            # Dispatch result processing based on result type
             if isinstance(result, dict):
-                # Multi-step results (e.g., repair sequence, network repair)
-                # Check if any sub-step failed
-                has_error = False
-                outputs = []
-                for key, val in result.items():
-                    if isinstance(val, dict):
-                        step_status = val.get('status', 'unknown')
-                        if step_status in ('error', 'timeout'):
-                            has_error = True
-                        step_output = val.get('output', '')
-                        step_error = val.get('error', '')
-                        outputs.append(f"[{key}] {step_status}: {step_output or step_error}")
-
-                job.output = '\n'.join(outputs)
-                job.status = 'partial_success' if has_error else 'completed'
-                job.duration_ms = duration_ms
-
+                _apply_dict_result(job, result, duration_ms)
             elif hasattr(result, 'to_dict'):
-                # CommandResult object
-                rd = result.to_dict()
-                job.output = rd.get('output', '')
-                job.error = rd.get('error', '')
-                job.return_code = rd.get('return_code')
-                job.duration_ms = duration_ms
-                status_val = rd.get('status', 'unknown')
-                if status_val in ('success',):
-                    job.status = 'completed'
-                elif status_val in ('warning', 'not_applicable', 'skipped'):
-                    job.status = 'completed'
-                    if not job.output:
-                        job.output = status_val
-                else:
-                    job.status = 'failed'
+                _apply_command_result(job, result, duration_ms)
             else:
-                job.output = str(result) if result else ''
-                job.status = 'completed'
-                job.duration_ms = duration_ms
+                _apply_generic_result(job, result, duration_ms)
 
             job.completed_at = datetime.now().isoformat()
 

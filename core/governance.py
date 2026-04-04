@@ -662,17 +662,21 @@ def _collect_events_for_action(action_id: str, session_id: str,
     )
 
     module = action_id.split('.')[0]
-    events = {}
 
-    if module == 'update':
-        events['update_events'] = collect_update_events(max_events=10)
-    elif module == 'repair':
-        events['application_errors'] = collect_application_errors(max_events=10)
-        events['disk_errors'] = collect_disk_errors(max_events=5)
-    elif module == 'security':
-        events['defender_events'] = collect_defender_events(max_events=10)
-    elif module == 'cleanup':
-        events['disk_errors'] = collect_disk_errors(max_events=5)
+    # Dispatch table: module name → callable that returns the events dict for that module.
+    # Each lambda is only called when the module matches, keeping imports lazy-safe.
+    _MODULE_EVENT_COLLECTORS = {
+        'update':   lambda: {'update_events': collect_update_events(max_events=10)},
+        'repair':   lambda: {
+            'application_errors': collect_application_errors(max_events=10),
+            'disk_errors':        collect_disk_errors(max_events=5),
+        },
+        'security': lambda: {'defender_events': collect_defender_events(max_events=10)},
+        'cleanup':  lambda: {'disk_errors': collect_disk_errors(max_events=5)},
+    }
+
+    collector_fn = _MODULE_EVENT_COLLECTORS.get(module)
+    events = collector_fn() if collector_fn else {}
 
     if events:
         store_collected_events(session_id, events, job_id)

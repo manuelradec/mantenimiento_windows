@@ -19,18 +19,18 @@ _sessions_lock = threading.Lock()
 MAINTENANCE_STEPS = [
     {
         'id': 'malwarebytes',
-        'name': 'Escaneo MalwareBytes',
-        'description': 'Ejecutar escaneo de amenazas con MalwareBytes',
+        'name': 'Auditoría de Seguridad',
+        'description': 'Inspección interna: Defender, Firewall, registro, tareas, TEMP, UAC, RDP',
     },
     {
         'id': 'ccleaner',
-        'name': 'Optimización CCleaner',
-        'description': 'Ejecutar limpieza automática con CCleaner',
+        'name': 'Limpieza Interna del Sistema',
+        'description': 'Limpieza nativa: TEMP, Windows Temp, Prefetch, Papelera, caché DNS e Internet',
     },
     {
         'id': 'advancedsystemcare',
-        'name': 'Advanced SystemCare',
-        'description': 'Ejecutar escaneo y reparación con Advanced SystemCare',
+        'name': 'Salud y Reparación del Sistema',
+        'description': 'DISM CheckHealth, SFC /scannow, servicios críticos, reinicio pendiente, actualizaciones',
     },
     {
         'id': 'defrag',
@@ -200,6 +200,11 @@ def _run_maintenance(session_id):
                 result = handler()
                 step_info['status'] = result.get('status', 'completed')
                 step_info['message'] = result.get('message', '')
+                # Propagate structured data for reporting (findings, actions, etc.)
+                for key in ('findings', 'actions_executed', 'space_freed_mb',
+                            'repairs', 'errors', 'warnings', 'recommended_actions'):
+                    if key in result:
+                        step_info[key] = result[key]
             else:
                 step_info['status'] = 'skipped'
                 step_info['message'] = 'Sin manejador disponible.'
@@ -230,56 +235,419 @@ def _check_exe_exists(paths):
 
 
 def _step_malwarebytes():
-    paths = [
-        r'C:\Program Files\Malwarebytes\Anti-Malware\mbam.exe',
-        r'C:\Program Files (x86)\Malwarebytes\Anti-Malware\mbam.exe',
-    ]
-    exe = _check_exe_exists(paths)
-    if not exe:
-        return {'status': 'skipped', 'message': 'MalwareBytes no está instalado.'}
-
-    run_cmd(
-        f'start "" "{exe}"',
-        shell=True, timeout=10,
-        description='Launch MalwareBytes',
-    )
-    return {'status': 'completed', 'message': 'MalwareBytes iniciado. Ejecute el escaneo manualmente.'}
+    """Internal security inspection — replaces MalwareBytes dependency."""
+    from services.security_audit import run_security_audit
+    return run_security_audit()
 
 
 def _step_ccleaner():
-    paths = [
-        r'C:\Program Files\CCleaner\CCleaner.exe',
-        r'C:\Program Files (x86)\CCleaner\CCleaner.exe',
-    ]
-    exe = _check_exe_exists(paths)
-    if not exe:
-        return {'status': 'skipped', 'message': 'CCleaner no está instalado.'}
-
-    result = run_cmd(
-        f'"{exe}" /AUTO',
-        timeout=300,
-        description='Run CCleaner auto-clean',
+    """Internal native cleanup — replaces CCleaner dependency."""
+    from datetime import datetime as _dt
+    from services.cleanup import (
+        clean_user_temp, clean_windows_temp, clean_prefetch,
+        empty_recycle_bin, clean_inet_cache, flush_dns_cache,
     )
-    if result.is_error:
-        return {'status': 'failed', 'message': result.error or 'Error al ejecutar CCleaner.'}
-    return {'status': 'completed', 'message': 'CCleaner ejecutado exitosamente.'}
+
+    started_at = _dt.now()
+    actions_executed = []
+    total_freed_mb = 0.0
+    errors = []
+
+    cleanup_tasks = [
+        ('Temp de usuario (%TEMP%)',     clean_user_temp),
+        ('Temp de Windows (Win\\Temp)',   clean_windows_temp),
+        ('Prefetch',                     clean_prefetch),
+        ('Papelera de reciclaje',        empty_recycle_bin),
+        ('Cache de Internet (INetCache)', clean_inet_cache),
+        ('Cache DNS',                    flush_dns_cache),
+    ]
+
+    for label, func in cleanup_tasks:
+        try:
+            r = func()
+            freed = (r.details or {}).get('freed_mb', 0) if hasattr(r, 'details') else 0
+            freed = freed or 0
+            total_freed_mb += freed
+            action_entry = {
+                'action': label,
+                'status': r.status.value if hasattr(r.status, 'value') else str(r.status),
+                'freed_mb': round(freed, 2),
+                'detail': (r.output or ''),
+            }
+            if r.is_error:
+                errors.append(f'{label}: {r.error or "error"}')
+        except Exception as e:
+            action_entry = {
+                'action': label,
+                'status': 'error',
+                'freed_mb': 0,
+                'detail': str(e),
+            }
+            errors.append(f'{label}: {e}')
+        actions_executed.append(action_entry)
+
+    ended_at = _dt.now()
+    duration = (ended_at - started_at).total_seconds()
+    total_freed_mb = round(total_freed_mb, 2)
+
+    message = (
+        f'Limpieza completada: {total_freed_mb} MB liberados '
+        f'en {len(actions_executed)} operaciones.'
+    )
+    if errors:
+        message += f' ({len(errors)} operacion(es) con error menor).'
+
+    return {
+        'status': 'completed',
+        'message': message,
+        'actions_executed': actions_executed,
+        'space_freed_mb': total_freed_mb,
+        'errors': errors,
+        'warnings': [],
+        'started_at': started_at.isoformat(),
+        'ended_at': ended_at.isoformat(),
+        'duration': round(duration, 1),
+    }
 
 
 def _step_advancedsystemcare():
-    paths = [
-        r'C:\Program Files (x86)\IObit\Advanced SystemCare\ASC.exe',
-        r'C:\Program Files\IObit\Advanced SystemCare\ASC.exe',
-    ]
-    exe = _check_exe_exists(paths)
-    if not exe:
-        return {'status': 'skipped', 'message': 'Advanced SystemCare no está instalado.'}
-
-    run_cmd(
-        f'start "" "{exe}"',
-        shell=True, timeout=10,
-        description='Launch Advanced SystemCare',
+    """Internal system health & repair module — replaces Advanced SystemCare dependency."""
+    import shutil as _shutil
+    from datetime import datetime as _dt
+    from services.command_runner import (
+        run_cmd as _run_cmd,
+        run_powershell as _run_ps,
+        CommandStatus as _CS,
     )
-    return {'status': 'completed', 'message': 'Advanced SystemCare iniciado. Ejecute el escaneo manualmente.'}
+
+    started_at = _dt.now()
+    findings = []
+    actions_executed = []
+    repairs = []
+    errors = []
+    warnings = []
+    recommended_actions = []
+
+    def _finding(title, severity, evidence, action=''):
+        return {'title': title, 'severity': severity,
+                'evidence': str(evidence)[:400], 'recommended_action': action}
+
+    # ------------------------------------------------------------------
+    # 1. Pending reboot detection (multiple registry locations)
+    # ------------------------------------------------------------------
+    r = _run_ps(
+        "$rb = $false; "
+        "if (Test-Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion"
+        "\\Component Based Servicing\\RebootPending') { $rb = $true }; "
+        "if (Test-Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion"
+        "\\WindowsUpdate\\Auto Update\\RebootRequired') { $rb = $true }; "
+        "$pfr = (Get-ItemProperty 'HKLM:\\SYSTEM\\CurrentControlSet\\Control"
+        "\\Session Manager' -Name PendingFileRenameOperations "
+        "-ErrorAction SilentlyContinue).PendingFileRenameOperations; "
+        "if ($pfr) { $rb = $true }; "
+        "$rb",
+        timeout=10,
+        description='Pending reboot check',
+    )
+    if (r.output or '').strip().lower() == 'true':
+        findings.append(_finding(
+            'Reinicio del sistema pendiente',
+            'warning',
+            'Clave RebootPending o RebootRequired encontrada en registro',
+            'Reinicie el equipo para completar actualizaciones o cambios pendientes.',
+        ))
+        recommended_actions.append('Reiniciar el equipo (reinicio pendiente detectado)')
+    else:
+        findings.append(_finding(
+            'Sin reinicio pendiente',
+            'info',
+            'No se detectaron claves de reinicio pendiente en registro',
+        ))
+
+    # ------------------------------------------------------------------
+    # 2. Disk space check (C:)
+    # ------------------------------------------------------------------
+    try:
+        total, used, free = _shutil.disk_usage('C:\\')
+        free_gb = round(free / (1024 ** 3), 1)
+        used_pct = round(used / total * 100, 1)
+        if free_gb < 5:
+            findings.append(_finding(
+                f'Disco C: critico — solo {free_gb} GB libres ({100 - used_pct:.1f}% libre)',
+                'critical',
+                f'Total: {round(total/(1024**3),1)} GB | Usado: {round(used/(1024**3),1)} GB '
+                f'| Libre: {free_gb} GB',
+                'Libere espacio en C: urgentemente (elimine archivos grandes, '
+                'vacie papelera, desinstale programas).',
+            ))
+            recommended_actions.append('Liberar espacio urgente en disco C:')
+        elif free_gb < 15:
+            findings.append(_finding(
+                f'Disco C: espacio bajo — {free_gb} GB libres ({100 - used_pct:.1f}% libre)',
+                'warning',
+                f'Libre: {free_gb} GB de {round(total/(1024**3),1)} GB totales',
+                'Considere limpiar archivos o ampliar el almacenamiento.',
+            ))
+            recommended_actions.append('Revisar espacio disponible en disco C:')
+        else:
+            findings.append(_finding(
+                f'Disco C: espacio adecuado — {free_gb} GB libres ({100 - used_pct:.1f}% libre)',
+                'info',
+                f'Libre: {free_gb} GB de {round(total/(1024**3),1)} GB totales',
+            ))
+    except Exception as e:
+        errors.append(f'Espacio en disco: {e}')
+
+    # ------------------------------------------------------------------
+    # 3. Critical Windows services status
+    # ------------------------------------------------------------------
+    critical_services = [
+        'WinDefend', 'mpssvc', 'EventLog', 'wuauserv',
+        'Dhcp', 'Dnscache', 'LanmanWorkstation',
+    ]
+    svc_names = ','.join(f"'{s}'" for s in critical_services)
+    r = _run_ps(
+        f"Get-Service -Name {svc_names} -ErrorAction SilentlyContinue "
+        "| Where-Object { $_.Status -ne 'Running' } "
+        "| ForEach-Object { \"$($_.Name)|$($_.Status)|$($_.DisplayName)\" }",
+        timeout=15,
+        description='Critical services status check',
+    )
+    stopped = []
+    for line in (r.output or '').splitlines():
+        line = line.strip()
+        if '|' not in line:
+            continue
+        parts = line.split('|', 2)
+        stopped.append({
+            'name': parts[0],
+            'status': parts[1] if len(parts) > 1 else '',
+            'display': parts[2] if len(parts) > 2 else parts[0],
+        })
+
+    if stopped:
+        for svc in stopped:
+            findings.append(_finding(
+                f'Servicio critico detenido: {svc["display"]}',
+                'warning',
+                f'{svc["name"]}: {svc["status"]}',
+                f'Verifique e inicie el servicio {svc["name"]} si es necesario.',
+            ))
+        recommended_actions.append(
+            f'Revisar {len(stopped)} servicio(s) critico(s) detenidos'
+        )
+    else:
+        findings.append(_finding(
+            'Servicios criticos del sistema: todos activos',
+            'info',
+            f'Verificados: {", ".join(critical_services)}',
+        ))
+
+    # ------------------------------------------------------------------
+    # 4. DISM CheckHealth (fast — does not repair, reads flag only)
+    # ------------------------------------------------------------------
+    r = _run_cmd(
+        ['dism', '/Online', '/Cleanup-Image', '/CheckHealth'],
+        requires_admin=True,
+        timeout=120,
+        description='DISM CheckHealth',
+    )
+    dism_out = (r.output or '').lower()
+    actions_executed.append({
+        'action': 'DISM /CheckHealth',
+        'status': r.status.value if hasattr(r.status, 'value') else str(r.status),
+        'detail': (r.output or r.error or '')[:600],
+    })
+    if r.is_error:
+        errors.append(f'DISM CheckHealth: {r.error or "error"}')
+        findings.append(_finding(
+            'DISM: no se pudo ejecutar la verificacion',
+            'warning',
+            r.error or 'DISM retorno error',
+            'Ejecute DISM /Online /Cleanup-Image /CheckHealth con permisos de administrador.',
+        ))
+    elif 'repairable' in dism_out:
+        findings.append(_finding(
+            'DISM: imagen del sistema marcada como reparable',
+            'warning',
+            'DISM /CheckHealth reporto bandera de reparacion',
+            'Ejecute: DISM /Online /Cleanup-Image /RestoreHealth',
+        ))
+        recommended_actions.append('Ejecutar DISM /RestoreHealth para reparar imagen')
+    else:
+        findings.append(_finding(
+            'DISM: imagen del sistema sin corrupcion detectada',
+            'info',
+            'DISM /CheckHealth: sin banderas de reparacion',
+        ))
+
+    # ------------------------------------------------------------------
+    # 5. SFC /scannow (verifies and repairs Windows system files)
+    # ------------------------------------------------------------------
+    r = _run_cmd(
+        ['sfc', '/scannow'],
+        requires_admin=True,
+        timeout=900,
+        description='SFC integrity scan',
+    )
+    sfc_out = (r.output or '').lower()
+    actions_executed.append({
+        'action': 'SFC /scannow',
+        'status': r.status.value if hasattr(r.status, 'value') else str(r.status),
+        'detail': (r.output or '')[:600],
+    })
+    if r.is_error:
+        errors.append(f'SFC: {r.error or "error"}')
+        findings.append(_finding(
+            'SFC: error al ejecutar la verificacion',
+            'warning',
+            r.error or 'SFC retorno codigo de error',
+            'Ejecute sfc /scannow desde una terminal con permisos de administrador.',
+        ))
+    elif ('did not find any integrity violations' in sfc_out
+          or 'no encontr' in sfc_out
+          or 'no integrity violations' in sfc_out):
+        findings.append(_finding(
+            'SFC: archivos del sistema integros — sin infracciones',
+            'info',
+            'sfc /scannow: no se encontraron violaciones de integridad',
+        ))
+        repairs.append('SFC verifico integridad del sistema sin problemas')
+    elif ('successfully repaired' in sfc_out
+          or 'reparo correctamente' in sfc_out
+          or 'reparados correctamente' in sfc_out):
+        findings.append(_finding(
+            'SFC: archivos del sistema reparados exitosamente',
+            'info',
+            'sfc /scannow: archivos danados detectados y reparados',
+        ))
+        repairs.append('SFC reparo archivos del sistema correctamente')
+    elif 'found integrity violations' in sfc_out or 'infracciones' in sfc_out:
+        findings.append(_finding(
+            'SFC: infracciones de integridad detectadas y NO reparadas',
+            'warning',
+            'sfc /scannow reporto archivos danados que no pudo reparar',
+            'Ejecute DISM /RestoreHealth y luego repita sfc /scannow.',
+        ))
+        recommended_actions.append('Ejecutar DISM /RestoreHealth y repetir SFC')
+    else:
+        findings.append(_finding(
+            'SFC completado',
+            'info',
+            (r.output or '')[:200],
+        ))
+
+    # ------------------------------------------------------------------
+    # 6. Startup programs (impact review)
+    # ------------------------------------------------------------------
+    r = _run_ps(
+        "Get-CimInstance Win32_StartupCommand -ErrorAction SilentlyContinue "
+        "| Select-Object Name, Location "
+        "| ForEach-Object { \"$($_.Name)|$($_.Location)\" } "
+        "| Select-Object -First 25",
+        timeout=15,
+        description='Startup programs impact review',
+    )
+    startup_entries = []
+    for line in (r.output or '').splitlines():
+        line = line.strip()
+        if '|' not in line:
+            continue
+        parts = line.split('|', 1)
+        startup_entries.append({
+            'name': parts[0],
+            'location': parts[1] if len(parts) > 1 else '',
+        })
+
+    if startup_entries:
+        findings.append(_finding(
+            f'Inicio automatico: {len(startup_entries)} programa(s) registrado(s)',
+            'info',
+            ' | '.join(
+                f'{e["name"]} ({e["location"]})' for e in startup_entries[:6]
+            ),
+        ))
+    else:
+        findings.append(_finding(
+            'Inicio automatico: sin programas registrados',
+            'info',
+            'Win32_StartupCommand: sin entradas',
+        ))
+
+    # ------------------------------------------------------------------
+    # 7. Pending Windows Updates (via Windows Update Agent COM object)
+    # ------------------------------------------------------------------
+    r = _run_ps(
+        "try { "
+        "  $s = New-Object -ComObject Microsoft.Update.Session -ErrorAction Stop; "
+        "  $r = $s.CreateUpdateSearcher().Search("
+        "    'IsInstalled=0 and Type=\\'Software\\' and IsHidden=0'); "
+        "  $r.Updates.Count "
+        "} catch { '-1' }",
+        timeout=45,
+        description='Pending Windows Updates check',
+    )
+    pending_raw = (r.output or '').strip()
+    try:
+        pending = int(pending_raw)
+        if pending > 0:
+            findings.append(_finding(
+                f'{pending} actualizacion(es) de Windows pendiente(s)',
+                'warning',
+                f'Windows Update Agent: {pending} actualizaciones sin instalar',
+                'Instale las actualizaciones pendientes desde Windows Update.',
+            ))
+            recommended_actions.append('Instalar actualizaciones pendientes de Windows')
+        elif pending == 0:
+            findings.append(_finding(
+                'Windows Update: sin actualizaciones pendientes',
+                'info',
+                'Windows Update Agent: el sistema esta al dia',
+            ))
+        # -1 means COM query failed — skip silently (not all configs support it)
+    except (ValueError, TypeError):
+        warnings.append('No se pudo consultar actualizaciones pendientes via COM')
+
+    # ------------------------------------------------------------------
+    # Summary
+    # ------------------------------------------------------------------
+    ended_at = _dt.now()
+    duration = (ended_at - started_at).total_seconds()
+
+    critical_count = sum(1 for f in findings if f.get('severity') == 'critical')
+    warning_count = sum(1 for f in findings if f.get('severity') == 'warning')
+
+    if critical_count > 0:
+        message = (
+            f'Salud del sistema: {critical_count} problema(s) CRITICO(S) — '
+            f'{warning_count} advertencia(s). Atencion inmediata requerida.'
+        )
+    elif warning_count > 0:
+        message = (
+            f'Salud del sistema: {warning_count} advertencia(s). '
+            f'{len(repairs)} reparacion(es) completada(s) por SFC/DISM.'
+        )
+    else:
+        message = (
+            f'Salud del sistema: buena. DISM y SFC sin problemas. '
+            f'{len(actions_executed)} herramienta(s) ejecutada(s).'
+        )
+    if errors:
+        message += f' ({len(errors)} error(es) menores).'
+
+    return {
+        'status': 'completed',
+        'message': message,
+        'findings': findings,
+        'actions_executed': actions_executed,
+        'repairs': repairs,
+        'errors': errors,
+        'warnings': warnings,
+        'started_at': started_at.isoformat(),
+        'ended_at': ended_at.isoformat(),
+        'duration': round(duration, 1),
+        'recommended_actions': recommended_actions,
+    }
 
 
 def _step_defrag():

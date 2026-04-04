@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import services.security_audit; import routes.maintenance; print\\('OK'\\)\")",
+      "Bash(python -c ':*)"
+    ]
+  }
+}
