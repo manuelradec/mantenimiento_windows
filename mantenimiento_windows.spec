@@ -69,6 +69,7 @@ a = Analysis(
         'core.snapshots',
         # Maintenance and reporting
         'services.maintenance_report',
+        'services.security_audit',
         # Route modules
         'routes',
         'routes.logs',

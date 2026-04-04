@@ -698,6 +698,14 @@ def _step_defrag():
         )
         op = 'Desfragmentación de HDD'
 
+    if result.status.value == 'requires_admin':
+        return {
+            'status': 'skipped',
+            'message': (
+                f'{op}: omitido — se requiere ejecutar como Administrador. '
+                'Abra la aplicacion con clic derecho → Ejecutar como administrador.'
+            ),
+        }
     if result.is_error:
         return {'status': 'failed', 'message': f'Error en {op}: {result.error}'}
     return {'status': 'completed', 'message': f'{op} completado exitosamente.'}
@@ -721,9 +729,24 @@ def _step_disk_cleanup():
         requires_admin=True, timeout=300,
         description='Disk Cleanup',
     )
+    if result.status.value == 'requires_admin':
+        return {
+            'status': 'skipped',
+            'message': (
+                'Limpieza de disco omitida: se requiere Administrador. '
+                'Abra la aplicacion con clic derecho → Ejecutar como administrador.'
+            ),
+        }
     if result.is_error:
         return {'status': 'failed', 'message': result.error or 'Error en limpieza de disco.'}
-    return {'status': 'completed', 'message': 'Limpieza de disco completada.'}
+    return {
+        'status': 'completed',
+        'message': (
+            'Limpieza de disco ejecutada (cleanmgr /sagerun:1). '
+            'NOTA: si no se configuraron categorias previamente con "cleanmgr /sageset:1", '
+            'la limpieza puede no haber eliminado archivos en este equipo.'
+        ),
+    }
 
 
 def _step_sfc():
@@ -739,19 +762,38 @@ def _step_sfc():
 
 
 def _step_windows_update():
-    run_cmd(
+    r = run_cmd(
         'UsoClient StartScan',
         requires_admin=True, timeout=120,
         description='Scan for updates',
     )
-    # Get Windows version info
     ver = run_powershell(
         "[System.Environment]::OSVersion.Version.ToString()",
         timeout=10,
         description='Get Windows version',
     )
-    msg = f"Escaneo de actualizaciones completado. Windows: {(ver.output or 'N/A').strip()}"
-    return {'status': 'completed', 'message': msg}
+    ver_str = (ver.output or 'N/A').strip()
+
+    if r.status.value == 'requires_admin':
+        return {
+            'status': 'skipped',
+            'message': (
+                f'Escaneo de actualizaciones omitido: se requiere Administrador. '
+                f'Windows: {ver_str}'
+            ),
+        }
+    if r.is_error:
+        return {
+            'status': 'completed',
+            'message': (
+                f'UsoClient no disponible en este equipo. '
+                f'Revise Windows Update manualmente. Windows: {ver_str}'
+            ),
+        }
+    return {
+        'status': 'completed',
+        'message': f'Escaneo de actualizaciones solicitado a Windows Update. Windows: {ver_str}',
+    }
 
 
 def _step_lenovo_update():
