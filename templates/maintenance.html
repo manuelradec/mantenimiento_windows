@@ -10,8 +10,13 @@
         <h3 id="master-step-label">Preparando...</h3>
         <button class="btn btn-danger btn-sm" id="cancel-maintenance-btn" onclick="cancelMaintenance()">Cancelar mantenimiento</button>
     </div>
-    <div class="progress-bar-container" style="height:24px;background:var(--bg-surface-1);border-radius:6px;overflow:hidden;margin:10px 16px;">
-        <div id="master-progress-bar" style="width:0%;height:100%;background:linear-gradient(90deg,var(--brand-blue),var(--brand-teal));transition:width 0.5s ease;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#fff;">
+    <div style="height:24px;background:var(--bg-surface-1);border-radius:6px;overflow:hidden;margin:10px 16px;">
+        <div id="master-progress-bar"
+             style="width:0%;height:100%;
+                    background:linear-gradient(90deg,var(--brand-blue,#274C9B),var(--brand-teal,#0AAE6B));
+                    transition:width 0.5s ease;border-radius:6px;
+                    display:flex;align-items:center;justify-content:center;
+                    font-size:12px;font-weight:600;color:#fff;">
             0%
         </div>
     </div>
@@ -21,22 +26,25 @@
     </div>
 </div>
 
-<!-- Steps Checklist -->
+<!-- Steps List -->
 <div class="section-card">
     <div class="section-header">
         <h3>Pasos del mantenimiento</h3>
     </div>
-    <div id="steps-list" style="padding:0 16px 16px;">
+    <div id="steps-list" style="padding:0 8px 16px;">
         <div style="text-align:center;padding:20px;opacity:0.6;">Cargando pasos...</div>
     </div>
 </div>
 
 <!-- Start Button -->
 <div id="start-section" style="text-align:center;padding:20px;">
-    <button class="btn btn-primary" id="start-btn" onclick="startMaintenance()" style="font-size:16px;padding:14px 40px;">
+    <button class="btn btn-primary" id="start-btn" onclick="startMaintenance()"
+            style="font-size:16px;padding:14px 40px;">
         Iniciar Mantenimiento Lógico
     </button>
-    <p style="margin-top:10px;font-size:13px;opacity:0.6;">Se ejecutarán 9 pasos de mantenimiento preventivo en secuencia.</p>
+    <p style="margin-top:10px;font-size:13px;opacity:0.6;">
+        Se ejecutarán 9 pasos de mantenimiento preventivo en secuencia.
+    </p>
 </div>
 
 <!-- Summary Card (shown after completion) -->
@@ -47,30 +55,64 @@
     <div id="summary-content" style="padding:16px;"></div>
 </div>
 
-<!-- Output Console -->
+<!-- Output Console (report generation output) -->
 <div class="section-card">
     <div class="section-header"><h3>Consola de salida</h3></div>
-    <pre class="console" id="output-console" style="min-height:100px;max-height:300px;overflow-y:auto;"></pre>
+    <pre class="console" id="output-console"
+         style="min-height:100px;max-height:300px;overflow-y:auto;"></pre>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <style>
-/* Indeterminate activity bar for running steps.
-   Uses translateX animation — stays within overflow:hidden container.
-   Width 35% + translateX range keeps it visually continuous. */
+/* ── Indeterminate progress animation ─────────────────────────────── */
 @keyframes step-slide {
     0%   { transform: translateX(-100%); }
-    50%  { transform: translateX(260%); }
+    50%  { transform: translateX(200%); }
     100% { transform: translateX(-100%); }
 }
-</style>
-<script>
-let maintenanceSessionId = null;
-let maintenancePollInterval = null;
-let maintenanceStartTime = null;
-let lastScrolledStep = null;  // tracks which step we last auto-scrolled to
 
+/* ── Step row base — adds left-border slot to avoid layout shift ──── */
+.maint-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 8px 10px 12px;
+    border-bottom: 1px solid var(--border-subtle, #333);
+    /* inset box-shadow used for the left accent: layout-neutral */
+    box-shadow: inset 4px 0 0 transparent;
+    border-radius: 3px;
+    transition: background 0.25s ease, box-shadow 0.25s ease;
+    position: relative;
+}
+
+/* ── Running state: unmistakable blue highlight ───────────────────── */
+.maint-step.step-running {
+    background: rgba(39, 76, 155, 0.11);
+    box-shadow: inset 4px 0 0 var(--brand-blue, #274C9B);
+}
+
+/* ── Completion flash — green/red pulse when step finishes ────────── */
+@keyframes flash-success {
+    0%   { background: rgba(10, 174, 107, 0.24); }
+    100% { background: transparent; }
+}
+@keyframes flash-fail {
+    0%   { background: rgba(227, 59, 20, 0.20); }
+    100% { background: transparent; }
+}
+.step-flash-success { animation: flash-success 1.1s ease-out forwards; }
+.step-flash-fail    { animation: flash-fail    1.1s ease-out forwards; }
+</style>
+
+<script>
+let maintenanceSessionId    = null;
+let maintenancePollInterval = null;
+let maintenanceStartTime    = null;
+let lastScrolledStep        = null;
+let prevStepStatuses        = {};  // step.id → last known status (flash transition detection)
+
+/* ── Build step rows on page load ──────────────────────────────────── */
 async function loadSteps() {
     try {
         const response = await fetch('/maintenance/api/steps');
@@ -80,33 +122,92 @@ async function loadSteps() {
 
         data.steps.forEach((step, i) => {
             const div = document.createElement('div');
-            div.id = `step-${step.id}`;
-            div.className = 'step-item';
-            div.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border-subtle);';
+            div.id        = `step-${step.id}`;
+            div.className = 'maint-step';
             div.innerHTML = `
-                <span class="step-icon" id="icon-${step.id}" style="font-size:18px;width:28px;text-align:center;filter:grayscale(1);opacity:0.5;align-self:flex-start;margin-top:2px;flex-shrink:0;">&#9203;</span>
+                <!-- Status icon -->
+                <span id="icon-${step.id}"
+                      style="font-size:22px;width:30px;text-align:center;
+                             filter:grayscale(1);opacity:0.35;
+                             flex-shrink:0;padding-top:2px;">&#9203;</span>
+
+                <!-- Content column -->
                 <div style="flex:1;min-width:0;">
+
                     <strong style="font-size:14px;">${i + 1}. ${escapeHtml(step.name)}</strong>
-                    <div style="font-size:12px;opacity:0.7;">${escapeHtml(step.description)}</div>
-                    <div class="step-message" id="msg-${step.id}" style="font-size:11px;margin-top:2px;"></div>
-                    <div id="activity-${step.id}" style="display:none;margin-top:5px;height:3px;background:var(--bg-surface-1,#2a2a3a);border-radius:2px;overflow:hidden;position:relative;">
-                        <div style="position:absolute;height:100%;width:35%;background:linear-gradient(90deg,var(--brand-blue,#274C9B),var(--brand-teal,#0AAE6B));border-radius:2px;animation:step-slide 1.8s ease-in-out infinite;"></div>
+                    <div style="font-size:12px;opacity:0.65;margin-top:1px;">
+                        ${escapeHtml(step.description)}
                     </div>
-                    <div id="detail-${step.id}" style="display:none;margin-top:5px;padding:5px 8px;background:rgba(0,0,0,0.18);border-radius:4px;border-left:2px solid var(--border-subtle,#444);font-size:10.5px;line-height:1.6;"></div>
+
+                    <!-- ── RUNNING block (visible only while executing) ── -->
+                    <div id="exec-${step.id}" style="display:none;margin-top:9px;">
+
+                        <!-- 8px indeterminate progress bar -->
+                        <div id="activity-${step.id}"
+                             style="height:8px;
+                                    background:var(--bg-surface-1,#2a2a3a);
+                                    border-radius:4px;overflow:hidden;position:relative;">
+                            <div style="position:absolute;height:100%;width:40%;
+                                        background:linear-gradient(90deg,
+                                            var(--brand-blue,#274C9B),
+                                            var(--brand-teal,#0AAE6B));
+                                        border-radius:4px;
+                                        animation:step-slide 1.7s ease-in-out infinite;">
+                            </div>
+                        </div>
+
+                        <!-- Live elapsed counter -->
+                        <div id="exec-hint-${step.id}"
+                             style="margin-top:5px;font-size:11.5px;
+                                    opacity:0.72;font-style:italic;">
+                            En ejecuci&oacute;n &mdash; 00:00 transcurrido...
+                        </div>
+
+                    </div>
+
+                    <!-- ── RESULT block (visible after step finishes) ── -->
+                    <div id="result-${step.id}" style="display:none;margin-top:9px;">
+
+                        <!-- Primary result message — prominent, color-coded -->
+                        <div id="msg-${step.id}"
+                             style="font-size:13px;line-height:1.5;
+                                    padding:6px 10px;border-radius:4px;
+                                    background:rgba(0,0,0,0.14);">
+                        </div>
+
+                        <!-- Detail items: admin notices, errors, recommended actions -->
+                        <div id="detail-${step.id}"
+                             style="display:none;margin-top:5px;
+                                    padding:6px 10px;border-radius:4px;
+                                    background:rgba(0,0,0,0.18);
+                                    border-left:2px solid var(--border-subtle,#444);
+                                    font-size:11.5px;line-height:1.75;">
+                        </div>
+
+                    </div>
                 </div>
-                <span class="step-elapsed" id="elapsed-${step.id}" style="font-size:12px;opacity:0.6;min-width:50px;text-align:right;align-self:flex-start;margin-top:2px;flex-shrink:0;"></span>
+
+                <!-- Elapsed time -->
+                <span id="elapsed-${step.id}"
+                      style="font-size:12px;opacity:0.6;min-width:48px;
+                             text-align:right;flex-shrink:0;padding-top:3px;">
+                </span>
             `;
             container.appendChild(div);
         });
     } catch (e) {
-        document.getElementById('steps-list').innerHTML = '<div style="color:var(--color-danger);">Error al cargar pasos.</div>';
+        document.getElementById('steps-list').innerHTML =
+            '<div style="color:var(--color-danger);">Error al cargar pasos.</div>';
     }
 }
 
+/* ── Start maintenance session ────────────────────────────────────── */
 async function startMaintenance() {
     const btn = document.getElementById('start-btn');
-    btn.disabled = true;
+    btn.disabled    = true;
     btn.textContent = 'Iniciando...';
+    prevStepStatuses = {};
+    lastScrolledStep = null;
 
     try {
         const response = await fetch('/maintenance/api/start', {
@@ -119,29 +220,27 @@ async function startMaintenance() {
             maintenanceSessionId = data.session_id;
             maintenanceStartTime = Date.now();
             document.getElementById('master-progress-card').style.display = 'block';
-            document.getElementById('start-section').style.display = 'none';
-            document.getElementById('summary-card').style.display = 'none';
+            document.getElementById('start-section').style.display        = 'none';
+            document.getElementById('summary-card').style.display          = 'none';
 
             maintenancePollInterval = setInterval(pollMaintenance, 2000);
         }
     } catch (e) {
-        displayResult({status: 'error', error: `Error al iniciar: ${e.message}`});
-        btn.disabled = false;
+        displayResult({ status: 'error', error: `Error al iniciar: ${e.message}` });
+        btn.disabled    = false;
         btn.textContent = 'Iniciar Mantenimiento Lógico';
     }
 }
 
+/* ── Poll session status every 2 s ───────────────────────────────── */
 async function pollMaintenance() {
     if (!maintenanceSessionId) return;
 
     try {
         const response = await fetch(`/maintenance/api/status/${maintenanceSessionId}`);
-        const session = await response.json();
+        const session  = await response.json();
 
-        if (session.error) {
-            clearInterval(maintenancePollInterval);
-            return;
-        }
+        if (session.error) { clearInterval(maintenancePollInterval); return; }
 
         updateStepsUI(session);
 
@@ -149,82 +248,191 @@ async function pollMaintenance() {
             clearInterval(maintenancePollInterval);
             showSummary(session);
         }
-    } catch (e) {
-        // Keep polling on network errors
+    } catch (_) {
+        // Keep polling on transient network errors
     }
 }
 
+/* ── Core UI update — called on every poll ──────────────────────── */
 function updateStepsUI(session) {
     const steps = session.steps || [];
-    let completed = 0, failed = 0, skipped = 0, running = 0;
+    let completed = 0, failed = 0, skipped = 0;
 
-    steps.forEach((step, i) => {
-        const icon = document.getElementById(`icon-${step.id}`);
-        const msg = document.getElementById(`msg-${step.id}`);
+    steps.forEach((step) => {
+        const row     = document.getElementById(`step-${step.id}`);
+        const icon    = document.getElementById(`icon-${step.id}`);
+        const exec    = document.getElementById(`exec-${step.id}`);
+        const hint    = document.getElementById(`exec-hint-${step.id}`);
+        const result  = document.getElementById(`result-${step.id}`);
+        const msg     = document.getElementById(`msg-${step.id}`);
+        const detail  = document.getElementById(`detail-${step.id}`);
         const elapsed = document.getElementById(`elapsed-${step.id}`);
-        const activity = document.getElementById(`activity-${step.id}`);
-        const detail = document.getElementById(`detail-${step.id}`);
+        if (!icon) return;
 
-        if (icon) {
-            switch(step.status) {
-                case 'pending':
-                    icon.innerHTML = '&#9203;';
-                    icon.style.filter = 'grayscale(1)';
-                    icon.style.opacity = '0.5';
-                    if (activity) activity.style.display = 'none';
-                    break;
-                case 'running':
-                    icon.innerHTML = '&#128260;';
-                    icon.style.filter = 'none';
-                    icon.style.opacity = '1';
-                    running++;
-                    // Show indeterminate activity bar while step is executing
-                    if (activity) activity.style.display = 'block';
-                    // Auto-scroll to this step once when it starts running
-                    if (lastScrolledStep !== step.id) {
-                        lastScrolledStep = step.id;
-                        const stepEl = document.getElementById(`step-${step.id}`);
-                        if (stepEl) stepEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        // Detect running → terminal transition for completion flash
+        const prevStatus     = prevStepStatuses[step.id];
+        const wasRunning     = prevStatus === 'running';
+        const nowTerminal    = step.status !== 'running' && step.status !== 'pending';
+        const justFinished   = wasRunning && nowTerminal;
+
+        /* ── Per-status visual state ─────────────────────────────── */
+        switch (step.status) {
+
+            case 'pending':
+                icon.innerHTML    = '&#9203;';
+                icon.style.filter = 'grayscale(1)';
+                icon.style.opacity = '0.35';
+                if (row) row.className = 'maint-step';
+                if (exec)   exec.style.display   = 'none';
+                if (result) result.style.display = 'none';
+                break;
+
+            case 'running':
+                icon.innerHTML    = '&#128260;';          // 🔄
+                icon.style.filter  = 'none';
+                icon.style.opacity = '1';
+                if (row) {
+                    row.className = 'maint-step step-running';
+                }
+                if (exec)   exec.style.display   = 'block';
+                if (result) result.style.display = 'none';
+
+                // Live elapsed counter inside exec block
+                if (hint && step.started_at) {
+                    const sec = Math.round(
+                        (Date.now() - new Date(step.started_at).getTime()) / 1000
+                    );
+                    const mm = String(Math.floor(sec / 60)).padStart(2, '0');
+                    const ss = String(sec % 60).padStart(2, '0');
+                    hint.textContent = `En ejecución — ${mm}:${ss} transcurrido...`;
+                }
+
+                // Auto-scroll to this step once, centered in viewport
+                if (lastScrolledStep !== step.id) {
+                    lastScrolledStep = step.id;
+                    if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                break;
+
+            case 'completed':
+                icon.innerHTML    = '&#9989;';
+                icon.style.filter  = 'none';
+                icon.style.opacity = '1';
+                if (row) {
+                    row.className = 'maint-step';
+                    if (justFinished) {
+                        row.classList.add('step-flash-success');
+                        setTimeout(() => row.classList.remove('step-flash-success'), 1200);
                     }
-                    break;
-                case 'completed':
-                    icon.innerHTML = '&#9989;';
-                    icon.style.filter = 'none';
-                    icon.style.opacity = '1';
-                    if (activity) activity.style.display = 'none';
-                    completed++;
-                    break;
-                case 'skipped':
-                    icon.innerHTML = '&#9888;';
-                    icon.style.filter = 'none';
-                    icon.style.opacity = '0.8';
-                    if (activity) activity.style.display = 'none';
-                    skipped++;
-                    break;
-                case 'failed':
-                    icon.innerHTML = '&#10060;';
-                    icon.style.filter = 'none';
-                    icon.style.opacity = '1';
-                    if (activity) activity.style.display = 'none';
-                    failed++;
-                    break;
-                case 'cancelled':
-                    icon.innerHTML = '&#128683;';
-                    icon.style.filter = 'grayscale(1)';
-                    icon.style.opacity = '0.6';
-                    if (activity) activity.style.display = 'none';
-                    break;
-            }
+                }
+                if (exec)   exec.style.display   = 'none';
+                if (result) result.style.display = 'block';
+                completed++;
+                break;
+
+            case 'skipped':
+                icon.innerHTML    = '&#9888;';
+                icon.style.filter  = 'none';
+                icon.style.opacity = '0.80';
+                if (row) row.className = 'maint-step';
+                if (exec)   exec.style.display   = 'none';
+                if (result) result.style.display = 'block';
+                skipped++;
+                break;
+
+            case 'failed':
+                icon.innerHTML    = '&#10060;';
+                icon.style.filter  = 'none';
+                icon.style.opacity = '1';
+                if (row) {
+                    row.className = 'maint-step';
+                    if (justFinished) {
+                        row.classList.add('step-flash-fail');
+                        setTimeout(() => row.classList.remove('step-flash-fail'), 1200);
+                    }
+                }
+                if (exec)   exec.style.display   = 'none';
+                if (result) result.style.display = 'block';
+                failed++;
+                break;
+
+            case 'cancelled':
+                icon.innerHTML    = '&#128683;';
+                icon.style.filter  = 'grayscale(1)';
+                icon.style.opacity = '0.50';
+                if (row) row.className = 'maint-step';
+                if (exec)   exec.style.display   = 'none';
+                if (result) result.style.display = 'block';
+                break;
         }
 
-        // Populate inline detail panel for terminal states
-        if (detail && step.status !== 'pending' && step.status !== 'running') {
-            const dp = [];
-            // Admin-skipped tools (highest priority — technician must know)
-            if (step.admin_skipped && step.admin_skipped.length) {
-                dp.push(`<div style="color:var(--color-warning,#D6814A);">&#9888; Sin Administrador: ${escapeHtml(step.admin_skipped.join(', '))}</div>`);
+        prevStepStatuses[step.id] = step.status;
+
+        /* ── Result message — color-coded, prominent ─────────────── */
+        if (msg && nowTerminal && step.message) {
+            const bg = step.status === 'completed' ? 'rgba(10,174,107,0.13)'   :
+                       step.status === 'failed'    ? 'rgba(227,59,20,0.15)'    :
+                       step.status === 'skipped'   ? 'rgba(214,129,74,0.13)'   :
+                                                     'rgba(0,0,0,0.14)';
+            const fg = step.status === 'completed' ? 'var(--color-success,#0AAE6B)' :
+                       step.status === 'failed'    ? 'var(--color-danger,#E33B14)'  :
+                       step.status === 'skipped'   ? 'var(--color-warning,#D6814A)' : '';
+
+            // Build the primary message line
+            let html = `<span style="color:${fg};">${escapeHtml(step.message)}</span>`;
+
+            // Summary badges (compact, scannable)
+            const badges = [];
+            if (step.space_freed_mb != null) {
+                badges.push(
+                    `<span style="color:var(--color-success,#0AAE6B);">${step.space_freed_mb} MB liberados</span>`
+                );
             }
-            // Errors (up to 3)
+            if (step.findings && step.findings.length) {
+                const crit = step.findings.filter(f => f.severity === 'critical').length;
+                const warn = step.findings.filter(f => f.severity === 'warning').length;
+                const info = step.findings.filter(f => f.severity === 'info').length;
+                if (crit) badges.push(`<span style="color:var(--color-danger,#E33B14);">${crit} cr&iacute;tico(s)</span>`);
+                if (warn) badges.push(`<span style="color:var(--color-warning,#D6814A);">${warn} aviso(s)</span>`);
+                if (info) badges.push(`<span style="opacity:0.6;">${info} OK</span>`);
+            }
+            if (step.admin_skipped && step.admin_skipped.length) {
+                badges.push(
+                    `<span style="color:var(--color-warning,#D6814A);">&#9888; Sin admin: ${escapeHtml(step.admin_skipped.join(', '))}</span>`
+                );
+            }
+            if (step.errors && step.errors.length) {
+                badges.push(
+                    `<span style="color:var(--color-danger,#E33B14);">${step.errors.length} error(es)</span>`
+                );
+            }
+            if (step.recommended_actions && step.recommended_actions.length) {
+                badges.push(
+                    `<span style="color:var(--color-warning,#D6814A);">${step.recommended_actions.length} acci&oacute;n(es) recomendada(s)</span>`
+                );
+            }
+            if (badges.length) {
+                html += `<br><span style="font-size:11px;">${badges.join(' &nbsp;|&nbsp; ')}</span>`;
+            }
+
+            msg.style.background = bg;
+            msg.innerHTML = html;
+        }
+
+        /* ── Detail panel: admin notices, errors, actions ─────────── */
+        if (detail && nowTerminal) {
+            const dp = [];
+
+            if (step.admin_skipped && step.admin_skipped.length) {
+                dp.push(
+                    `<div style="color:var(--color-warning,#D6814A);">&#9888; Sin Administrador: ${escapeHtml(step.admin_skipped.join(', '))}</div>`
+                );
+            }
+            if (step.warnings && step.warnings.length) {
+                step.warnings.slice(0, 2).forEach(w => {
+                    dp.push(`<div style="color:var(--color-warning,#D6814A);">&#9432; ${escapeHtml(String(w))}</div>`);
+                });
+            }
             if (step.errors && step.errors.length) {
                 step.errors.slice(0, 3).forEach(e => {
                     dp.push(`<div style="color:var(--color-danger,#E33B14);">&#10007; ${escapeHtml(String(e))}</div>`);
@@ -233,96 +441,70 @@ function updateStepsUI(session) {
                     dp.push(`<div style="opacity:0.55;">+ ${step.errors.length - 3} error(es) adicional(es)</div>`);
                 }
             }
-            // Recommended actions (up to 3 — most actionable for technician)
             if (step.recommended_actions && step.recommended_actions.length) {
                 step.recommended_actions.slice(0, 3).forEach(a => {
                     dp.push(`<div style="color:var(--brand-teal,#0AAE6B);">&#8594; ${escapeHtml(String(a))}</div>`);
                 });
                 if (step.recommended_actions.length > 3) {
-                    dp.push(`<div style="opacity:0.55;">+ ${step.recommended_actions.length - 3} accion(es) recomendada(s) mas (ver reporte)</div>`);
+                    dp.push(`<div style="opacity:0.55;">+ ${step.recommended_actions.length - 3} acci&oacute;n(es) m&aacute;s (ver reporte)</div>`);
                 }
             }
+
             if (dp.length) {
-                detail.innerHTML = dp.join('');
+                detail.innerHTML     = dp.join('');
                 detail.style.display = 'block';
             } else {
                 detail.style.display = 'none';
             }
         }
 
-        if (msg && step.message) {
-            const color = step.status === 'failed' ? 'var(--color-danger)' :
-                         step.status === 'skipped' ? 'var(--color-warning)' :
-                         step.status === 'completed' ? 'var(--color-success)' : '';
-            msg.innerHTML = `<span style="color:${color}">${escapeHtml(step.message)}</span>`;
-
-            // Compact details line for structured steps (security audit, cleanup, health)
-            const parts = [];
-            if (step.space_freed_mb != null) {
-                parts.push(`<span style="color:var(--color-success)">${step.space_freed_mb} MB liberados</span>`);
-            }
-            if (step.findings && step.findings.length) {
-                const crit = step.findings.filter(f => f.severity === 'critical').length;
-                const warn = step.findings.filter(f => f.severity === 'warning').length;
-                const info = step.findings.filter(f => f.severity === 'info').length;
-                if (crit) parts.push(`<span style="color:var(--color-danger)">${crit} critico(s)</span>`);
-                if (warn) parts.push(`<span style="color:var(--color-warning)">${warn} advertencia(s)</span>`);
-                if (info) parts.push(`<span style="opacity:0.6;">${info} verificacion(es) OK</span>`);
-            }
-            if (step.admin_skipped && step.admin_skipped.length) {
-                parts.push(`<span style="color:var(--color-warning)">Sin admin: ${step.admin_skipped.join(', ')}</span>`);
-            }
-            if (step.errors && step.errors.length) {
-                parts.push(`<span style="color:var(--color-danger)">${step.errors.length} error(es)</span>`);
-            }
-            if (step.recommended_actions && step.recommended_actions.length) {
-                parts.push(`<span style="color:var(--color-warning)">${step.recommended_actions.length} accion(es) recomendada(s)</span>`);
-            }
-            if (parts.length) {
-                msg.innerHTML += `<br><span style="font-size:10px;">${parts.join(' &nbsp;|&nbsp; ')}</span>`;
-            }
-        }
-
+        /* ── Elapsed time (post-completion) ──────────────────────── */
         if (elapsed && step.elapsed) {
             elapsed.textContent = `${step.elapsed}s`;
         }
     });
 
-    // Update master progress
+    /* ── Master progress bar ─────────────────────────────────────── */
     const total = steps.length;
-    const done = completed + failed + skipped;
-    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-    const bar = document.getElementById('master-progress-bar');
+    const done  = completed + failed + skipped;
+    const pct   = total > 0 ? Math.round((done / total) * 100) : 0;
+    const bar   = document.getElementById('master-progress-bar');
     if (bar) {
-        bar.style.width = pct + '%';
-        bar.textContent = pct + '%';
+        bar.style.width   = pct + '%';
+        bar.textContent   = pct + '%';
         if (failed > 0) {
-            bar.style.background = 'linear-gradient(90deg,var(--brand-orange),var(--color-danger))';
+            bar.style.background =
+                'linear-gradient(90deg,var(--brand-orange,#D6814A),var(--color-danger,#E33B14))';
         }
     }
 
     const currentStep = session.current_step || 0;
     const label = document.getElementById('master-step-label');
     if (label && steps[currentStep]) {
-        label.textContent = `Paso ${currentStep + 1} de ${total} — ${steps[currentStep].name}`;
+        const s = steps[currentStep];
+        const suffix = s.status === 'running' ? ' \u2014 En ejecuci\u00f3n...' : '';
+        label.textContent = `Paso ${currentStep + 1} de ${total} \u2014 ${s.name}${suffix}`;
     }
 
-    // Elapsed time
     if (maintenanceStartTime) {
-        const elapsed = Math.round((Date.now() - maintenanceStartTime) / 1000);
-        const mins = Math.floor(elapsed / 60);
-        const secs = elapsed % 60;
-        const el = document.getElementById('master-elapsed');
-        if (el) el.textContent = `Tiempo: ${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+        const sec  = Math.round((Date.now() - maintenanceStartTime) / 1000);
+        const mm   = String(Math.floor(sec / 60)).padStart(2, '0');
+        const ss   = String(sec % 60).padStart(2, '0');
+        const el   = document.getElementById('master-elapsed');
+        if (el) el.textContent = `Tiempo: ${mm}:${ss}`;
     }
 
     const stats = document.getElementById('master-stats');
-    if (stats) stats.textContent = `Completados: ${completed} | Omitidos: ${skipped} | Fallidos: ${failed}`;
+    if (stats) {
+        stats.textContent =
+            `Completados: ${completed} | Omitidos: ${skipped} | Fallidos: ${failed}`;
+    }
 }
 
+/* ── Post-completion summary card ───────────────────────────────── */
 function showSummary(session) {
-    const card = document.getElementById('summary-card');
-    const content = document.getElementById('summary-content');
+    const card        = document.getElementById('summary-card');
+    const content     = document.getElementById('summary-content');
     const startSection = document.getElementById('start-section');
 
     card.style.display = 'block';
@@ -330,30 +512,45 @@ function showSummary(session) {
         startSection.style.display = 'block';
         const btn = document.getElementById('start-btn');
         if (btn) {
-            btn.disabled = false;
+            btn.disabled    = false;
             btn.textContent = 'Ejecutar de nuevo';
         }
     }
 
-    const steps = session.steps || [];
-    const completed = steps.filter(s => s.status === 'completed').length;
-    const skipped = steps.filter(s => s.status === 'skipped').length;
-    const failed = steps.filter(s => s.status === 'failed').length;
+    const steps        = session.steps || [];
+    const completed    = steps.filter(s => s.status === 'completed').length;
+    const skipped      = steps.filter(s => s.status === 'skipped').length;
+    const failed       = steps.filter(s => s.status === 'failed').length;
     const totalElapsed = steps.reduce((sum, s) => sum + (s.elapsed || 0), 0);
 
     content.innerHTML = `
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;">
-            <div class="stat-box"><div class="stat-value" style="color:var(--color-success);">${completed}</div><div class="stat-label">Completados</div></div>
-            <div class="stat-box"><div class="stat-value" style="color:var(--color-warning);">${skipped}</div><div class="stat-label">Omitidos</div></div>
-            <div class="stat-box"><div class="stat-value" style="color:var(--color-danger);">${failed}</div><div class="stat-label">Fallidos</div></div>
-            <div class="stat-box"><div class="stat-value">${Math.round(totalElapsed)}s</div><div class="stat-label">Tiempo total</div></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+                    gap:12px;margin-bottom:16px;">
+            <div class="stat-box">
+                <div class="stat-value" style="color:var(--color-success);">${completed}</div>
+                <div class="stat-label">Completados</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" style="color:var(--color-warning);">${skipped}</div>
+                <div class="stat-label">Omitidos</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" style="color:var(--color-danger);">${failed}</div>
+                <div class="stat-label">Fallidos</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">${Math.round(totalElapsed)}s</div>
+                <div class="stat-label">Tiempo total</div>
+            </div>
         </div>
         <div style="text-align:center;">
-            <button class="btn btn-primary btn-sm" onclick="generateReport('${session.id}')">Generar Reporte</button>
+            <button class="btn btn-primary btn-sm"
+                    onclick="generateReport('${session.id}')">Generar Reporte</button>
         </div>
     `;
 }
 
+/* ── Cancel in-progress maintenance ────────────────────────────── */
 async function cancelMaintenance() {
     if (!maintenanceSessionId) return;
     const confirmed = await showConfirm(
@@ -369,12 +566,16 @@ async function cancelMaintenance() {
             headers: getDefaultHeaders(),
         });
     } catch (e) {
-        displayResult({status: 'error', error: `Error al cancelar: ${e.message}`});
+        displayResult({ status: 'error', error: `Error al cancelar: ${e.message}` });
     }
 }
 
+/* ── Report generation ──────────────────────────────────────────── */
 async function generateReport(sessionId) {
-    displayResult({status: 'info', output: 'Generando reportes (HTML, FO-TI-19, Excel, Google Sheets, carpeta de red)...'});
+    displayResult({
+        status: 'info',
+        output: 'Generando reportes (HTML, FO-TI-19, Excel, Google Sheets, carpeta de red)...',
+    });
     try {
         const response = await fetch(`/maintenance/api/report/${sessionId}`, {
             method: 'POST',
@@ -384,26 +585,34 @@ async function generateReport(sessionId) {
         if (data.status === 'success') {
             const r = data.reports || {};
             let msg = 'Reportes generados:\n';
-            if (r.html_local && r.html_local.status === 'success') msg += `  HTML local: ${r.html_local.path}\n`;
-            if (r.fo_ti_19 && r.fo_ti_19.status === 'success') msg += `  FO-TI-19 (Hoja de Servicio): ${r.fo_ti_19.path}\n`;
-            else if (r.fo_ti_19 && r.fo_ti_19.error) msg += `  FO-TI-19: Error - ${r.fo_ti_19.error}\n`;
-            if (r.network_share && r.network_share.status === 'success') msg += `  Carpeta de red: ${r.network_share.path}\n`;
-            else if (r.network_share && r.network_share.error) msg += `  Carpeta de red: ${r.network_share.error}\n`;
-            if (r.google_sheets && r.google_sheets.status === 'success') msg += '  Google Sheets: Actualizado\n';
-            else if (r.google_sheets) msg += `  Google Sheets: ${r.google_sheets.reason || r.google_sheets.error || 'Omitido'}\n`;
-            if (r.excel_form && r.excel_form.status === 'success') msg += `  Excel FO-TI-19: ${r.excel_form.local_path}\n`;
-            else if (r.excel_form) msg += `  Excel FO-TI-19: ${r.excel_form.reason || r.excel_form.error || 'Omitido'}\n`;
-            displayResult({status: 'success', output: msg});
+            if (r.html_local && r.html_local.status === 'success')
+                msg += `  HTML local: ${r.html_local.path}\n`;
+            if (r.fo_ti_19 && r.fo_ti_19.status === 'success')
+                msg += `  FO-TI-19 (Hoja de Servicio): ${r.fo_ti_19.path}\n`;
+            else if (r.fo_ti_19 && r.fo_ti_19.error)
+                msg += `  FO-TI-19: Error - ${r.fo_ti_19.error}\n`;
+            if (r.network_share && r.network_share.status === 'success')
+                msg += `  Carpeta de red: ${r.network_share.path}\n`;
+            else if (r.network_share && r.network_share.error)
+                msg += `  Carpeta de red: ${r.network_share.error}\n`;
+            if (r.google_sheets && r.google_sheets.status === 'success')
+                msg += '  Google Sheets: Actualizado\n';
+            else if (r.google_sheets)
+                msg += `  Google Sheets: ${r.google_sheets.reason || r.google_sheets.error || 'Omitido'}\n`;
+            if (r.excel_form && r.excel_form.status === 'success')
+                msg += `  Excel FO-TI-19: ${r.excel_form.local_path}\n`;
+            else if (r.excel_form)
+                msg += `  Excel FO-TI-19: ${r.excel_form.reason || r.excel_form.error || 'Omitido'}\n`;
+            displayResult({ status: 'success', output: msg });
         } else {
-            displayResult({status: 'error', error: data.error || 'Error al generar reportes.'});
+            displayResult({ status: 'error', error: data.error || 'Error al generar reportes.' });
         }
     } catch (e) {
-        displayResult({status: 'error', error: `Error: ${e.message}`});
+        displayResult({ status: 'error', error: `Error: ${e.message}` });
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    loadSteps();
-});
+/* ── Init ───────────────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => { loadSteps(); });
 </script>
 {% endblock %}
