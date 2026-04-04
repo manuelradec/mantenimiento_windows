@@ -675,40 +675,29 @@ def _step_advancedsystemcare():
 
 
 def _step_defrag():
-    # Detect drive type
-    detect = run_powershell(
-        "Get-PhysicalDisk | Select-Object -First 1 -ExpandProperty MediaType",
-        timeout=15,
-        description='Detect drive type',
+    # /O is the unified optimization flag: performs ReTrim on SSDs and
+    # defragmentation on HDDs. Windows selects the appropriate operation
+    # automatically based on drive type.
+    result = run_cmd(
+        ['defrag', 'C:', '/O'],
+        requires_admin=True, timeout=600,
+        description='Optimize disk C:',
     )
-    media_type = (detect.output or '').strip().upper()
-
-    if 'SSD' in media_type:
-        result = run_cmd(
-            ['defrag', 'C:', '/L'],
-            requires_admin=True, timeout=300,
-            description='ReTrim SSD',
-        )
-        op = 'TRIM en SSD'
-    else:
-        result = run_cmd(
-            ['defrag', 'C:', '/O'],
-            requires_admin=True, timeout=600,
-            description='Defragment HDD',
-        )
-        op = 'Desfragmentación de HDD'
 
     if result.status.value == 'requires_admin':
         return {
             'status': 'skipped',
             'message': (
-                f'{op}: omitido — se requiere ejecutar como Administrador. '
+                'Optimizacion de disco omitida: se requiere ejecutar como Administrador. '
                 'Abra la aplicacion con clic derecho → Ejecutar como administrador.'
             ),
         }
     if result.is_error:
-        return {'status': 'failed', 'message': f'Error en {op}: {result.error}'}
-    return {'status': 'completed', 'message': f'{op} completado exitosamente.'}
+        return {'status': 'failed', 'message': f'Error en optimizacion de disco: {result.error}'}
+    return {
+        'status': 'completed',
+        'message': 'Optimizacion de disco completada (defrag /O: TRIM en SSD, desfragmentacion en HDD).',
+    }
 
 
 def _step_temp_cleanup():
@@ -806,12 +795,20 @@ def _step_lenovo_update():
     if not exe:
         return {'status': 'skipped', 'message': 'Lenovo Vantage/System Update no está instalado.'}
 
-    run_cmd(
+    result = run_cmd(
         f'start "" "{exe}"',
         shell=True, timeout=10,
         description='Launch Lenovo Update',
     )
-    return {'status': 'completed', 'message': 'Lenovo Update iniciado. Verifique actualizaciones manualmente.'}
+    if result.is_error:
+        return {
+            'status': 'skipped',
+            'message': (
+                f'Lenovo Update detectado en {exe}. '
+                'No se pudo iniciar automaticamente — abralo manualmente desde el Menu Inicio.'
+            ),
+        }
+    return {'status': 'completed', 'message': f'Lenovo Update iniciado ({exe}). Verifique actualizaciones manualmente.'}
 
 
 def _collect_system_info():

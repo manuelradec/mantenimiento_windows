@@ -106,6 +106,8 @@ def generate_html_report(system_info, steps, session_data):
         <li>Tiempo total: {total_time:.0f} segundos</li>
     </ul>
 
+    {_build_inventory_section_html(system_info)}
+
     <div class="footer">
         Generado por CleanCPU v{Config.APP_VERSION} — RADEC AUTOPARTES<br>
         {timestamp}
@@ -114,6 +116,118 @@ def generate_html_report(system_info, steps, session_data):
 </html>'''
 
     return html
+
+
+def _build_inventory_section_html(system_info: dict) -> str:
+    """
+    Build an HTML inventory/system-snapshot section from system_info dict.
+    Tolerant of missing keys — any absent field renders as 'N/A'.
+    system_info may contain a nested 'inventory' key (from collect_inventory())
+    or flat keys from the legacy _collect_system_info() call.
+    """
+    from html import escape as he
+
+    inv = system_info.get('inventory', {})
+    basic = inv.get('basic', {})
+    hardware = inv.get('hardware', {})
+    system = inv.get('system', {})
+    network = inv.get('network', {})
+    office = inv.get('office', {})
+
+    def g(d: dict, key: str, fallback: str = 'N/A') -> str:
+        """Get from dict, fall back to system_info flat keys, then fallback."""
+        v = d.get(key) or system_info.get(key)
+        return he(str(v).strip()) if v else fallback
+
+    # ---- Basic ----
+    rows_basic = [
+        ('Fecha / Hora', f"{g(basic, 'date')} {g(basic, 'time')}"),
+        ('Equipo (hostname)', g(basic, 'hostname', system_info.get('hostname', 'N/A'))),
+        ('Usuario (login)', g(basic, 'username')),
+        ('Nombre completo', g(basic, 'full_name')),
+    ]
+
+    # ---- Hardware ----
+    rows_hw = [
+        ('Fabricante', g(hardware, 'manufacturer', system_info.get('manufacturer', 'N/A'))),
+        ('Modelo', g(hardware, 'model', system_info.get('model', 'N/A'))),
+        ('No. de serie', g(hardware, 'serial', system_info.get('serial', 'N/A'))),
+        ('UUID', g(hardware, 'uuid')),
+        ('Dominio/Grupo', g(hardware, 'domain')),
+        ('Tipo de union', g(hardware, 'join_type')),
+    ]
+
+    # ---- System ----
+    ram_modules = system.get('ram_modules', [])
+    ram_mod_str = ', '.join(
+        f"{m.get('slot', '')} {m.get('capacity', '')} {m.get('type', '')} {m.get('speed', '')}"
+        for m in ram_modules
+    ) if ram_modules else ''
+
+    disks = system.get('disks', [])
+    disks_str = ' | '.join(
+        f"{d.get('model', '')} {d.get('capacity', '')} ({d.get('media_type', '')})"
+        for d in disks
+    ) if disks else ''
+
+    rows_sys = [
+        ('Sistema operativo', g(system, 'os_name', system_info.get('os_version', 'N/A'))),
+        ('Version', g(system, 'os_version')),
+        ('Build', g(system, 'os_build')),
+        ('Arquitectura', g(system, 'os_arch', system_info.get('architecture', 'N/A'))),
+        ('Procesador', g(system, 'processor', system_info.get('processor', 'N/A'))),
+        ('RAM total', g(system, 'ram_total')),
+        ('Modulos RAM', he(ram_mod_str) if ram_mod_str else 'N/A'),
+        ('Discos fisicos', he(disks_str) if disks_str else 'N/A'),
+    ]
+
+    # ---- Network ----
+    rows_net = [
+        ('Ethernet MAC', g(network, 'ethernet_mac')),
+        ('Ethernet IPv4', g(network, 'ethernet_ip')),
+        ('WiFi MAC', g(network, 'wifi_mac')),
+        ('WiFi IPv4', g(network, 'wifi_ip')),
+    ]
+
+    # ---- Office ----
+    rows_off = [
+        ('Producto', g(office, 'product_name')),
+        ('Version', g(office, 'version')),
+        ('Plataforma', g(office, 'platform')),
+        ('Canal', g(office, 'channel')),
+        ('Release IDs', g(office, 'release_ids')),
+    ]
+
+    def _table(rows):
+        return (
+            '<table style="border-collapse:collapse;width:100%;margin:6px 0 14px;">'
+            + ''.join(
+                f'<tr><td style="padding:4px 10px;width:160px;font-weight:bold;'
+                f'color:#555;">{k}</td>'
+                f'<td style="padding:4px 10px;border-bottom:1px solid #eee;">{v}</td></tr>'
+                for k, v in rows
+            )
+            + '</table>'
+        )
+
+    return f'''
+    <h2 style="color:#0E7C5A;margin-top:28px;">Inventario del equipo</h2>
+
+    <h3 style="margin:10px 0 4px;font-size:13px;color:#274C9B;">Identificación</h3>
+    {_table(rows_basic)}
+
+    <h3 style="margin:10px 0 4px;font-size:13px;color:#274C9B;">Hardware</h3>
+    {_table(rows_hw)}
+
+    <h3 style="margin:10px 0 4px;font-size:13px;color:#274C9B;">Sistema operativo</h3>
+    {_table(rows_sys)}
+
+    <h3 style="margin:10px 0 4px;font-size:13px;color:#274C9B;">Red</h3>
+    {_table(rows_net)}
+
+    <h3 style="margin:10px 0 4px;font-size:13px;color:#274C9B;">Microsoft Office</h3>
+    {_table(rows_off)}
+'''
 
 
 def save_report_locally(html_content, system_info):
@@ -953,6 +1067,15 @@ def generate_full_report(session_data):
     from routes.maintenance import _collect_system_info
     system_info = _collect_system_info()
     steps = session_data.get('steps', [])
+
+    # Attach full inventory snapshot to system_info for report sections.
+    # Collected independently — a failure here does not abort report generation.
+    try:
+        from services.system_inventory import collect_inventory
+        system_info['inventory'] = collect_inventory()
+    except Exception as e:
+        logger.warning(f"Inventory collection failed during report generation: {e}")
+        system_info['inventory'] = {}
 
     results = {}
 
