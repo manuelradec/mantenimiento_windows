@@ -8,7 +8,10 @@
       "Bash(python -m flake8 routes/maintenance.py)",
       "Bash(python -m flake8 routes/maintenance.py services/security_audit.py core/governance.py services/network_tools.py core/job_runner.py)",
       "Bash(python -m flake8 services/security_audit.py routes/maintenance.py)",
-      "Bash(python -c \"import routes.maintenance; import services.security_audit; print\\('imports OK'\\)\")"
+      "Bash(python -c \"import routes.maintenance; import services.security_audit; print\\('imports OK'\\)\")",
+      "Bash(python -c \"import sys; print\\(sys.executable\\)\")",
+      "Bash(python -c \"import flask; print\\('flask OK'\\)\")",
+      "Bash(venv/Scripts/python.exe -c \"import flask; print\\('venv flask OK'\\)\")"
     ]
   }
 }
