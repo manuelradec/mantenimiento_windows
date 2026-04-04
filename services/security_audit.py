@@ -38,12 +38,13 @@ _SUSPICIOUS_EXTS = {
     '.scr', '.com', '.pif', '.hta', '.wsf',
 }
 
-# Path fragments that flag a startup/task executable as suspicious
+# Path fragments that flag a startup/task executable as suspicious.
+# Deliberately narrow: only truly risky execution locations.
+# AppData\Roaming and Downloads are NOT included — too broad, causes false
+# positives for common apps (Teams, Slack, Zoom, Discord, Spotify, etc.).
 _SUSPICIOUS_PATHS = (
     '\\temp\\', '\\tmp\\', '%temp%', '%tmp%',
     '\\appdata\\local\\temp',
-    '\\downloads\\',
-    '\\appdata\\roaming\\',
 )
 
 
@@ -108,7 +109,6 @@ def _check_defender():
     parts = raw.split('|')
     av_enabled = parts[0] if len(parts) > 0 else ''
     rt_enabled = parts[1] if len(parts) > 1 else ''
-    spy_enabled = parts[2] if len(parts) > 2 else ''
     sig_age_str = parts[3] if len(parts) > 3 else '-1'
     scan_age_str = parts[4] if len(parts) > 4 else '-1'
 
@@ -778,18 +778,18 @@ def run_security_audit():
     recommended_actions = []
 
     checks = [
-        ('Windows Defender',        _check_defender),
-        ('Firewall de Windows',     _check_firewall),
-        ('Windows Update',          _check_windows_update),
-        ('Registro Run/RunOnce',    _check_run_registry),
-        ('Carpetas de inicio',      _check_startup_folders),
-        ('Tareas programadas',      _check_scheduled_tasks),
-        ('Ejecutables en TEMP',     _check_temp_executables),
-        ('UAC',                     _check_uac),
-        ('WDigest',                 _check_wdigest),
+        ('Windows Defender', _check_defender),
+        ('Firewall de Windows', _check_firewall),
+        ('Windows Update', _check_windows_update),
+        ('Registro Run/RunOnce', _check_run_registry),
+        ('Carpetas de inicio', _check_startup_folders),
+        ('Tareas programadas', _check_scheduled_tasks),
+        ('Ejecutables en TEMP', _check_temp_executables),
+        ('UAC', _check_uac),
+        ('WDigest', _check_wdigest),
         ('Escritorio Remoto (RDP)', _check_rdp),
-        ('Cuenta Invitado',         _check_guest_account),
-        ('AutoRun / AutoPlay',      _check_autorun),
+        ('Cuenta Invitado', _check_guest_account),
+        ('AutoRun / AutoPlay', _check_autorun),
     ]
 
     for check_name, check_fn in checks:

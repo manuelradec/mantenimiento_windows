@@ -55,10 +55,21 @@
 {% endblock %}
 
 {% block scripts %}
+<style>
+/* Indeterminate activity bar for running steps.
+   Uses translateX animation — stays within overflow:hidden container.
+   Width 35% + translateX range keeps it visually continuous. */
+@keyframes step-slide {
+    0%   { transform: translateX(-100%); }
+    50%  { transform: translateX(260%); }
+    100% { transform: translateX(-100%); }
+}
+</style>
 <script>
 let maintenanceSessionId = null;
 let maintenancePollInterval = null;
 let maintenanceStartTime = null;
+let lastScrolledStep = null;  // tracks which step we last auto-scrolled to
 
 async function loadSteps() {
     try {
@@ -73,13 +84,17 @@ async function loadSteps() {
             div.className = 'step-item';
             div.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border-subtle);';
             div.innerHTML = `
-                <span class="step-icon" id="icon-${step.id}" style="font-size:18px;width:28px;text-align:center;filter:grayscale(1);opacity:0.5;">&#9203;</span>
-                <div style="flex:1;">
+                <span class="step-icon" id="icon-${step.id}" style="font-size:18px;width:28px;text-align:center;filter:grayscale(1);opacity:0.5;align-self:flex-start;margin-top:2px;flex-shrink:0;">&#9203;</span>
+                <div style="flex:1;min-width:0;">
                     <strong style="font-size:14px;">${i + 1}. ${escapeHtml(step.name)}</strong>
                     <div style="font-size:12px;opacity:0.7;">${escapeHtml(step.description)}</div>
                     <div class="step-message" id="msg-${step.id}" style="font-size:11px;margin-top:2px;"></div>
+                    <div id="activity-${step.id}" style="display:none;margin-top:5px;height:3px;background:var(--bg-surface-1,#2a2a3a);border-radius:2px;overflow:hidden;position:relative;">
+                        <div style="position:absolute;height:100%;width:35%;background:linear-gradient(90deg,var(--brand-blue,#274C9B),var(--brand-teal,#0AAE6B));border-radius:2px;animation:step-slide 1.8s ease-in-out infinite;"></div>
+                    </div>
+                    <div id="detail-${step.id}" style="display:none;margin-top:5px;padding:5px 8px;background:rgba(0,0,0,0.18);border-radius:4px;border-left:2px solid var(--border-subtle,#444);font-size:10.5px;line-height:1.6;"></div>
                 </div>
-                <span class="step-elapsed" id="elapsed-${step.id}" style="font-size:12px;opacity:0.6;min-width:50px;text-align:right;"></span>
+                <span class="step-elapsed" id="elapsed-${step.id}" style="font-size:12px;opacity:0.6;min-width:50px;text-align:right;align-self:flex-start;margin-top:2px;flex-shrink:0;"></span>
             `;
             container.appendChild(div);
         });
@@ -147,6 +162,8 @@ function updateStepsUI(session) {
         const icon = document.getElementById(`icon-${step.id}`);
         const msg = document.getElementById(`msg-${step.id}`);
         const elapsed = document.getElementById(`elapsed-${step.id}`);
+        const activity = document.getElementById(`activity-${step.id}`);
+        const detail = document.getElementById(`detail-${step.id}`);
 
         if (icon) {
             switch(step.status) {
@@ -154,36 +171,82 @@ function updateStepsUI(session) {
                     icon.innerHTML = '&#9203;';
                     icon.style.filter = 'grayscale(1)';
                     icon.style.opacity = '0.5';
+                    if (activity) activity.style.display = 'none';
                     break;
                 case 'running':
                     icon.innerHTML = '&#128260;';
                     icon.style.filter = 'none';
                     icon.style.opacity = '1';
                     running++;
+                    // Show indeterminate activity bar while step is executing
+                    if (activity) activity.style.display = 'block';
+                    // Auto-scroll to this step once when it starts running
+                    if (lastScrolledStep !== step.id) {
+                        lastScrolledStep = step.id;
+                        const stepEl = document.getElementById(`step-${step.id}`);
+                        if (stepEl) stepEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
                     break;
                 case 'completed':
                     icon.innerHTML = '&#9989;';
                     icon.style.filter = 'none';
                     icon.style.opacity = '1';
+                    if (activity) activity.style.display = 'none';
                     completed++;
                     break;
                 case 'skipped':
                     icon.innerHTML = '&#9888;';
                     icon.style.filter = 'none';
                     icon.style.opacity = '0.8';
+                    if (activity) activity.style.display = 'none';
                     skipped++;
                     break;
                 case 'failed':
                     icon.innerHTML = '&#10060;';
                     icon.style.filter = 'none';
                     icon.style.opacity = '1';
+                    if (activity) activity.style.display = 'none';
                     failed++;
                     break;
                 case 'cancelled':
                     icon.innerHTML = '&#128683;';
                     icon.style.filter = 'grayscale(1)';
                     icon.style.opacity = '0.6';
+                    if (activity) activity.style.display = 'none';
                     break;
+            }
+        }
+
+        // Populate inline detail panel for terminal states
+        if (detail && step.status !== 'pending' && step.status !== 'running') {
+            const dp = [];
+            // Admin-skipped tools (highest priority — technician must know)
+            if (step.admin_skipped && step.admin_skipped.length) {
+                dp.push(`<div style="color:var(--color-warning,#D6814A);">&#9888; Sin Administrador: ${escapeHtml(step.admin_skipped.join(', '))}</div>`);
+            }
+            // Errors (up to 3)
+            if (step.errors && step.errors.length) {
+                step.errors.slice(0, 3).forEach(e => {
+                    dp.push(`<div style="color:var(--color-danger,#E33B14);">&#10007; ${escapeHtml(String(e))}</div>`);
+                });
+                if (step.errors.length > 3) {
+                    dp.push(`<div style="opacity:0.55;">+ ${step.errors.length - 3} error(es) adicional(es)</div>`);
+                }
+            }
+            // Recommended actions (up to 3 — most actionable for technician)
+            if (step.recommended_actions && step.recommended_actions.length) {
+                step.recommended_actions.slice(0, 3).forEach(a => {
+                    dp.push(`<div style="color:var(--brand-teal,#0AAE6B);">&#8594; ${escapeHtml(String(a))}</div>`);
+                });
+                if (step.recommended_actions.length > 3) {
+                    dp.push(`<div style="opacity:0.55;">+ ${step.recommended_actions.length - 3} accion(es) recomendada(s) mas (ver reporte)</div>`);
+                }
+            }
+            if (dp.length) {
+                detail.innerHTML = dp.join('');
+                detail.style.display = 'block';
+            } else {
+                detail.style.display = 'none';
             }
         }
 
@@ -192,6 +255,32 @@ function updateStepsUI(session) {
                          step.status === 'skipped' ? 'var(--color-warning)' :
                          step.status === 'completed' ? 'var(--color-success)' : '';
             msg.innerHTML = `<span style="color:${color}">${escapeHtml(step.message)}</span>`;
+
+            // Compact details line for structured steps (security audit, cleanup, health)
+            const parts = [];
+            if (step.space_freed_mb != null) {
+                parts.push(`<span style="color:var(--color-success)">${step.space_freed_mb} MB liberados</span>`);
+            }
+            if (step.findings && step.findings.length) {
+                const crit = step.findings.filter(f => f.severity === 'critical').length;
+                const warn = step.findings.filter(f => f.severity === 'warning').length;
+                const info = step.findings.filter(f => f.severity === 'info').length;
+                if (crit) parts.push(`<span style="color:var(--color-danger)">${crit} critico(s)</span>`);
+                if (warn) parts.push(`<span style="color:var(--color-warning)">${warn} advertencia(s)</span>`);
+                if (info) parts.push(`<span style="opacity:0.6;">${info} verificacion(es) OK</span>`);
+            }
+            if (step.admin_skipped && step.admin_skipped.length) {
+                parts.push(`<span style="color:var(--color-warning)">Sin admin: ${step.admin_skipped.join(', ')}</span>`);
+            }
+            if (step.errors && step.errors.length) {
+                parts.push(`<span style="color:var(--color-danger)">${step.errors.length} error(es)</span>`);
+            }
+            if (step.recommended_actions && step.recommended_actions.length) {
+                parts.push(`<span style="color:var(--color-warning)">${step.recommended_actions.length} accion(es) recomendada(s)</span>`);
+            }
+            if (parts.length) {
+                msg.innerHTML += `<br><span style="font-size:10px;">${parts.join(' &nbsp;|&nbsp; ')}</span>`;
+            }
         }
 
         if (elapsed && step.elapsed) {
