@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(python -c \"import services.security_audit; import routes.maintenance; print\\('OK'\\)\")",
-      "Bash(python -c ':*)"
+      "Bash(python -c ':*)",
+      "Bash(python -m flake8 services/security_audit.py core/governance.py routes/maintenance.py --select=E241,E272,F401,F841)",
+      "Bash(python -m flake8 services/security_audit.py core/governance.py routes/maintenance.py services/command_runner.py services/network_tools.py core/job_runner.py legacy_tkinter_main.py --max-line-length=120 --statistics)",
+      "Bash(python -m flake8 routes/maintenance.py)"
     ]
   }
 }

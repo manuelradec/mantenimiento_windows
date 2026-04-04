@@ -254,12 +254,12 @@ def _step_ccleaner():
     errors = []
 
     cleanup_tasks = [
-        ('Temp de usuario (%TEMP%)',     clean_user_temp),
-        ('Temp de Windows (Win\\Temp)',   clean_windows_temp),
-        ('Prefetch',                     clean_prefetch),
-        ('Papelera de reciclaje',        empty_recycle_bin),
+        ('Temp de usuario (%TEMP%)', clean_user_temp),
+        ('Temp de Windows (Win\\Temp)', clean_windows_temp),
+        ('Prefetch', clean_prefetch),
+        ('Papelera de reciclaje', empty_recycle_bin),
         ('Cache de Internet (INetCache)', clean_inet_cache),
-        ('Cache DNS',                    flush_dns_cache),
+        ('Cache DNS', flush_dns_cache),
     ]
 
     for label, func in cleanup_tasks:
@@ -317,7 +317,6 @@ def _step_advancedsystemcare():
     from services.command_runner import (
         run_cmd as _run_cmd,
         run_powershell as _run_ps,
-        CommandStatus as _CS,
     )
 
     started_at = _dt.now()
@@ -375,7 +374,7 @@ def _step_advancedsystemcare():
             findings.append(_finding(
                 f'Disco C: critico — solo {free_gb} GB libres ({100 - used_pct:.1f}% libre)',
                 'critical',
-                f'Total: {round(total/(1024**3),1)} GB | Usado: {round(used/(1024**3),1)} GB '
+                f'Total: {round(total / (1024 ** 3), 1)} GB | Usado: {round(used / (1024 ** 3), 1)} GB '
                 f'| Libre: {free_gb} GB',
                 'Libere espacio en C: urgentemente (elimine archivos grandes, '
                 'vacie papelera, desinstale programas).',
@@ -385,7 +384,7 @@ def _step_advancedsystemcare():
             findings.append(_finding(
                 f'Disco C: espacio bajo — {free_gb} GB libres ({100 - used_pct:.1f}% libre)',
                 'warning',
-                f'Libre: {free_gb} GB de {round(total/(1024**3),1)} GB totales',
+                f'Libre: {free_gb} GB de {round(total / (1024 ** 3), 1)} GB totales',
                 'Considere limpiar archivos o ampliar el almacenamiento.',
             ))
             recommended_actions.append('Revisar espacio disponible en disco C:')
@@ -393,7 +392,7 @@ def _step_advancedsystemcare():
             findings.append(_finding(
                 f'Disco C: espacio adecuado — {free_gb} GB libres ({100 - used_pct:.1f}% libre)',
                 'info',
-                f'Libre: {free_gb} GB de {round(total/(1024**3),1)} GB totales',
+                f'Libre: {free_gb} GB de {round(total / (1024 ** 3), 1)} GB totales',
             ))
     except Exception as e:
         errors.append(f'Espacio en disco: {e}')
