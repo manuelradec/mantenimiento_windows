@@ -4,35 +4,169 @@
 {% block page_desc %}Registro de sesión, reportes RADEC FO-TI-19/20 y mejoras de hardware{% endblock %}
 
 {% block content %}
-<!-- RADEC Reports Section -->
-<div class="card" style="margin-bottom: 20px; border-left: 4px solid #274C9B;">
+
+<!-- ============================================================
+     RADEC REPORTS SECTION
+     ============================================================ -->
+<div class="card" style="margin-bottom:20px;border-left:4px solid #274C9B;">
     <div class="card-header">
         <h3>Reportes RADEC</h3>
     </div>
     <div class="card-body">
-        <!-- Sucursal & Technician inputs -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
-            <div>
-                <label style="font-size:12px;font-weight:bold;display:block;margin-bottom:4px;">Sucursal:</label>
-                <input type="text" id="input-sucursal" placeholder="Ej: CN PUEBLA"
-                       style="width:100%;padding:8px;border:1px solid var(--border-subtle);border-radius:4px;
-                              background:var(--bg-surface-1);color:var(--text-primary);font-size:13px;">
+
+        <!-- ── SUCURSAL ─────────────────────────────────────── -->
+        <div style="margin-bottom:18px;">
+            <label class="field-label">Sucursal</label>
+            <input type="text" id="input-sucursal" placeholder="Ej: CN PUEBLA"
+                   class="field-input" style="max-width:340px;">
+        </div>
+
+        <!-- ── MAINTENANCE TYPE ─────────────────────────────── -->
+        <div style="margin-bottom:18px;">
+            <label class="field-label">Tipo de mantenimiento <span style="color:var(--brand-red);">*</span></label>
+            <select id="input-maint-type" class="field-input" style="max-width:280px;" required>
+                <option value="preventivo" selected>Mantenimiento preventivo</option>
+                <option value="correctivo">Mantenimiento correctivo</option>
+                <option value="revision">Revisión</option>
+            </select>
+        </div>
+
+        <!-- ── MODEL SELECTOR ───────────────────────────────── -->
+        <div style="margin-bottom:18px;">
+            <label class="field-label">Modelo del equipo</label>
+            <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;max-width:560px;">
+                <div style="position:relative;flex:1;min-width:240px;">
+                    <input type="text" id="input-model-search"
+                           placeholder="Buscar modelo o escribir manualmente…"
+                           class="field-input"
+                           autocomplete="off"
+                           oninput="onModelSearch(this.value)"
+                           onblur="onModelBlur()"
+                           onfocus="onModelSearch(this.value)">
+                    <div id="model-dropdown"
+                         style="display:none;position:absolute;top:100%;left:0;right:0;
+                                max-height:220px;overflow-y:auto;
+                                background:var(--bg-surface-raised);
+                                border:1px solid var(--border-strong);
+                                border-top:none;border-radius:0 0 6px 6px;
+                                z-index:500;box-shadow:var(--shadow-md);">
+                    </div>
+                </div>
+                <span id="model-manual-badge"
+                      style="display:none;align-self:center;font-size:11px;
+                             background:rgba(214,129,74,0.15);color:var(--brand-orange);
+                             border:1px solid rgba(214,129,74,0.3);
+                             padding:3px 8px;border-radius:12px;">
+                    Entrada manual
+                </span>
             </div>
-            <div>
-                <label style="font-size:12px;font-weight:bold;display:block;margin-bottom:4px;">Nombre del Técnico:</label>
-                <input type="text" id="input-technician" placeholder="Ej: PABLO MEDINA MELITON"
-                       style="width:100%;padding:8px;border:1px solid var(--border-subtle);border-radius:4px;
-                              background:var(--bg-surface-1);color:var(--text-primary);font-size:13px;">
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">
+                Si el modelo no aparece en la lista, escríbalo directamente — se usará como entrada manual.
             </div>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <!-- ── TWO-COLUMN: TECHNICIAN + OPERATOR ─────────────── -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:18px;">
+
+            <!-- Technician -->
+            <fieldset style="border:1px solid var(--border);border-radius:8px;padding:14px 16px;">
+                <legend style="font-size:11px;font-weight:700;text-transform:uppercase;
+                               letter-spacing:0.8px;color:var(--brand-blue-light);padding:0 6px;">
+                    Técnico
+                </legend>
+                <div style="display:flex;flex-direction:column;gap:10px;">
+                    <div>
+                        <label class="field-label">Nombre</label>
+                        <input type="text" id="input-technician" placeholder="Ej: PABLO MEDINA MELITON"
+                               class="field-input">
+                    </div>
+                    <div>
+                        <label class="field-label">Dirección</label>
+                        <input type="text" id="input-tech-address" placeholder="Dirección (opcional)"
+                               class="field-input">
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                        <div>
+                            <label class="field-label">Teléfono</label>
+                            <input type="text" id="input-tech-phone" placeholder="(55) 0000-0000"
+                                   class="field-input">
+                        </div>
+                        <div>
+                            <label class="field-label">Correo</label>
+                            <input type="email" id="input-tech-email" placeholder="tecnico@radec.mx"
+                                   class="field-input">
+                        </div>
+                    </div>
+                </div>
+            </fieldset>
+
+            <!-- Operator / Equipment responsible -->
+            <fieldset style="border:1px solid var(--border);border-radius:8px;padding:14px 16px;">
+                <legend style="font-size:11px;font-weight:700;text-transform:uppercase;
+                               letter-spacing:0.8px;color:var(--brand-teal);padding:0 6px;">
+                    Responsable del equipo
+                </legend>
+                <div style="display:flex;flex-direction:column;gap:10px;">
+                    <div>
+                        <label class="field-label">Nombre</label>
+                        <input type="text" id="input-operator" placeholder="Nombre del responsable"
+                               class="field-input">
+                    </div>
+                    <div>
+                        <label class="field-label">Dirección</label>
+                        <input type="text" id="input-op-address" placeholder="Dirección (opcional)"
+                               class="field-input">
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                        <div>
+                            <label class="field-label">Teléfono</label>
+                            <input type="text" id="input-op-phone" placeholder="(55) 0000-0000"
+                                   class="field-input">
+                        </div>
+                        <div>
+                            <label class="field-label">Correo</label>
+                            <input type="email" id="input-op-email" placeholder="responsable@radec.mx"
+                                   class="field-input">
+                        </div>
+                    </div>
+                </div>
+            </fieldset>
+        </div>
+
+        <!-- ── ACCESSORIES ──────────────────────────────────── -->
+        <div style="margin-bottom:18px;">
+            <label class="field-label">Accesorios del equipo</label>
+            <input type="text" id="input-accessories"
+                   value="MOUSE, TECLADO, NO-BREAK"
+                   placeholder="Ej: MOUSE, TECLADO, NO-BREAK, MONITOR"
+                   class="field-input" style="max-width:560px;">
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">
+                Separados por coma. Edite o deje en blanco para completar a mano.
+            </div>
+        </div>
+
+        <!-- ── DRIVE TYPE OVERRIDES ─────────────────────────── -->
+        <div style="margin-bottom:20px;">
+            <label class="field-label">Tipo de unidades de almacenamiento</label>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">
+                Detectado automáticamente. Corrija si el valor no corresponde.
+            </div>
+            <div id="drive-overrides-container">
+                <!-- Populated by JS on page load via /reports/api/hardware-upgrades -->
+                <div style="opacity:0.5;font-size:12px;">Detectando unidades…</div>
+            </div>
+        </div>
+
+        <!-- ── GENERATE BUTTONS ─────────────────────────────── -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px;">
+
             <!-- FO-TI-19 -->
-            <div style="background:var(--bg-surface-1);border-radius:8px;padding:16px;border:1px solid var(--border-subtle);">
-                <h4 style="margin:0 0 8px;color:#274C9B;">FO-TI-19 — Hoja de Servicio</h4>
+            <div style="background:var(--bg-surface-1);border-radius:8px;padding:16px;
+                        border:1px solid var(--border-subtle);">
+                <h4 style="margin:0 0 6px;color:#274C9B;">FO-TI-19 — Hoja de Servicio</h4>
                 <p style="font-size:12px;opacity:0.7;margin:0 0 12px;">
-                    Reporte detallado por equipo con datos de hardware, monitor, procesador, RAM, disco,
-                    tipo de servicio, actividades realizadas y mejoras detectadas.
+                    Reporte detallado por equipo con hardware, tipo de servicio,
+                    técnico, responsable, accesorios y mejoras detectadas.
                 </p>
                 <div style="display:flex;gap:8px;">
                     <button class="btn btn-sm btn-primary" onclick="exportFoTi19()">Generar FO-TI-19</button>
@@ -41,11 +175,12 @@
             </div>
 
             <!-- FO-TI-20 -->
-            <div style="background:var(--bg-surface-1);border-radius:8px;padding:16px;border:1px solid var(--border-subtle);">
-                <h4 style="margin:0 0 8px;color:#274C9B;">FO-TI-20 — Bitácora de Mantenimiento</h4>
+            <div style="background:var(--bg-surface-1);border-radius:8px;padding:16px;
+                        border:1px solid var(--border-subtle);">
+                <h4 style="margin:0 0 6px;color:#274C9B;">FO-TI-20 — Bitácora de Mantenimiento</h4>
                 <p style="font-size:12px;opacity:0.7;margin:0 0 12px;">
-                    Tabla resumen de equipos mantenidos en la sucursal con fecha, usuario, equipo,
-                    reporte final y espacio para firma.
+                    Tabla resumen de equipos mantenidos en la sucursal con fecha,
+                    usuario, equipo, reporte final y firma.
                 </p>
                 <div style="display:flex;gap:8px;">
                     <button class="btn btn-sm btn-primary" onclick="exportFoTi20()">Generar FO-TI-20</button>
@@ -54,28 +189,26 @@
             </div>
         </div>
 
-        <!-- Bitacora entries editor -->
-        <div style="margin-top:16px;background:var(--bg-surface-1);border-radius:8px;padding:16px;border:1px solid var(--border-subtle);">
-            <h4 style="margin:0 0 8px;">Entradas para Bitácora FO-TI-20</h4>
-            <p style="font-size:11px;opacity:0.7;margin:0 0 8px;">
-                Agregue las entradas de equipos mantenidos para generar la bitácora completa de la sucursal.
+        <!-- ── BITÁCORA ENTRIES ──────────────────────────────── -->
+        <div style="margin-top:18px;background:var(--bg-surface-1);border-radius:8px;
+                    padding:16px;border:1px solid var(--border-subtle);">
+            <h4 style="margin:0 0 6px;">Entradas para Bitácora FO-TI-20</h4>
+            <p style="font-size:11px;opacity:0.7;margin:0 0 10px;">
+                Agregue los equipos mantenidos. La fecha se establece en el día de hoy por defecto.
             </p>
-            <div id="bitacora-entries">
-                <div class="bitacora-entry" style="display:grid;grid-template-columns:120px 1fr 1fr 1fr 30px;gap:6px;margin-bottom:6px;align-items:center;">
-                    <input type="date" class="entry-fecha" style="padding:4px;border:1px solid var(--border-subtle);border-radius:3px;background:var(--bg-surface-2);color:var(--text-primary);font-size:11px;">
-                    <input type="text" class="entry-usuario" placeholder="Usuario" style="padding:4px;border:1px solid var(--border-subtle);border-radius:3px;background:var(--bg-surface-2);color:var(--text-primary);font-size:11px;">
-                    <input type="text" class="entry-equipo" placeholder="Equipo (modelo)" style="padding:4px;border:1px solid var(--border-subtle);border-radius:3px;background:var(--bg-surface-2);color:var(--text-primary);font-size:11px;">
-                    <input type="text" class="entry-reporte" placeholder="MANTENIMIENTO PREVENTIVO" value="MANTENIMIENTO PREVENTIVO" style="padding:4px;border:1px solid var(--border-subtle);border-radius:3px;background:var(--bg-surface-2);color:var(--text-primary);font-size:11px;">
-                    <button onclick="removeEntry(this)" style="background:none;border:none;color:var(--color-danger);cursor:pointer;font-size:16px;" title="Eliminar">&times;</button>
-                </div>
-            </div>
-            <button class="btn btn-sm btn-outline" onclick="addEntry()" style="margin-top:6px;">+ Agregar entrada</button>
+            <div id="bitacora-entries"></div>
+            <button class="btn btn-sm btn-outline" onclick="addEntry()" style="margin-top:8px;">
+                + Agregar entrada
+            </button>
         </div>
-    </div>
+
+    </div><!-- /card-body -->
 </div>
 
-<!-- Hardware Upgrades / Mejoras Section -->
-<div class="card" style="margin-bottom: 20px; border-left: 4px solid #0AAE6B;">
+<!-- ============================================================
+     HARDWARE UPGRADES / MEJORAS
+     ============================================================ -->
+<div class="card" style="margin-bottom:20px;border-left:4px solid #0AAE6B;">
     <div class="card-header">
         <h3>Mejoras de Hardware Detectadas</h3>
         <button class="btn btn-sm btn-primary" onclick="scanHardwareUpgrades()">Escanear Mejoras</button>
@@ -88,39 +221,43 @@
     </div>
 </div>
 
-<!-- Session Summary -->
-<div class="card" style="margin-bottom: 20px;">
+<!-- ============================================================
+     SESSION SUMMARY
+     ============================================================ -->
+<div class="card" style="margin-bottom:20px;">
     <div class="card-header">
         <h3>Resumen de sesión</h3>
-        <div style="display: flex; gap: 8px;">
+        <div style="display:flex;gap:8px;">
             <button class="btn btn-sm btn-primary" onclick="downloadReport('html')">Exportar HTML</button>
             <button class="btn btn-sm btn-outline" onclick="downloadReport('txt')">Exportar TXT</button>
             <button class="btn btn-sm btn-outline" onclick="downloadReport('json')">Exportar JSON</button>
         </div>
     </div>
     <div class="card-body">
-        <div class="grid grid-4" style="margin-bottom: 16px;">
+        <div class="grid grid-4" style="margin-bottom:16px;">
             <div class="stat-box">
                 <div class="label">Total de acciones</div>
                 <div class="value">{{ summary.total_actions }}</div>
             </div>
             <div class="stat-box">
                 <div class="label">Exitosas</div>
-                <div class="value" style="color: var(--success);">{{ summary.by_status.get('success', 0) }}</div>
+                <div class="value" style="color:var(--success);">{{ summary.by_status.get('success',0) }}</div>
             </div>
             <div class="stat-box">
                 <div class="label">Advertencias</div>
-                <div class="value" style="color: var(--warning);">{{ summary.by_status.get('warning', 0) }}</div>
+                <div class="value" style="color:var(--warning);">{{ summary.by_status.get('warning',0) }}</div>
             </div>
             <div class="stat-box">
                 <div class="label">Errores</div>
-                <div class="value" style="color: var(--danger);">{{ summary.by_status.get('error', 0) }}</div>
+                <div class="value" style="color:var(--danger);">{{ summary.by_status.get('error',0) }}</div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Activity Log -->
+<!-- ============================================================
+     ACTIVITY LOG
+     ============================================================ -->
 <div class="card">
     <div class="card-header">
         <h3>Registro de actividad</h3>
@@ -142,7 +279,9 @@
                 <tbody id="log-tbody">
                     {% for entry in entries %}
                     <tr>
-                        <td style="white-space: nowrap; font-family: monospace; font-size: 11px;">{{ entry.timestamp[:19] }}</td>
+                        <td style="white-space:nowrap;font-family:monospace;font-size:11px;">
+                            {{ entry.timestamp[:19] }}
+                        </td>
                         <td><span class="badge badge-info">{{ entry.module }}</span></td>
                         <td>{{ entry.action }}</td>
                         <td>
@@ -156,7 +295,7 @@
                             <span class="status"><span class="status-dot gray"></span> {{ entry.status }}</span>
                             {% endif %}
                         </td>
-                        <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
                             {{ entry.result[:100] if entry.result else entry.error[:100] if entry.error else '-' }}
                         </td>
                     </tr>
@@ -166,115 +305,337 @@
         </div>
         {% else %}
         <div class="alert alert-info">
-            Aún no se han registrado acciones. Ejecute operaciones de mantenimiento desde otras secciones para verlas aquí.
+            Aún no se han registrado acciones. Ejecute operaciones de mantenimiento desde otras
+            secciones para verlas aquí.
         </div>
         {% endif %}
     </div>
 </div>
+
 {% endblock %}
 
 {% block scripts %}
+<style>
+/* ── Shared field styles for this page ─────────────────────── */
+.field-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+.field-input {
+    width: 100%;
+    padding: 7px 10px;
+    background: var(--bg-surface-2);
+    border: 1px solid var(--border-strong);
+    border-radius: 5px;
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+}
+.field-input:focus {
+    border-color: var(--brand-blue);
+    box-shadow: 0 0 0 2px var(--brand-blue-glow);
+}
+.drive-row {
+    display: grid;
+    grid-template-columns: 1fr 180px;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 8px;
+    background: var(--bg-surface-1);
+    border-radius: 5px;
+    padding: 8px 10px;
+    border: 1px solid var(--border-subtle);
+}
+.drive-row .drive-name {
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.bitacora-entry {
+    display: grid;
+    grid-template-columns: 130px 1fr 1fr 1fr 28px;
+    gap: 6px;
+    margin-bottom: 6px;
+    align-items: center;
+}
+.bitacora-entry input {
+    padding: 5px 7px;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    background: var(--bg-surface-2);
+    color: var(--text);
+    font-size: 11px;
+    width: 100%;
+    outline: none;
+}
+.bitacora-entry input:focus {
+    border-color: var(--brand-blue);
+}
+.model-option {
+    padding: 8px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-subtle);
+    transition: background 0.1s;
+}
+.model-option:hover, .model-option.selected {
+    background: var(--brand-blue-glow);
+}
+.model-option .match-highlight {
+    color: var(--brand-blue-light);
+    font-weight: 700;
+}
+</style>
+
 <script>
-// ============================================================
-// FO-TI-19 Hoja de Servicio
-// ============================================================
-async function exportFoTi19() {
-    const sucursal = document.getElementById('input-sucursal').value;
-    const technician = document.getElementById('input-technician').value;
+// ================================================================
+// MODEL CATALOG — deduplicated, normalized
+// ================================================================
+const MODEL_CATALOG = (function() {
+    const raw = [
+        "Ideapad 3 15IAU7","V330-14IKB","ideapad 3 15IIL05","ThinkCentre M73",
+        "ThinkCentre M700","V15 G4 IRU","Ideapad 3 15ITL6","Ideapad 3 Slim 15IAH8",
+        "Ideapad Slim 3 15IAH8","V14 G2-ITL","IdeaPad Slim 3 15IAH8",
+        "V14 G3 IAP","ThinkPad L440","ThinkPad T420","ThinkPad T450",
+        "ThinkCentre M910s","ThinkCentre M82","IdeaPad 3 15IAU7",
+        "ThinkCentre M91P","ThinkCentre Neo 50s Gen 4","IdeaPad 3 15ITL6",
+        "ThinkCentre Neo 50s Gen3","ThinkCentre Neo 50s Gen 5",
+        "IdeaPad 3 15ILT6","V130-14IKB","L480","Ideapad 3 14ITL05",
+        "V15 G4 IRU","V14 G4 IRU","ThinkCentre M720s","Ideapad 3 15ITL06",
+        "V14 G2ITL","Thinkpad T430","Ideapad 3-14ITL05","ThinkCentre M Series",
+        "L430","V15 G3 IAP","V130","ThinkCentre M91p","ThinkCentre M71e",
+        "ThinkCentre M91p 7033","ThinkBook 14IIL","Ideapad 3","Ideapad 3 15IIL05",
+        "ThinCentre M73","ThinKCentre M73","ThinKCentre M70","IdeaPad 520S",
+        "Ideapad3 15ITL06","V14 G2-ITL","ThinkCentre M77","ThinkCentre M57",
+        "ThinkCentre M710e","V310-14ISK","Ideapad S145-14IIL","V310",
+        "10GSA0A0LS","IdeaPad 510S-14ISK","Ideapad 520S","ThinkPad T460",
+        "ThinkPad L430","Imac 10.1","Imac A2873","V15G4IRU","Ideapad Slim 3",
+        "ThinkCentre","Ideapad 3 Slim 15IAH8","Ideapad3"
+    ];
+    // Deduplicate: normalise to lower-case for comparison, keep first-seen
+    // casing. Also sort alphabetically for a consistent UX.
+    const seen = new Map();
+    raw.forEach(m => {
+        const key = m.trim().toLowerCase().replace(/\s+/g, ' ');
+        if (!seen.has(key)) seen.set(key, m.trim());
+    });
+    return [...seen.values()].sort((a, b) => a.localeCompare(b, 'es'));
+})();
 
-    displayResult({status: 'info', output: 'Generando reporte FO-TI-19...'});
-    try {
-        const response = await fetch('/reports/api/export/fo-ti-19', {
-            method: 'POST',
-            headers: { ...getDefaultHeaders(), 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sucursal, technician_name: technician }),
-        });
-        const data = await response.json();
-        if (data.status === 'success') {
-            displayResult({status: 'success', output: `FO-TI-19 generado: ${data.path}`});
-        } else {
-            displayResult({status: 'error', error: data.error || 'Error al generar FO-TI-19.'});
+// ── Model search state ──────────────────────────────────────
+let _modelSelected = false;  // true when user picked from dropdown
+
+function onModelSearch(query) {
+    const dropdown = document.getElementById('model-dropdown');
+    const badge    = document.getElementById('model-manual-badge');
+    const q = query.trim();
+
+    // Reset "selected from list" flag when user types again
+    _modelSelected = false;
+    badge.style.display = 'none';
+
+    if (q.length < 1) {
+        dropdown.style.display = 'none';
+        return;
+    }
+
+    // Case-insensitive substring match, max 12 results
+    const lower = q.toLowerCase();
+    const matches = MODEL_CATALOG.filter(m => m.toLowerCase().includes(lower)).slice(0, 12);
+
+    if (matches.length === 0) {
+        // No match — the typed value will be used as manual entry
+        dropdown.style.display = 'none';
+        badge.style.display = 'inline-block';
+        return;
+    }
+
+    // Build dropdown with bolded match region
+    dropdown.innerHTML = matches.map(m => {
+        const idx   = m.toLowerCase().indexOf(lower);
+        const pre   = escapeHtml(m.substring(0, idx));
+        const match = escapeHtml(m.substring(idx, idx + q.length));
+        const post  = escapeHtml(m.substring(idx + q.length));
+        return `<div class="model-option"
+                     onmousedown="selectModel('${escapeAttr(m)}')"
+                     title="${escapeAttr(m)}">
+                    ${pre}<span class="match-highlight">${match}</span>${post}
+                </div>`;
+    }).join('');
+
+    dropdown.style.display = 'block';
+}
+
+function selectModel(value) {
+    const input   = document.getElementById('input-model-search');
+    const dropdown = document.getElementById('model-dropdown');
+    const badge    = document.getElementById('model-manual-badge');
+    input.value          = value;
+    _modelSelected       = true;
+    dropdown.style.display = 'none';
+    badge.style.display  = 'none';
+}
+
+// Fires on blur (focus leaves the input).
+// Uses setTimeout so mousedown on a dropdown option fires first.
+function onModelBlur() {
+    setTimeout(() => {
+        const dropdown = document.getElementById('model-dropdown');
+        const badge    = document.getElementById('model-manual-badge');
+        const val      = document.getElementById('input-model-search').value.trim();
+        dropdown.style.display = 'none';
+        // If user left the field without selecting from list and there is text,
+        // that text becomes the manual entry value — show the badge.
+        if (val && !_modelSelected) {
+            badge.style.display = 'inline-block';
         }
+    }, 180);
+}
+
+// Escape value for embedding in an HTML attribute (e.g. onmousedown argument)
+function escapeAttr(str) {
+    return str.replace(/'/g, "\\'");
+}
+
+// Public getter — used by report generation functions to read the chosen value
+function getSelectedModel() {
+    return document.getElementById('input-model-search').value.trim();
+}
+
+// ================================================================
+// DRIVE TYPE OVERRIDES
+// ================================================================
+
+// Map WMI MediaType numeric codes and strings → human label
+function mediaTypeLabel(raw) {
+    const s = String(raw).toUpperCase();
+    if (s === '4' || s.includes('SSD') || s.includes('SOLID'))   return 'SSD';
+    if (s === '5' || s.includes('NVM') || s.includes('M.2'))     return 'M.2 NVMe';
+    if (s === '3' || s.includes('HDD') || s.includes('UNSPECIFIED') || s === '0')
+                                                                  return 'HDD';
+    return 'SSD'; // safe default — technician can override
+}
+
+async function loadDriveOverrides() {
+    const container = document.getElementById('drive-overrides-container');
+    try {
+        const r = await fetch('/reports/api/hardware-upgrades');
+        const d = await r.json();
+        const disks = (d.data && d.data.storage && d.data.storage.disks) || [];
+        if (disks.length === 0) {
+            container.innerHTML =
+                '<div style="font-size:12px;opacity:0.5;">No se detectaron unidades de almacenamiento.</div>';
+            return;
+        }
+        container.innerHTML = disks.map((disk, i) => {
+            const name     = disk.FriendlyName || `Disco ${i + 1}`;
+            const detected = mediaTypeLabel(disk.MediaType || disk.BusType || '');
+            const sizeGB   = disk.SizeGB ? `${Math.round(disk.SizeGB)} GB` : '';
+            return `
+            <div class="drive-row">
+                <div class="drive-name" title="${escapeHtml(name)}">
+                    <strong>${escapeHtml(name)}</strong>
+                    ${sizeGB ? `<span style="opacity:0.6;font-size:11px;margin-left:6px;">${sizeGB}</span>` : ''}
+                </div>
+                <select class="field-input drive-type-select" data-disk-index="${i}"
+                        style="font-size:12px;padding:5px 8px;">
+                    <option value="SSD"     ${detected === 'SSD'      ? 'selected' : ''}>SSD</option>
+                    <option value="HDD"     ${detected === 'HDD'      ? 'selected' : ''}>HDD</option>
+                    <option value="M.2 NVMe" ${detected === 'M.2 NVMe' ? 'selected' : ''}>M.2 NVMe</option>
+                </select>
+            </div>`;
+        }).join('');
     } catch (e) {
-        displayResult({status: 'error', error: `Error: ${e.message}`});
+        container.innerHTML =
+            `<div style="font-size:12px;opacity:0.5;">No se pudo detectar automáticamente — corrija manualmente si aplica.</div>`;
     }
 }
 
-function downloadFoTi19() {
-    const sucursal = encodeURIComponent(document.getElementById('input-sucursal').value);
-    const technician = encodeURIComponent(document.getElementById('input-technician').value);
-    window.open(`/reports/api/download/fo-ti-19?sucursal=${sucursal}&technician_name=${technician}`, '_blank');
+// Public getter — returns [{name, type}] array for the backend
+function getDriveOverrides() {
+    const results = [];
+    document.querySelectorAll('.drive-type-select').forEach(sel => {
+        const row  = sel.closest('.drive-row');
+        const name = row ? (row.querySelector('.drive-name strong')
+                               ?.textContent?.trim() || `Disco ${sel.dataset.diskIndex}`)
+                         : `Disco ${sel.dataset.diskIndex}`;
+        results.push({ name, type: sel.value });
+    });
+    return results;
 }
 
-// ============================================================
-// FO-TI-20 Bitacora
-// ============================================================
-async function exportFoTi20() {
-    const sucursal = document.getElementById('input-sucursal').value;
-    const entries = collectBitacoraEntries();
+// ================================================================
+// BITÁCORA ENTRIES
+// ================================================================
 
-    displayResult({status: 'info', output: 'Generando bitácora FO-TI-20...'});
-    try {
-        const response = await fetch('/reports/api/export/fo-ti-20', {
-            method: 'POST',
-            headers: { ...getDefaultHeaders(), 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sucursal, entries }),
-        });
-        const data = await response.json();
-        if (data.status === 'success') {
-            displayResult({status: 'success', output: `FO-TI-20 generado: ${data.path}`});
-        } else {
-            displayResult({status: 'error', error: data.error || 'Error al generar FO-TI-20.'});
-        }
-    } catch (e) {
-        displayResult({status: 'error', error: `Error: ${e.message}`});
-    }
+function todayISO() {
+    // Returns YYYY-MM-DD in LOCAL time (not UTC), matching the machine's date
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
 }
 
-function downloadFoTi20() {
-    const sucursal = encodeURIComponent(document.getElementById('input-sucursal').value);
-    window.open(`/reports/api/download/fo-ti-20?sucursal=${sucursal}`, '_blank');
+// Map maintenance type select values to the canonical FO-TI-20 report label.
+const MAINT_TYPE_LABELS = {
+    preventivo: 'MANTENIMIENTO PREVENTIVO',
+    correctivo: 'MANTENIMIENTO CORRECTIVO',
+    revision:   'REVISIÓN',
+};
+
+function getMaintTypeLabel() {
+    const sel = document.getElementById('input-maint-type');
+    const val = sel ? sel.value : 'preventivo';
+    return MAINT_TYPE_LABELS[val] || 'MANTENIMIENTO PREVENTIVO';
 }
 
-// ============================================================
-// Bitacora entries management
-// ============================================================
-function addEntry() {
-    const container = document.getElementById('bitacora-entries');
+function makeEntryRow(isFirst) {
+    const reporteDefault = getMaintTypeLabel();
     const div = document.createElement('div');
     div.className = 'bitacora-entry';
-    div.style.cssText = 'display:grid;grid-template-columns:120px 1fr 1fr 1fr 30px;gap:6px;margin-bottom:6px;align-items:center;';
     div.innerHTML = `
-        <input type="date" class="entry-fecha" style="padding:4px;border:1px solid var(--border-subtle);border-radius:3px;background:var(--bg-surface-2);color:var(--text-primary);font-size:11px;">
-        <input type="text" class="entry-usuario" placeholder="Usuario" style="padding:4px;border:1px solid var(--border-subtle);border-radius:3px;background:var(--bg-surface-2);color:var(--text-primary);font-size:11px;">
-        <input type="text" class="entry-equipo" placeholder="Equipo (modelo)" style="padding:4px;border:1px solid var(--border-subtle);border-radius:3px;background:var(--bg-surface-2);color:var(--text-primary);font-size:11px;">
-        <input type="text" class="entry-reporte" placeholder="MANTENIMIENTO PREVENTIVO" value="MANTENIMIENTO PREVENTIVO" style="padding:4px;border:1px solid var(--border-subtle);border-radius:3px;background:var(--bg-surface-2);color:var(--text-primary);font-size:11px;">
-        <button onclick="removeEntry(this)" style="background:none;border:none;color:var(--color-danger);cursor:pointer;font-size:16px;" title="Eliminar">&times;</button>
-    `;
-    container.appendChild(div);
+        <input type="date" class="entry-fecha" value="${todayISO()}">
+        <input type="text" class="entry-usuario" placeholder="Usuario">
+        <input type="text" class="entry-equipo"  placeholder="Equipo (modelo)">
+        <input type="text" class="entry-reporte" value="${escapeHtml(reporteDefault)}"
+               placeholder="${escapeHtml(reporteDefault)}">
+        <button onclick="removeEntry(this)"
+                style="background:none;border:none;color:var(--danger);
+                       cursor:pointer;font-size:18px;line-height:1;padding:0;"
+                title="Eliminar">&times;</button>`;
+    return div;
+}
+
+function addEntry() {
+    document.getElementById('bitacora-entries').appendChild(makeEntryRow(false));
 }
 
 function removeEntry(btn) {
-    const entries = document.querySelectorAll('.bitacora-entry');
-    if (entries.length > 1) {
-        btn.closest('.bitacora-entry').remove();
-    }
+    const rows = document.querySelectorAll('.bitacora-entry');
+    if (rows.length > 1) btn.closest('.bitacora-entry').remove();
 }
 
 function collectBitacoraEntries() {
     const entries = [];
     document.querySelectorAll('.bitacora-entry').forEach(row => {
-        const fechaInput = row.querySelector('.entry-fecha').value;
-        const usuario = row.querySelector('.entry-usuario').value;
-        const equipo = row.querySelector('.entry-equipo').value;
-        const reporte = row.querySelector('.entry-reporte').value;
-
+        const fechaRaw = row.querySelector('.entry-fecha').value;
+        const usuario  = row.querySelector('.entry-usuario').value;
+        const equipo   = row.querySelector('.entry-equipo').value;
+        const reporte  = row.querySelector('.entry-reporte').value;
         if (usuario || equipo) {
-            // Format date from YYYY-MM-DD to DD/MM/YYYY
-            let fecha = fechaInput;
-            if (fechaInput && fechaInput.includes('-')) {
-                const parts = fechaInput.split('-');
-                fecha = `${parts[2]}/${parts[1]}/${parts[0]}`;
+            let fecha = fechaRaw;
+            if (fechaRaw && fechaRaw.includes('-')) {
+                const [y, mo, d] = fechaRaw.split('-');
+                fecha = `${d}/${mo}/${y}`;
             }
             entries.push({ fecha, usuario, equipo, reporte_final: reporte });
         }
@@ -282,24 +643,127 @@ function collectBitacoraEntries() {
     return entries;
 }
 
-// ============================================================
-// Hardware Upgrades / Mejoras
-// ============================================================
+// ================================================================
+// COLLECT ALL FORM DATA
+// Centralised getter — used by FO-TI-19 and FO-TI-20 generators
+// ================================================================
+function collectFormData() {
+    return {
+        sucursal:          document.getElementById('input-sucursal').value.trim(),
+        maint_type:        document.getElementById('input-maint-type').value,
+        model:             getSelectedModel(),
+        technician_name:   document.getElementById('input-technician').value.trim(),
+        tech_address:      document.getElementById('input-tech-address').value.trim(),
+        tech_phone:        document.getElementById('input-tech-phone').value.trim(),
+        tech_email:        document.getElementById('input-tech-email').value.trim(),
+        operator_name:     document.getElementById('input-operator').value.trim(),
+        op_address:        document.getElementById('input-op-address').value.trim(),
+        op_phone:          document.getElementById('input-op-phone').value.trim(),
+        op_email:          document.getElementById('input-op-email').value.trim(),
+        accessories:       document.getElementById('input-accessories').value.trim(),
+        drive_overrides:   getDriveOverrides(),
+    };
+}
+
+// ================================================================
+// FO-TI-19
+// ================================================================
+async function exportFoTi19() {
+    const payload = collectFormData();
+    displayResult({ status: 'info', output: 'Generando reporte FO-TI-19…' });
+    try {
+        const response = await fetch('/reports/api/export/fo-ti-19', {
+            method: 'POST',
+            headers: { ...getDefaultHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        const data = await response.json();
+        if (data.status === 'success') {
+            displayResult({ status: 'success', output: `FO-TI-19 generado: ${data.path}` });
+        } else {
+            displayResult({ status: 'error', error: data.error || 'Error al generar FO-TI-19.' });
+        }
+    } catch (e) {
+        displayResult({ status: 'error', error: `Error: ${e.message}` });
+    }
+}
+
+function downloadFoTi19() {
+    const p = collectFormData();
+    const qs = new URLSearchParams({
+        sucursal:        p.sucursal,
+        technician_name: p.technician_name,
+        maint_type:      p.maint_type,
+        model:           p.model,
+        tech_address:    p.tech_address,
+        tech_phone:      p.tech_phone,
+        tech_email:      p.tech_email,
+        operator_name:   p.operator_name,
+        op_address:      p.op_address,
+        op_phone:        p.op_phone,
+        op_email:        p.op_email,
+        accessories:     p.accessories,
+        // drive_overrides omitted — GET cannot carry JSON dict
+    });
+    window.open(`/reports/api/download/fo-ti-19?${qs}`, '_blank');
+}
+
+// ================================================================
+// FO-TI-20
+// ================================================================
+async function exportFoTi20() {
+    const p = collectFormData();
+    const payload = {
+        sucursal:   p.sucursal,
+        maint_type: p.maint_type,
+        entries:    collectBitacoraEntries(),
+    };
+    displayResult({ status: 'info', output: 'Generando bitácora FO-TI-20…' });
+    try {
+        const response = await fetch('/reports/api/export/fo-ti-20', {
+            method: 'POST',
+            headers: { ...getDefaultHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        const data = await response.json();
+        if (data.status === 'success') {
+            displayResult({ status: 'success', output: `FO-TI-20 generado: ${data.path}` });
+        } else {
+            displayResult({ status: 'error', error: data.error || 'Error al generar FO-TI-20.' });
+        }
+    } catch (e) {
+        displayResult({ status: 'error', error: `Error: ${e.message}` });
+    }
+}
+
+function downloadFoTi20() {
+    const p = collectFormData();
+    const qs = new URLSearchParams({
+        sucursal:   p.sucursal,
+        maint_type: p.maint_type,
+    });
+    window.open(`/reports/api/download/fo-ti-20?${qs}`, '_blank');
+}
+
+// ================================================================
+// HARDWARE UPGRADES (existing feature — preserved)
+// ================================================================
 async function scanHardwareUpgrades() {
     const container = document.getElementById('hardware-upgrades-content');
-    container.innerHTML = '<div style="text-align:center;padding:20px;"><span class="spinner"></span> Escaneando hardware...</div>';
-
+    container.innerHTML =
+        '<div style="text-align:center;padding:20px;"><span class="spinner"></span> Escaneando hardware…</div>';
     try {
         const response = await fetch('/reports/api/hardware-upgrades');
         const data = await response.json();
-
         if (data.status === 'success') {
             renderUpgradeResults(data.data);
         } else {
-            container.innerHTML = `<div class="alert alert-danger">Error: ${escapeHtml(data.error || 'Error desconocido')}</div>`;
+            container.innerHTML =
+                `<div class="alert alert-danger">Error: ${escapeHtml(data.error || 'Error desconocido')}</div>`;
         }
     } catch (e) {
-        container.innerHTML = `<div class="alert alert-danger">Error de conexión: ${escapeHtml(e.message)}</div>`;
+        container.innerHTML =
+            `<div class="alert alert-danger">Error de conexión: ${escapeHtml(e.message)}</div>`;
     }
 }
 
@@ -307,13 +771,14 @@ function renderUpgradeResults(upgrades) {
     const container = document.getElementById('hardware-upgrades-content');
     let html = '';
 
-    // RAM Section
     const ram = upgrades.ram || {};
     if (ram.total_slots) {
-        const pct = ram.max_capacity_gb > 0 ? Math.round((ram.current_capacity_gb / ram.max_capacity_gb) * 100) : 100;
+        const pct = ram.max_capacity_gb > 0
+            ? Math.round((ram.current_capacity_gb / ram.max_capacity_gb) * 100) : 100;
         const barColor = ram.empty_slots > 0 ? '#0AAE6B' : '#274C9B';
         html += `
-        <div style="margin-bottom:16px;padding:12px;background:var(--bg-surface-1);border-radius:6px;border-left:4px solid ${barColor};">
+        <div style="margin-bottom:16px;padding:12px;background:var(--bg-surface-1);
+                    border-radius:6px;border-left:4px solid ${barColor};">
             <h4 style="margin:0 0 8px;">Memoria RAM</h4>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
                 <div><strong>Slots:</strong> ${ram.occupied_slots} de ${ram.total_slots} ocupados</div>
@@ -323,103 +788,111 @@ function renderUpgradeResults(upgrades) {
             <div style="height:8px;background:var(--bg-surface-2);border-radius:4px;overflow:hidden;">
                 <div style="width:${pct}%;height:100%;background:${barColor};border-radius:4px;"></div>
             </div>
-            ${ram.empty_slots > 0 ? `<p style="color:#0AAE6B;font-weight:bold;margin:8px 0 0;font-size:12px;">${ram.empty_slots} slot(s) disponible(s) para expansión</p>` : ''}
+            ${ram.empty_slots > 0
+                ? `<p style="color:#0AAE6B;font-weight:bold;margin:8px 0 0;font-size:12px;">
+                       ${ram.empty_slots} slot(s) disponible(s) para expansión</p>` : ''}
         </div>`;
-
-        // Module details
-        if (ram.modules && ram.modules.length > 0) {
+        if (ram.modules && ram.modules.length) {
             html += '<div style="margin-bottom:12px;padding-left:16px;">';
             ram.modules.forEach(mod => {
-                const cap = mod.CapacityGB || 0;
-                const mfr = (mod.Manufacturer || 'N/A').trim();
-                const speed = mod.ConfiguredClockSpeed || mod.Speed || 0;
+                const cap  = mod.CapacityGB || 0;
+                const mfr  = (mod.Manufacturer || 'N/A').trim();
+                const spd  = mod.ConfiguredClockSpeed || mod.Speed || 0;
                 const bank = mod.BankLabel || mod.DeviceLocator || '';
-                html += `<div style="font-size:11px;padding:2px 0;">${escapeHtml(bank)}: ${Math.round(cap)} GB - ${escapeHtml(mfr)} @ ${speed} MHz</div>`;
+                html += `<div style="font-size:11px;padding:2px 0;">${escapeHtml(bank)}: ${Math.round(cap)} GB — ${escapeHtml(mfr)} @ ${spd} MHz</div>`;
             });
             html += '</div>';
         }
     }
 
-    // Storage Section
     const storage = upgrades.storage || {};
-    const disks = storage.disks || [];
-    if (disks.length > 0) {
+    const disks   = storage.disks || [];
+    if (disks.length) {
         const borderColor = storage.has_hdd ? '#D6814A' : '#0AAE6B';
-        html += `
-        <div style="margin-bottom:16px;padding:12px;background:var(--bg-surface-1);border-radius:6px;border-left:4px solid ${borderColor};">
+        html += `<div style="margin-bottom:16px;padding:12px;background:var(--bg-surface-1);
+                             border-radius:6px;border-left:4px solid ${borderColor};">
             <h4 style="margin:0 0 8px;">Almacenamiento</h4>`;
-
         disks.forEach(d => {
-            const name = d.FriendlyName || 'N/A';
+            const name  = d.FriendlyName || 'N/A';
             const media = d.MediaType || 'N/A';
-            const bus = d.BusType || '';
-            const size = d.SizeGB || 0;
+            const bus   = d.BusType || '';
+            const size  = d.SizeGB || 0;
             const health = d.HealthStatus || 'N/A';
             const isHDD = String(media).toUpperCase().includes('HDD') || media === '3';
-            const icon = isHDD ? '&#128191;' : '&#128190;';
-            html += `
-            <div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;">
+            const icon  = isHDD ? '&#128191;' : '&#128190;';
+            html += `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;">
                 <span style="font-size:18px;">${icon}</span>
                 <div>
-                    <strong>${escapeHtml(String(name))}</strong> — ${Math.round(size)} GB — ${escapeHtml(String(media))} ${bus ? '(' + escapeHtml(String(bus)) + ')' : ''}
-                    <span style="margin-left:8px;color:${health === 'Healthy' ? '#0AAE6B' : '#E33B14'};">${escapeHtml(String(health))}</span>
+                    <strong>${escapeHtml(String(name))}</strong> — ${Math.round(size)} GB —
+                    ${escapeHtml(String(media))} ${bus ? '(' + escapeHtml(String(bus)) + ')' : ''}
+                    <span style="margin-left:8px;color:${health === 'Healthy' ? '#0AAE6B' : '#E33B14'};">
+                        ${escapeHtml(String(health))}
+                    </span>
                 </div>
             </div>`;
         });
-
         if (storage.has_hdd) {
-            html += `<p style="color:#D6814A;font-weight:bold;margin:8px 0 0;font-size:12px;">Se recomienda actualizar disco HDD a SSD/NVMe</p>`;
+            html += `<p style="color:#D6814A;font-weight:bold;margin:8px 0 0;font-size:12px;">
+                         Se recomienda actualizar disco HDD a SSD/NVMe</p>`;
         }
         html += '</div>';
     }
 
-    // NVMe/M.2 Section
     const expansion = upgrades.expansion || {};
     if (expansion.m2_slots_total > 0 || expansion.nvme_disks_installed > 0) {
-        const hasAvailable = expansion.m2_slots_available > 0;
-        html += `
-        <div style="margin-bottom:16px;padding:12px;background:var(--bg-surface-1);border-radius:6px;border-left:4px solid ${hasAvailable ? '#274C9B' : '#666'};">
+        const hasAvail = expansion.m2_slots_available > 0;
+        html += `<div style="margin-bottom:16px;padding:12px;background:var(--bg-surface-1);
+                             border-radius:6px;border-left:4px solid ${hasAvail ? '#274C9B' : '#666'};">
             <h4 style="margin:0 0 8px;">Slots M.2 / NVMe</h4>
             <div style="font-size:12px;">
                 <div><strong>Discos NVMe instalados:</strong> ${expansion.nvme_disks_installed}</div>
                 <div><strong>Slots M.2 totales:</strong> ${expansion.m2_slots_total}</div>
                 <div><strong>Slots M.2 disponibles:</strong> ${expansion.m2_slots_available}</div>
             </div>
-            ${hasAvailable ? `<p style="color:#274C9B;font-weight:bold;margin:8px 0 0;font-size:12px;">Puede instalar almacenamiento NVMe adicional</p>` : ''}
+            ${hasAvail
+                ? `<p style="color:#274C9B;font-weight:bold;margin:8px 0 0;font-size:12px;">
+                       Puede instalar almacenamiento NVMe adicional</p>` : ''}
         </div>`;
     }
 
-    // Recommendations
     const recs = upgrades.recommendations || [];
-    if (recs.length > 0) {
-        html += `
-        <div style="padding:12px;background:var(--bg-surface-1);border-radius:6px;border-left:4px solid #274C9B;">
+    if (recs.length) {
+        html += `<div style="padding:12px;background:var(--bg-surface-1);
+                             border-radius:6px;border-left:4px solid #274C9B;">
             <h4 style="margin:0 0 8px;">Recomendaciones</h4>
-            <ul style="margin:0;padding-left:20px;font-size:12px;">`;
-        recs.forEach(r => {
-            html += `<li style="margin-bottom:4px;">${escapeHtml(r)}</li>`;
-        });
-        html += '</ul></div>';
+            <ul style="margin:0;padding-left:20px;font-size:12px;">
+                ${recs.map(r => `<li style="margin-bottom:4px;">${escapeHtml(r)}</li>`).join('')}
+            </ul>
+        </div>`;
     }
 
     if (!html) {
-        html = '<div class="alert alert-info">No se detectaron oportunidades de mejora. El equipo está en su capacidad óptima.</div>';
+        html = '<div class="alert alert-info">No se detectaron oportunidades de mejora.</div>';
     }
-
     container.innerHTML = html;
 }
 
-// ============================================================
-// Existing functionality
-// ============================================================
+// ================================================================
+// ACTIVITY LOG
+// ================================================================
 async function refreshLog() {
     try {
-        const response = await fetch('/reports/api/entries');
-        const data = await response.json();
+        await fetch('/reports/api/entries');
         window.location.reload();
     } catch (e) {
         alert('Error al actualizar el registro');
     }
 }
+
+// ================================================================
+// INITIALISATION
+// ================================================================
+document.addEventListener('DOMContentLoaded', () => {
+    // Seed the first bitácora row (today's date pre-filled)
+    document.getElementById('bitacora-entries').appendChild(makeEntryRow(true));
+
+    // Load drive detection (non-blocking — shows placeholder while loading)
+    loadDriveOverrides();
+});
 </script>
 {% endblock %}

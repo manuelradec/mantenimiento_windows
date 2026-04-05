@@ -101,6 +101,9 @@
 
     <!-- Permission Denied Modal (dynamically created by JS if needed) -->
 
+    <!-- Toast notification container (Phase 1 — Global UX) -->
+    <div id="toast-container" role="status" aria-live="polite" aria-atomic="false"></div>
+
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     {% block scripts %}{% endblock %}
 </body>

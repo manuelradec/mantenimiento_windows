@@ -8,6 +8,7 @@ Handles:
 - RADEC Excel form FO-TI-19 generation (via openpyxl)
 """
 import os
+import re
 import sys
 import shutil
 import logging
@@ -510,7 +511,11 @@ def _fill_form_fields(ws, system_info, steps, date_display):
 
 
 def generate_fo_ti_19_html(system_info, steps, session_data,
-                           sucursal='', technician_name=''):
+                           sucursal='', technician_name='',
+                           maint_type='preventivo', model_override='',
+                           tech_address='', tech_phone='', tech_email='',
+                           operator_name='', op_address='', op_phone='', op_email='',
+                           accessories_override='', drive_overrides=None):
     """
     Generate FO-TI-19 Hoja de Servicio Mantenimiento de Equipo de Cómputo.
     Matches the official RADEC format with all fields.
@@ -519,11 +524,18 @@ def generate_fo_ti_19_html(system_info, steps, session_data,
 
     date_display = datetime.now().strftime('%d/%m/%Y')
 
-    # Service type checkmarks
-    svc_preventivo = 'checked'
+    # Service type checkmarks (derived from maint_type)
+    _mt = (maint_type or 'preventivo').lower()
+    svc_preventivo = 'checked' if _mt == 'preventivo' else ''
+    svc_correctivo = 'checked' if _mt == 'correctivo' else ''
+    svc_revision = 'checked' if _mt == 'revision' else ''
 
     # Determine accessories
-    accessories = 'MOUSE, TECLADO Y NO-BREAK'
+    accessories = (
+        accessories_override.strip()
+        if accessories_override and accessories_override.strip()
+        else 'MOUSE, TECLADO Y NO-BREAK'
+    )
 
     # Unidades (drives) checkmarks
     has_cdrom = system_info.get('has_cdrom', False)
@@ -541,17 +553,41 @@ def generate_fo_ti_19_html(system_info, steps, session_data,
     if otros_parts:
         otros_text = ', '.join(otros_parts)
 
-    # Activities text
-    activities = (
-        'SE REALIZO LA LIMPIEZA INTERNA COMO EXTERNA, ASI COMO EL '
-        'MANTENIMIENTO LOGICO, SE ENTREGA EQUIPO FUNCIONANDO CORRECTAMENTE.'
-    )
+    # Build drive-type override note for HD row
+    _drive_note = ''
+    if drive_overrides and isinstance(drive_overrides, dict):
+        _types = [str(v).strip().upper() for v in drive_overrides.values()
+                  if v and str(v).strip()]
+        if _types:
+            _drive_note = ' — Tipos confirmados: ' + ', '.join(_types)
+
+    # Activities text (based on maint_type)
+    _activities_map = {
+        'preventivo': (
+            'SE REALIZO LA LIMPIEZA INTERNA COMO EXTERNA, ASI COMO EL '
+            'MANTENIMIENTO LOGICO, SE ENTREGA EQUIPO FUNCIONANDO CORRECTAMENTE.'
+        ),
+        'correctivo': (
+            'SE REALIZO EL DIAGNOSTICO Y CORRECCION DE FALLA REPORTADA. '
+            'SE ENTREGA EQUIPO FUNCIONANDO CORRECTAMENTE.'
+        ),
+        'revision': (
+            'SE REALIZO REVISION GENERAL DEL EQUIPO. '
+            'SE ENTREGA INFORME DE ESTADO.'
+        ),
+    }
+    activities = _activities_map.get(_mt, _activities_map['preventivo'])
 
     # Physical observations
     observations_physical = 'EQUIPO FUNCIONAL'
 
-    # Comments
-    comments = 'MANTENIMIENTO ANUAL PREVENTIVO'
+    # Comments (based on maint_type)
+    _comments_map = {
+        'preventivo': 'MANTENIMIENTO ANUAL PREVENTIVO',
+        'correctivo': 'MANTENIMIENTO CORRECTIVO',
+        'revision': 'REVISION DE EQUIPO',
+    }
+    comments = _comments_map.get(_mt, _comments_map['preventivo'])
 
     # Technician observations
     tech_observations = ''
@@ -567,9 +603,22 @@ def generate_fo_ti_19_html(system_info, steps, session_data,
         else:
             tech_observations = 'TODOS LOS PASOS COMPLETADOS EXITOSAMENTE'
 
+    # Technician contact sub-lines for signature block
+    _tech_contact = ''
+    if tech_address:
+        _tech_contact += (
+            f'<br><span style="font-size:9px;font-weight:normal;">{he(tech_address)}</span>'
+        )
+    if tech_phone or tech_email:
+        _contact_line = ' | '.join(filter(None, [tech_phone, tech_email]))
+        _tech_contact += (
+            f'<br><span style="font-size:9px;font-weight:normal;">{he(_contact_line)}</span>'
+        )
+
     # Upgrade opportunities / Mejoras section
     upgrades = system_info.get('upgrade_opportunities', {})
-    mejoras_html = _build_mejoras_section(upgrades)
+    cpu_obs = _check_cpu_obsolescence(system_info.get('processor', ''))
+    mejoras_html = _build_mejoras_section(upgrades, cpu_obsolescence=cpu_obs)
 
     html = f'''<!DOCTYPE html>
 <html lang="es">
@@ -621,6 +670,8 @@ def generate_fo_ti_19_html(system_info, steps, session_data,
                              font-weight: bold; margin-right: 6px; }}
         .mejora-item .tag.storage {{ background: #D6814A; }}
         .mejora-item .tag.nvme {{ background: #274C9B; }}
+        .mejora-item .tag.obsolete {{ background: #C00; }}
+        .mejora-item .tag.manual {{ background: #888; }}
         .footer-version {{ text-align: right; font-size: 9px; color: #999; padding: 4px 10px; }}
     </style>
 </head>
@@ -663,23 +714,23 @@ def generate_fo_ti_19_html(system_info, steps, session_data,
     <div class="row">
         <div class="cell cell-label">Nombre del Solicitante:</div>
         <div class="cell cell-value" style="text-align:center;font-weight:bold;">
-            {he(system_info.get('user_fullname', system_info.get('username', 'N/A'))).upper()}
+            {he((operator_name or system_info.get('user_fullname', system_info.get('username', ''))).upper()) or '&nbsp;'}
         </div>
     </div>
 
     <!-- Direccion -->
     <div class="row">
         <div class="cell cell-label">Direcci&oacute;n:</div>
-        <div class="cell cell-value">&nbsp;</div>
+        <div class="cell cell-value">{he(op_address) or '&nbsp;'}</div>
     </div>
 
     <!-- Telefono / Correo -->
     <div class="row">
         <div class="cell cell-label" style="width:100px;">Tel&eacute;fono:</div>
-        <div class="cell cell-value" style="flex:1;">&nbsp;</div>
+        <div class="cell cell-value" style="flex:1;">{he(op_phone) or '&nbsp;'}</div>
         <div class="cell cell-label" style="width:130px;">Correo Electr&oacute;nico:</div>
         <div class="cell cell-value" style="flex:1;">
-            {he(system_info.get('user_email', 'N/A'))}
+            {he(op_email or system_info.get('user_email', '')) or '&nbsp;'}
         </div>
     </div>
 
@@ -687,7 +738,7 @@ def generate_fo_ti_19_html(system_info, steps, session_data,
     <div class="row">
         <div class="cell cell-label">Descripci&oacute;n del Equipo:</div>
         <div class="cell cell-value">
-            {he(system_info.get('equipment_description',
+            {he(model_override or system_info.get('equipment_description',
                 system_info.get('model', 'N/A')))}
         </div>
     </div>
@@ -722,7 +773,7 @@ def generate_fo_ti_19_html(system_info, steps, session_data,
     <div class="row">
         <div class="cell cell-label" style="width:140px;">Capacidad de HD:</div>
         <div class="cell cell-value" style="flex:1;">
-            {he(system_info.get('hard_drive', 'N/A'))}
+            {he(system_info.get('hard_drive', 'N/A'))}{he(_drive_note)}
         </div>
         <div class="cell cell-label" style="width:130px;">Sistema Operativo:</div>
         <div class="cell cell-value" style="flex:1;">
@@ -762,9 +813,9 @@ def generate_fo_ti_19_html(system_info, steps, session_data,
     <div class="row">
         <div class="cell cell-label" style="width:140px;">Tipo de Servicio<br>Solicitado:</div>
         <div class="cell cell-value" style="flex:1;display:flex;justify-content:space-around;align-items:center;">
-            <span><span class="radio"></span> Revisi&oacute;n</span>
+            <span><span class="radio {'checked' if svc_revision else ''}">&#8226;</span> Revisi&oacute;n</span>
             <span><span class="radio {'checked' if svc_preventivo else ''}">&#8226;</span> Preventivo</span>
-            <span><span class="radio"></span> Correctivo</span>
+            <span><span class="radio {'checked' if svc_correctivo else ''}">&#8226;</span> Correctivo</span>
         </div>
     </div>
 
@@ -789,7 +840,7 @@ def generate_fo_ti_19_html(system_info, steps, session_data,
         <div class="signature-box">
             <div style="min-height:40px;"></div>
             <div class="signature-line">
-                {he(system_info.get('user_fullname', '').upper())}<br>
+                {he((operator_name or system_info.get('user_fullname', '')).upper()) or '&nbsp;'}<br>
                 Nombre y Firma del Solicitante
             </div>
         </div>
@@ -797,7 +848,7 @@ def generate_fo_ti_19_html(system_info, steps, session_data,
             <div style="min-height:40px;"></div>
             <div class="signature-line">
                 {he(technician_name.upper()) if technician_name else '&nbsp;'}<br>
-                Nombre y Firma de quien Recibe
+                Nombre y Firma de quien Recibe{_tech_contact}
             </div>
         </div>
     </div>
@@ -956,11 +1007,153 @@ def generate_fo_ti_20_html(entries, sucursal=''):
     return html
 
 
-def _build_mejoras_section(upgrades):
+def _check_cpu_obsolescence(processor_str):
+    """
+    Option A obsolescence rule:
+    A machine is a mandatory renewal candidate if its processor is BELOW
+    Intel Core i5 5th generation.
+
+    Threshold matrix:
+      - Gen 6+, any Core family  → NOT obsolete
+      - Gen 5 + Core i5/i7/i9   → NOT obsolete  (at threshold or above)
+      - Gen 5 + Core i3          → obsolete       (below threshold)
+      - Gen 1-4, any Core family → obsolete
+
+    AMD, Xeon, Pentium, Celeron, Atom, and unrecognized families are never
+    silently skipped; all are reported as "Revisión manual requerida".
+
+    Returns dict:
+      generation (int or None), family (str or None, e.g. 'I5'),
+      obsolete  (True / False / None),
+      label     (str — display name),
+      reason    (str — explanation for the report)
+    """
+    if not processor_str:
+        return {
+            'generation': None, 'family': None, 'obsolete': None,
+            'label': 'Procesador no identificado',
+            'reason': 'Revisi\u00f3n manual requerida.',
+        }
+
+    p = processor_str.upper()
+
+    # Intel Core iX with explicit model number: iN-DDDD[suffix]
+    m = re.search(r'CORE\s+(I[3579])-(\d{4,5})', p)
+    if m:
+        family    = m.group(1)                              # 'I3', 'I5', 'I7', 'I9'
+        fdisp     = family[0].lower() + family[1:]          # 'i3', 'i5', 'i7', 'i9'
+        model_num = m.group(2)
+
+        if len(model_num) == 5:
+            # Gen 10+: first two digits (10xxx → 10, 11xxx → 11, …)
+            gen = int(model_num[:2])
+        else:
+            # Gen 1-9: first digit (4xxx → 4, 5xxx → 5, …)
+            gen = int(model_num[0]) or 1
+
+        label = f'Intel Core {fdisp} \u2014 Generaci\u00f3n {gen}'
+
+        if gen >= 6:
+            obsolete = False
+            reason = (
+                f'Generaci\u00f3n {gen}, dentro del umbral de soporte '
+                f'(m\u00ednimo requerido: Core i5, 5\u00aa generaci\u00f3n).'
+            )
+        elif gen == 5:
+            if family == 'I3':
+                # i3 5th gen is below the threshold (i5 5th gen)
+                obsolete = True
+                reason = (
+                    f'Core i3 de 5\u00aa generaci\u00f3n no alcanza el umbral m\u00ednimo. '
+                    f'Se requiere Core i5 de 5\u00aa generaci\u00f3n o superior.'
+                )
+            else:
+                # i5/i7/i9 on 5th gen — at or above threshold
+                obsolete = False
+                reason = (
+                    f'Core {fdisp} de 5\u00aa generaci\u00f3n, en umbral m\u00ednimo o superior '
+                    f'(m\u00ednimo requerido: Core i5, 5\u00aa generaci\u00f3n).'
+                )
+        else:
+            # gen <= 4: all Core families are below threshold
+            obsolete = True
+            reason = (
+                f'Generaci\u00f3n {gen}, por debajo del umbral m\u00ednimo '
+                f'(se requiere Core i5 de 5\u00aa generaci\u00f3n o superior).'
+            )
+
+        return {
+            'generation': gen, 'family': family,
+            'obsolete': obsolete, 'label': label, 'reason': reason,
+        }
+
+    # Intel Core 1st-generation — old WMI naming without hyphen:
+    # "Intel(R) Core(TM) i5 CPU 760 @ 2.80GHz"  (desktop, 3-digit)
+    # "Intel(R) Core(TM) i5 CPU M 520 @ 2.40GHz" (mobile with letter suffix)
+    # Identified by: family letter + whitespace + "CPU" keyword + 3-digit number.
+    # All CPUs matching this style are definitively 1st generation → obsolete.
+    m1g = re.search(r'\b(I[3579])\s+CPU\s+(?:[A-Z]\s+)?\d{3}\b', p)
+    if m1g:
+        family = m1g.group(1)                        # 'I3', 'I5', 'I7'
+        fdisp  = family[0].lower() + family[1:]      # 'i3', 'i5', 'i7'
+        return {
+            'generation': 1, 'family': family, 'obsolete': True,
+            'label': f'Intel Core {fdisp} \u2014 Generaci\u00f3n 1',
+            'reason': (
+                'Generaci\u00f3n 1 (modelo de 3 d\u00edgitos, denominaci\u00f3n '
+                'antigua sin gui\u00f3n), por debajo del umbral m\u00ednimo '
+                '(se requiere Core i5 de 5\u00aa generaci\u00f3n o superior).'
+            ),
+        }
+
+    # Intel Core iX present but no model number — generation indeterminate
+    if re.search(r'CORE\s+I[3579]\b', p):
+        fm = re.search(r'CORE\s+(I[3579])\b', p)
+        fdisp = (fm.group(1)[0].lower() + fm.group(1)[1:]) if fm else 'iX'
+        return {
+            'generation': None, 'family': fdisp, 'obsolete': None,
+            'label': f'Intel Core {fdisp} (sin n\u00famero de modelo)',
+            'reason': 'Generaci\u00f3n no determinada. Revisi\u00f3n manual requerida.',
+        }
+
+    # Known non-Core-iX families — rule does not apply; manual review required
+    _FAMILY_MAP = [
+        ('XEON', 'Intel Xeon'),
+        ('CELERON', 'Intel Celeron'),
+        ('PENTIUM', 'Intel Pentium'),
+        ('ATOM', 'Intel Atom'),
+        ('RYZEN', 'AMD Ryzen'),
+        ('ATHLON', 'AMD Athlon'),
+        ('EPYC', 'AMD EPYC'),
+        ('THREADRIPPER', 'AMD Threadripper'),
+        ('AMD', 'AMD'),
+        ('APPLE', 'Apple Silicon'),
+    ]
+    for keyword, brand in _FAMILY_MAP:
+        if keyword in p:
+            return {
+                'generation': None, 'family': brand, 'obsolete': None,
+                'label': brand,
+                'reason': 'Familia no clasificable por esta regla. Revisi\u00f3n manual requerida.',
+            }
+
+    # Completely unrecognized string
+    return {
+        'generation': None, 'family': None, 'obsolete': None,
+        'label': 'Procesador no reconocido',
+        'reason': 'Familia de procesador no reconocida. Revisi\u00f3n manual requerida.',
+    }
+
+
+def _build_mejoras_section(upgrades, cpu_obsolescence=None):
     """Build the Mejoras (Improvements) HTML section for FO-TI-19."""
     from html import escape as he
 
-    if not upgrades:
+    # Skip only when there is neither hardware upgrade data nor a CPU result.
+    # cpu_obsolescence is always shown (including manual-review results).
+    _has_cpu = bool(cpu_obsolescence and
+                    (cpu_obsolescence.get('label') or cpu_obsolescence.get('reason')))
+    if not upgrades and not _has_cpu:
         return ''
 
     recommendations = upgrades.get('recommendations', [])
@@ -1044,6 +1237,28 @@ def _build_mejoras_section(upgrades):
             <div class="mejora-item">
                 &#9679; {he(rec)}
             </div>'''
+
+    # CPU obsolescence block — rendered for all results, including manual review
+    if _has_cpu:
+        obs = cpu_obsolescence
+        reason_text = obs.get('reason', '')
+        if obs.get('obsolete') is True:
+            tag_class = 'obsolete'
+            msg = (f'<strong>Candidato a renovaci\u00f3n:</strong> '
+                   f'{he(obs.get("label", ""))} \u2014 {he(reason_text)}')
+        elif obs.get('obsolete') is False:
+            tag_class = ''
+            msg = f'{he(obs.get("label", ""))} \u2014 {he(reason_text)}'
+        else:
+            tag_class = 'manual'
+            lbl = obs.get('label', '')
+            msg = he(lbl) + (f' \u2014 {he(reason_text)}' if reason_text else '')
+
+        items_html += f'''
+        <div class="mejora-item">
+            <span class="tag cpu {tag_class}">CPU</span>
+            {msg}
+        </div>'''
 
     if not items_html:
         items_html = '''

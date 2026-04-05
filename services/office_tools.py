@@ -28,7 +28,9 @@ import re
 import sys
 import logging
 
-from services.command_runner import run_cmd, CommandStatus, CommandResult
+from services.command_runner import (
+    run_cmd, run_powershell, run_powershell_json, CommandStatus, CommandResult,
+)
 
 logger = logging.getLogger('cleancpu.office')
 
@@ -373,4 +375,366 @@ def activate_with_key(key: str) -> dict:
         'masked_key': masked,
         'inpkey_output': inpkey_out,
         'act_output': act_out,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 — Path discovery for Office tools
+# All finders return '' when not found; callers check before proceeding.
+# ---------------------------------------------------------------------------
+
+_C2R_SEARCH_PATHS = [
+    r'C:\Program Files\Common Files\microsoft shared\ClickToRun\OfficeClickToRun.exe',
+    r'C:\Program Files (x86)\Common Files\microsoft shared\ClickToRun\OfficeClickToRun.exe',
+]
+
+# Office 16 C2R installs use root\office16\; MSI installs use Office16\ directly.
+_OUTLOOK_SEARCH_PATHS = [
+    r'C:\Program Files\Microsoft Office\root\office16\OUTLOOK.EXE',
+    r'C:\Program Files (x86)\Microsoft Office\root\office16\OUTLOOK.EXE',
+    r'C:\Program Files\Microsoft Office\Office16\OUTLOOK.EXE',
+    r'C:\Program Files (x86)\Microsoft Office\Office16\OUTLOOK.EXE',
+    r'C:\Program Files\Microsoft Office\Office15\OUTLOOK.EXE',
+    r'C:\Program Files (x86)\Microsoft Office\Office15\OUTLOOK.EXE',
+]
+
+_SCANPST_SEARCH_PATHS = [
+    r'C:\Program Files\Microsoft Office\root\office16\SCANPST.EXE',
+    r'C:\Program Files (x86)\Microsoft Office\root\office16\SCANPST.EXE',
+    r'C:\Program Files\Microsoft Office\Office16\SCANPST.EXE',
+    r'C:\Program Files (x86)\Microsoft Office\Office16\SCANPST.EXE',
+    r'C:\Program Files\Microsoft Office\Office15\SCANPST.EXE',
+    r'C:\Program Files (x86)\Microsoft Office\Office15\SCANPST.EXE',
+]
+
+
+def _find_c2r() -> str:
+    """Return the first OfficeClickToRun.exe path that exists, or ''."""
+    for path in _C2R_SEARCH_PATHS:
+        if os.path.isfile(path):
+            return path
+    return ''
+
+
+def _find_outlook() -> str:
+    """Return the first OUTLOOK.EXE path that exists, or ''."""
+    for path in _OUTLOOK_SEARCH_PATHS:
+        if os.path.isfile(path):
+            return path
+    return ''
+
+
+def _find_scanpst() -> str:
+    """Return the first SCANPST.EXE path that exists, or ''."""
+    for path in _SCANPST_SEARCH_PATHS:
+        if os.path.isfile(path):
+            return path
+    return ''
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 — Public API: Office repair
+# ---------------------------------------------------------------------------
+
+def repair_office(repair_type: str = 'quick') -> dict:
+    """
+    Trigger Office ClickToRun repair (Quick or Full/Online).
+    Only available for C2R installations (OfficeClickToRun.exe must be present).
+
+    repair_type: 'quick'  → QuickRepair  (local files only, fast)
+                 'online' → FullRepair   (downloads from Microsoft, slow)
+
+    Launches via PowerShell Start-Process so the repair UI runs detached.
+    Returns immediately after the process is launched.
+
+    Returns dict with keys: status, message
+    """
+    if sys.platform != 'win32':
+        return {'status': 'not_applicable', 'message': 'Solo disponible en Windows.'}
+
+    c2r_path = _find_c2r()
+    if not c2r_path:
+        return {
+            'status': 'not_found',
+            'message': (
+                'OfficeClickToRun.exe no encontrado. '
+                'Este equipo puede tener una instalacion Office MSI/Volumen '
+                'en lugar de Click-to-Run, o Office no esta instalado.'
+            ),
+        }
+
+    repair_type_param = 'FullRepair' if repair_type == 'online' else 'QuickRepair'
+    label = 'en linea' if repair_type == 'online' else 'rapida'
+
+    # -Verb RunAs requests UAC if not already elevated; since the app runs as
+    # admin this completes silently.
+    ps_script = (
+        f'Start-Process -FilePath "{c2r_path}" '
+        f'-ArgumentList "scenario=Repair RepairType={repair_type_param} DisplayLevel=Full" '
+        '-Verb RunAs'
+    )
+    result = run_powershell(
+        ps_script, timeout=15,
+        description=f'Office {label} repair launch',
+    )
+
+    if result.status in (CommandStatus.SUCCESS, CommandStatus.WARNING,
+                         CommandStatus.NOT_APPLICABLE):
+        return {
+            'status': 'launched',
+            'message': (
+                f'Reparacion {label} de Office iniciada. '
+                'El proceso de reparacion se ejecuta en una ventana independiente. '
+                'Office debe estar cerrado durante la reparacion.'
+            ),
+        }
+    return {
+        'status': 'error',
+        'message': (
+            f'No se pudo iniciar la reparacion {label}: '
+            f'{result.error or result.output or "desconocido"}'
+        ),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 — Public API: Outlook helpers
+# ---------------------------------------------------------------------------
+
+def launch_office_safe_mode() -> dict:
+    """
+    Launch Outlook in safe mode (/safe).
+    Useful when Outlook crashes at startup or a faulty add-in is suspected.
+    Returns immediately — Outlook opens in its own window.
+    """
+    if sys.platform != 'win32':
+        return {'status': 'not_applicable', 'message': 'Solo disponible en Windows.'}
+
+    outlook_path = _find_outlook()
+    if not outlook_path:
+        return {
+            'status': 'not_found',
+            'message': 'OUTLOOK.EXE no encontrado en rutas conocidas.',
+        }
+
+    ps_script = f'Start-Process -FilePath "{outlook_path}" -ArgumentList "/safe"'
+    result = run_powershell(ps_script, timeout=10, description='Outlook /safe launch')
+
+    if result.status in (CommandStatus.SUCCESS, CommandStatus.WARNING,
+                         CommandStatus.NOT_APPLICABLE):
+        return {
+            'status': 'launched',
+            'message': (
+                'Outlook iniciado en modo seguro (/safe). '
+                'Si el problema desaparece, un complemento puede ser la causa. '
+                'Para desactivar complementos: Archivo > Opciones > Complementos.'
+            ),
+        }
+    return {
+        'status': 'error',
+        'message': (
+            f'No se pudo iniciar Outlook en modo seguro: '
+            f'{result.error or result.output or "desconocido"}'
+        ),
+    }
+
+
+def configure_mail_profile() -> dict:
+    """
+    Open the Windows Mail / Outlook profile manager (mlcfg32.cpl).
+    Used to create, repair, or delete Outlook mail profiles.
+    mlcfg32.cpl is a Windows component, always available.
+    """
+    if sys.platform != 'win32':
+        return {'status': 'not_applicable', 'message': 'Solo disponible en Windows.'}
+
+    ps_script = 'Start-Process -FilePath "control.exe" -ArgumentList "mlcfg32.cpl"'
+    result = run_powershell(ps_script, timeout=10, description='Open Mail profile applet')
+
+    if result.status in (CommandStatus.SUCCESS, CommandStatus.WARNING,
+                         CommandStatus.NOT_APPLICABLE):
+        return {
+            'status': 'launched',
+            'message': (
+                'Panel de configuracion de correo abierto. '
+                'Aqui puede crear, reparar o eliminar perfiles de Outlook.'
+            ),
+        }
+    return {
+        'status': 'error',
+        'message': (
+            f'No se pudo abrir la configuracion de correo: '
+            f'{result.error or result.output or "desconocido"}'
+        ),
+    }
+
+
+def launch_scanpst() -> dict:
+    """
+    Launch Outlook's Inbox Repair Tool (SCANPST.EXE).
+    SCANPST opens a GUI where the technician selects the PST/OST file to repair.
+    Returns immediately — SCANPST opens in its own window.
+    """
+    if sys.platform != 'win32':
+        return {'status': 'not_applicable', 'message': 'Solo disponible en Windows.'}
+
+    scanpst_path = _find_scanpst()
+    if not scanpst_path:
+        return {
+            'status': 'not_found',
+            'message': (
+                'SCANPST.EXE no encontrado. '
+                'Verifique que Outlook este instalado correctamente.'
+            ),
+        }
+
+    ps_script = f'Start-Process -FilePath "{scanpst_path}"'
+    result = run_powershell(ps_script, timeout=10, description='Launch SCANPST.EXE')
+
+    if result.status in (CommandStatus.SUCCESS, CommandStatus.WARNING,
+                         CommandStatus.NOT_APPLICABLE):
+        return {
+            'status': 'launched',
+            'message': (
+                'Herramienta de reparacion de archivos PST/OST (SCANPST.EXE) iniciada. '
+                'Seleccione el archivo de datos de Outlook en la ventana abierta.'
+            ),
+            'path': scanpst_path,
+        }
+    return {
+        'status': 'error',
+        'message': (
+            f'No se pudo iniciar SCANPST.EXE: '
+            f'{result.error or result.output or "desconocido"}'
+        ),
+    }
+
+
+def rebuild_outlook_search_index() -> dict:
+    """
+    Rebuild the Windows Search index (which Outlook uses for full-text search).
+
+    Procedure:
+      1. Stop the WSearch service (Windows Search).
+      2. Delete all files in the index catalog directory.
+      3. Restart WSearch — Windows will rebuild the index automatically.
+
+    Requires admin. Affects all Windows Search, not just Outlook.
+    Rebuilding is automatic after restart; it may take several minutes
+    depending on mailbox and file system size.
+    """
+    if sys.platform != 'win32':
+        return {'status': 'not_applicable', 'message': 'Solo disponible en Windows.'}
+
+    ps_script = (
+        'Stop-Service -Name WSearch -Force -ErrorAction SilentlyContinue; '
+        'Start-Sleep -Seconds 2; '
+        '$idx = "$env:ProgramData\\Microsoft\\Search\\Data\\Applications\\Windows"; '
+        'if (Test-Path $idx) { '
+        '  Remove-Item "$idx\\*" -Recurse -Force -ErrorAction SilentlyContinue; '
+        '  Write-Output "Indice de busqueda eliminado correctamente."; '
+        '} else { '
+        '  Write-Output "Directorio de indice no encontrado (puede ya estar limpio)."; '
+        '}; '
+        'Start-Service -Name WSearch -ErrorAction SilentlyContinue; '
+        'Write-Output "Servicio Windows Search reiniciado. '
+        'La reindexacion comenzara automaticamente."'
+    )
+    result = run_powershell(
+        ps_script, timeout=60, requires_admin=True,
+        description='Rebuild Windows Search index',
+    )
+
+    if result.status == CommandStatus.REQUIRES_ADMIN:
+        return {
+            'status': 'requires_admin',
+            'message': 'Se requieren permisos de Administrador para reconstruir el indice de busqueda.',
+        }
+    if result.status in (CommandStatus.SUCCESS, CommandStatus.WARNING):
+        return {
+            'status': 'success',
+            'message': (
+                'Indice de busqueda reconstruido. '
+                'Outlook reindexara los correos automaticamente '
+                '(puede tardar varios minutos segun el tamano del buz\u00f3n).'
+            ),
+            'output': result.output or '',
+        }
+    return {
+        'status': 'error',
+        'message': (
+            f'Error al reconstruir el indice: '
+            f'{result.error or result.output or "desconocido"}'
+        ),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 — Public API: Paquetería (installed programs inventory)
+# ---------------------------------------------------------------------------
+
+def get_installed_packages() -> dict:
+    """
+    List installed applications from the Windows registry.
+    Reads HKLM (64-bit and 32-bit hive) and HKCU uninstall keys.
+    No admin required — registry reads are allowed for standard users.
+
+    Returns dict with:
+        status:   'success' | 'empty' | 'not_applicable' | 'error'
+        message:  human-readable summary
+        packages: list of dicts (name, version, publisher, install_date)
+    """
+    if sys.platform != 'win32':
+        return {
+            'status': 'not_applicable',
+            'message': 'Inventario de paquetes solo disponible en Windows.',
+            'packages': [],
+        }
+
+    ps_script = (
+        '$paths = @('
+        '"HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*",'
+        '"HKLM:\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*",'
+        '"HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*"'
+        '); '
+        'Get-ItemProperty $paths -ErrorAction SilentlyContinue '
+        '| Where-Object { $_.DisplayName -ne $null -and $_.DisplayName.Trim() -ne "" } '
+        '| Select-Object DisplayName, DisplayVersion, Publisher, InstallDate '
+        '| Sort-Object DisplayName'
+    )
+
+    result = run_powershell_json(
+        ps_script, timeout=30,
+        description='List installed packages (registry)',
+    )
+
+    packages = []
+    data = result.details.get('data')
+    if data is not None:
+        if isinstance(data, dict):
+            data = [data]
+        for item in (data if isinstance(data, list) else []):
+            name = (item.get('DisplayName') or '').strip()
+            if name:
+                packages.append({
+                    'name': name,
+                    'version': (item.get('DisplayVersion') or '').strip(),
+                    'publisher': (item.get('Publisher') or '').strip(),
+                    'install_date': (item.get('InstallDate') or '').strip(),
+                })
+
+    if result.is_error and not packages:
+        return {
+            'status': 'error',
+            'message': f'Error al obtener la lista de programas: {result.error or "desconocido"}',
+            'packages': [],
+        }
+
+    return {
+        'status': 'success' if packages else 'empty',
+        'message': (
+            f'{len(packages)} programas encontrados.'
+            if packages else 'No se encontraron programas instalados.'
+        ),
+        'packages': packages,
     }

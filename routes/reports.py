@@ -11,6 +11,17 @@ from config import Config
 
 reports_bp = Blueprint('reports', __name__)
 
+_MAINT_TYPE_LABELS = {
+    'preventivo': 'MANTENIMIENTO PREVENTIVO',
+    'correctivo': 'MANTENIMIENTO CORRECTIVO',
+    'revision': 'REVISIÓN',
+}
+
+
+def _maint_type_label(maint_type):
+    return _MAINT_TYPE_LABELS.get((maint_type or 'preventivo').lower(),
+                                  'MANTENIMIENTO PREVENTIVO')
+
 
 @reports_bp.route('/')
 def index():
@@ -151,8 +162,19 @@ def api_export_fo_ti_19():
     from services.maintenance_report import generate_fo_ti_19_html
 
     data = request.get_json(silent=True) or {}
-    sucursal = data.get('sucursal', '')
-    technician_name = data.get('technician_name', '')
+    sucursal         = data.get('sucursal', '')
+    technician_name  = data.get('technician_name', '')
+    maint_type       = data.get('maint_type', 'preventivo')
+    model_override   = data.get('model', '')
+    tech_address     = data.get('tech_address', '')
+    tech_phone       = data.get('tech_phone', '')
+    tech_email       = data.get('tech_email', '')
+    operator_name    = data.get('operator_name', '')
+    op_address       = data.get('op_address', '')
+    op_phone         = data.get('op_phone', '')
+    op_email         = data.get('op_email', '')
+    accessories      = data.get('accessories', '')
+    drive_overrides  = data.get('drive_overrides') or {}
 
     # Collect system info
     from routes.maintenance import _collect_system_info
@@ -174,6 +196,17 @@ def api_export_fo_ti_19():
         system_info, steps, {},
         sucursal=sucursal,
         technician_name=technician_name,
+        maint_type=maint_type,
+        model_override=model_override,
+        tech_address=tech_address,
+        tech_phone=tech_phone,
+        tech_email=tech_email,
+        operator_name=operator_name,
+        op_address=op_address,
+        op_phone=op_phone,
+        op_email=op_email,
+        accessories_override=accessories,
+        drive_overrides=drive_overrides,
     )
 
     filename = f'FO-TI-19_{system_info.get("hostname", "EQUIPO")}_{datetime.now().strftime("%Y-%m-%d")}.html'
@@ -191,8 +224,19 @@ def api_download_fo_ti_19():
     from flask import request
     from services.maintenance_report import generate_fo_ti_19_html
 
-    sucursal = request.args.get('sucursal', '')
+    sucursal        = request.args.get('sucursal', '')
     technician_name = request.args.get('technician_name', '')
+    maint_type      = request.args.get('maint_type', 'preventivo')
+    model_override  = request.args.get('model', '')
+    tech_address    = request.args.get('tech_address', '')
+    tech_phone      = request.args.get('tech_phone', '')
+    tech_email      = request.args.get('tech_email', '')
+    operator_name   = request.args.get('operator_name', '')
+    op_address      = request.args.get('op_address', '')
+    op_phone        = request.args.get('op_phone', '')
+    op_email        = request.args.get('op_email', '')
+    accessories     = request.args.get('accessories', '')
+    # drive_overrides not carried in GET; omit (POST export is the primary form path)
 
     from routes.maintenance import _collect_system_info
     system_info = _collect_system_info()
@@ -212,6 +256,17 @@ def api_download_fo_ti_19():
         system_info, steps, {},
         sucursal=sucursal,
         technician_name=technician_name,
+        maint_type=maint_type,
+        model_override=model_override,
+        tech_address=tech_address,
+        tech_phone=tech_phone,
+        tech_email=tech_email,
+        operator_name=operator_name,
+        op_address=op_address,
+        op_phone=op_phone,
+        op_email=op_email,
+        accessories_override=accessories,
+        drive_overrides={},
     )
 
     filename = f'FO-TI-19_{system_info.get("hostname", "EQUIPO")}_{datetime.now().strftime("%Y-%m-%d")}.html'
@@ -230,8 +285,9 @@ def api_export_fo_ti_20():
     from services.maintenance_report import generate_fo_ti_20_html
 
     data = request.get_json(silent=True) or {}
-    sucursal = data.get('sucursal', '')
-    entries = data.get('entries', [])
+    sucursal   = data.get('sucursal', '')
+    entries    = data.get('entries', [])
+    maint_type = data.get('maint_type', 'preventivo')
 
     # If no entries provided, build from current session audit log
     if not entries:
@@ -243,7 +299,7 @@ def api_export_fo_ti_20():
             'fecha': datetime.now().strftime('%d/%m/%Y'),
             'usuario': username,
             'equipo': system_info.get('model', 'N/A'),
-            'reporte_final': 'MANTENIMIENTO PREVENTIVO',
+            'reporte_final': _maint_type_label(maint_type),
         }]
 
     html = generate_fo_ti_20_html(entries, sucursal=sucursal)
@@ -263,7 +319,8 @@ def api_download_fo_ti_20():
     from flask import request
     from services.maintenance_report import generate_fo_ti_20_html
 
-    sucursal = request.args.get('sucursal', '')
+    sucursal   = request.args.get('sucursal', '')
+    maint_type = request.args.get('maint_type', 'preventivo')
 
     from routes.maintenance import _collect_system_info
     system_info = _collect_system_info()
@@ -273,7 +330,7 @@ def api_download_fo_ti_20():
         'fecha': datetime.now().strftime('%d/%m/%Y'),
         'usuario': username,
         'equipo': system_info.get('model', 'N/A'),
-        'reporte_final': 'MANTENIMIENTO PREVENTIVO',
+        'reporte_final': _maint_type_label(maint_type),
     }]
 
     html = generate_fo_ti_20_html(entries, sucursal=sucursal)
