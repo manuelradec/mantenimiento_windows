@@ -528,7 +528,7 @@ def generate_fo_ti_19_html(system_info, steps, session_data,
     _mt = (maint_type or 'preventivo').lower()
     svc_preventivo = 'checked' if _mt == 'preventivo' else ''
     svc_correctivo = 'checked' if _mt == 'correctivo' else ''
-    svc_revision   = 'checked' if _mt == 'revision'   else ''
+    svc_revision = 'checked' if _mt == 'revision' else ''
 
     # Determine accessories
     accessories = (
@@ -585,7 +585,7 @@ def generate_fo_ti_19_html(system_info, steps, session_data,
     _comments_map = {
         'preventivo': 'MANTENIMIENTO ANUAL PREVENTIVO',
         'correctivo': 'MANTENIMIENTO CORRECTIVO',
-        'revision':   'REVISION DE EQUIPO',
+        'revision': 'REVISION DE EQUIPO',
     }
     comments = _comments_map.get(_mt, _comments_map['preventivo'])
 
@@ -1118,16 +1118,16 @@ def _check_cpu_obsolescence(processor_str):
 
     # Known non-Core-iX families — rule does not apply; manual review required
     _FAMILY_MAP = [
-        ('XEON',         'Intel Xeon'),
-        ('CELERON',      'Intel Celeron'),
-        ('PENTIUM',      'Intel Pentium'),
-        ('ATOM',         'Intel Atom'),
-        ('RYZEN',        'AMD Ryzen'),
-        ('ATHLON',       'AMD Athlon'),
-        ('EPYC',         'AMD EPYC'),
+        ('XEON', 'Intel Xeon'),
+        ('CELERON', 'Intel Celeron'),
+        ('PENTIUM', 'Intel Pentium'),
+        ('ATOM', 'Intel Atom'),
+        ('RYZEN', 'AMD Ryzen'),
+        ('ATHLON', 'AMD Athlon'),
+        ('EPYC', 'AMD EPYC'),
         ('THREADRIPPER', 'AMD Threadripper'),
-        ('AMD',          'AMD'),
-        ('APPLE',        'Apple Silicon'),
+        ('AMD', 'AMD'),
+        ('APPLE', 'Apple Silicon'),
     ]
     for keyword, brand in _FAMILY_MAP:
         if keyword in p:

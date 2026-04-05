@@ -14,7 +14,7 @@ reports_bp = Blueprint('reports', __name__)
 _MAINT_TYPE_LABELS = {
     'preventivo': 'MANTENIMIENTO PREVENTIVO',
     'correctivo': 'MANTENIMIENTO CORRECTIVO',
-    'revision':   'REVISIÓN',
+    'revision': 'REVISIÓN',
 }
 
 

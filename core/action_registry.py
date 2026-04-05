@@ -357,5 +357,61 @@ def _register_all_actions():
         ))
 
 
-# Auto-register on import
+def _register_office_actions():
+    """Register Phase 4 Office actions."""
+
+    # SAFE_READONLY — diagnostics, no side effects
+    for aid, name, desc in [
+        ('office.inspect', 'Inspeccionar licencia Office',
+         'Consultar estado de activacion de Office via ospp.vbs'),
+        ('office.paqueteria', 'Listar programas instalados',
+         'Inventario de software instalado (registro de Windows)'),
+    ]:
+        registry.register(ActionDef(
+            action_id=aid, name=name, module='office',
+            risk_class=RiskClass.SAFE_READONLY,
+            description=desc,
+        ))
+
+    # SAFE_MUTATION — GUI launchers; low risk, no data destruction
+    for aid, name, desc, timeout in [
+        ('office.safe_mode', 'Outlook modo seguro',
+         'Iniciar Outlook con /safe (sin complementos)', 10),
+        ('office.configure_mail', 'Configurar correo',
+         'Abrir panel de perfiles de Outlook (mlcfg32.cpl)', 10),
+        ('office.scanpst', 'Reparar PST (SCANPST)',
+         'Iniciar herramienta de reparacion de archivos PST/OST', 10),
+    ]:
+        registry.register(ActionDef(
+            action_id=aid, name=name, module='office',
+            risk_class=RiskClass.SAFE_MUTATION,
+            description=desc, default_timeout=timeout,
+        ))
+
+    # RISKY — require confirmation; affect running services or download data
+    for aid, name, desc, timeout, confirm_msg, needs_admin in [
+        ('office.repair_quick', 'Reparacion rapida Office',
+         'Ejecutar reparacion rapida de Office (ClickToRun, archivos locales)', 300,
+         'La reparacion rapida corregira archivos locales de Office. '
+         'Office debe estar cerrado. Continuar?', True),
+        ('office.repair_online', 'Reparacion en linea Office',
+         'Ejecutar reparacion en linea de Office (descarga todos los archivos)', 1800,
+         'La reparacion en linea descarga todos los archivos de Office desde Microsoft. '
+         'Requiere internet y puede tardar 30+ minutos. Office debe estar cerrado. Continuar?', True),
+        ('office.rebuild_index', 'Reconstruir indice de busqueda',
+         'Detener Windows Search, borrar indice y reconstruir (afecta toda la busqueda)', 60,
+         'Se detendra temporalmente Windows Search y se eliminara el indice actual. '
+         'Afecta toda la busqueda del sistema (no solo Outlook). Continuar?', True),
+    ]:
+        registry.register(ActionDef(
+            action_id=aid, name=name, module='office',
+            risk_class=RiskClass.RISKY,
+            requires_admin=needs_admin,
+            requires_confirmation=True,
+            confirm_message=confirm_msg,
+            description=desc, default_timeout=timeout,
+        ))
+
+
 _register_all_actions()
+_register_office_actions()
