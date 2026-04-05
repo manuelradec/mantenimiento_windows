@@ -346,10 +346,23 @@ function displayResult(data) {
     lines += '\n';
 
     consoleEl.innerHTML += lines;
-    consoleEl.scrollTop = consoleEl.scrollHeight;
 
-    // Auto-scroll the page to show the output
-    consoleEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    // Scroll console internally to bottom and scroll page to show it
+    scrollToOutput();
+
+    // Lower-right toast notification — brief summary of this result
+    const _toastTypeMap = {
+        success: 'success', completed: 'success',
+        warning: 'warning', partial_success: 'warning',
+        error: 'error', timeout: 'error', failed: 'error',
+    };
+    const _toastType = _toastTypeMap[status] || 'info';
+    const _toastMsg = data.error
+        ? String(data.error).substring(0, 88)
+        : data.output
+        ? String(data.output).substring(0, 88)
+        : status;
+    showToast(_toastMsg, _toastType);
 }
 
 // ============================================================
@@ -714,14 +727,78 @@ function closePermissionDenied() {
 }
 
 // ============================================================
-// Auto-scroll to Output (Task 7 — Option B: inline mini-terminal)
+// Auto-scroll to Output (Phase 1 — Global UX)
 // ============================================================
 
+/**
+ * scrollToOutput()
+ * Scrolls the page to bring the output console into view AND scrolls
+ * the console's internal content to the latest (bottom) entry.
+ * Looks for #output-console first, then #output-area as fallback.
+ * Safe to call even if neither element exists on the current page.
+ */
 function scrollToOutput() {
-    const consoleEl = document.getElementById('output-console') || document.getElementById('output-area');
-    if (consoleEl) {
-        consoleEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const consoleEl = document.getElementById('output-console')
+                   || document.getElementById('output-area');
+    if (!consoleEl) return;
+    // Scroll internal content to bottom so the latest entry is visible
+    consoleEl.scrollTop = consoleEl.scrollHeight;
+    // Scroll the page to bring the console into the viewport
+    consoleEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ============================================================
+// Toast Notifications (Phase 1 — Global UX)
+// ============================================================
+
+/**
+ * showToast(msg, type, duration)
+ *
+ *   msg      — text to display. HTML-escaped automatically. Truncate long
+ *              strings before passing; displayResult() truncates to 88 chars.
+ *   type     — 'success' | 'warning' | 'error' | 'info'   (default: 'info')
+ *   duration — ms before auto-dismiss                      (default: 4000)
+ *
+ * Requires <div id="toast-container"> in the page (injected by base.html).
+ * Safe to call from any module page — silently no-ops if container absent.
+ * Multiple toasts stack vertically; each auto-dismisses independently.
+ * Returns the created DOM element so callers can dismiss it early if needed.
+ */
+function showToast(msg, type = 'info', duration = 4000) {
+    const container = document.getElementById('toast-container');
+    if (!container) return null;
+
+    const icons = { success: '✓', warning: '⚠', error: '✕', info: 'i' };
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.setAttribute('role', 'alert');
+    toast.innerHTML =
+        `<span class="toast-icon">${icons[type] || 'i'}</span>` +
+        `<span class="toast-msg">${escapeHtml(String(msg))}</span>` +
+        `<button class="toast-close" aria-label="Cerrar">&times;</button>`;
+
+    container.appendChild(toast);
+
+    // Double requestAnimationFrame: first rAF lets the browser paint the
+    // element without the visible class, second rAF adds it so the CSS
+    // transition actually fires (opacity 0→1, translateX 24px→0).
+    requestAnimationFrame(() =>
+        requestAnimationFrame(() => toast.classList.add('toast-visible'))
+    );
+
+    let dismissTimer = setTimeout(dismiss, duration);
+
+    function dismiss() {
+        clearTimeout(dismissTimer);
+        toast.classList.remove('toast-visible');
+        toast.classList.add('toast-hiding');
+        // Remove from DOM after the 0.2s CSS transition completes
+        setTimeout(() => { if (toast.parentElement) toast.remove(); }, 250);
     }
+
+    toast.querySelector('.toast-close').addEventListener('click', dismiss);
+    return toast;
 }
 
 // ============================================================
