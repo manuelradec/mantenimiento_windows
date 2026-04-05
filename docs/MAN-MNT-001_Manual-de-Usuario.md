@@ -405,7 +405,7 @@ Resultado mostrado:
 
 ## 12. GENERACIÓN DE REPORTES
 
-Después de completar una sesión de mantenimiento, el técnico hace clic en **"Generar Reporte"** en la tarjeta de resumen. La aplicación genera todos los formatos disponibles en paralelo y muestra el resultado de cada uno.
+Después de completar una sesión de mantenimiento, el técnico hace clic en **"Generar Reporte"** en la tarjeta de resumen. La aplicación genera todos los formatos disponibles y muestra el resultado de cada uno.
 
 ### 12.1 Formatos generados
 
@@ -466,7 +466,8 @@ La aplicación soporta una sesión de mantenimiento activa a la vez. No ejecutar
 
 | Síntoma observado | Causa probable | Acción recomendada |
 |-------------------|----------------|-------------------|
-| Pasos 3, 4, 6, 8 se muestran como "Omitidos" con mensaje de Administrador | Aplicación ejecutada sin privilegios de Administrador | Cerrar la aplicación; reabrir con "Clic derecho → Ejecutar como administrador" |
+| Pasos 4, 6, 8 se muestran como "Omitidos" con mensaje de Administrador | Aplicación ejecutada sin privilegios de Administrador | Cerrar la aplicación; reabrir con "Clic derecho → Ejecutar como administrador" |
+| Pasos 1 y 3 muestran "Completado" pero DISM /CheckHealth y SFC /scannow no se ejecutaron | Sin Administrador, estas sub-operaciones se omiten internamente; el paso completa pero las anota en `admin_skipped` | Misma acción: reabrir como Administrador para que DISM y SFC se ejecuten |
 | El navegador no se abre automáticamente al iniciar | Comportamiento del navegador predeterminado o demora en inicio del servidor | Abrir manualmente `http://127.0.0.1:5000` después de 15 segundos |
 | "El sitio no está disponible" en el navegador | El servidor no inició o el puerto 5000 está ocupado | Verificar en el Administrador de tareas que `CleanCPU.exe` está en ejecución. Si el puerto está ocupado, identificar el proceso conflictivo. |
 | "ospp.vbs no encontrado" en módulo Office | Office no instalado o instalado en ruta no estándar | Verificar la instalación de Office; revisar rutas estándar manualmente |

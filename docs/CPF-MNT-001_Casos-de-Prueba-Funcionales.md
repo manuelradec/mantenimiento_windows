@@ -126,7 +126,9 @@
 - No produce error fatal silencioso (el técnico debe poder identificar el problema).
 
 **Criterios de validación:**
-- Pendiente de validación en piloto: verificar si el EXE muestra mensaje de error o simplemente no abre el navegador.
+- El servidor Waitress no inicia; el navegador no abre la interfaz de la aplicación.
+- El log de la aplicación contiene un error de binding (`[Errno 10048]` — "Only one usage of each socket address" o equivalente Windows).
+- El proceso `CleanCPU.exe` puede permanecer activo sin servidor, identificable en el Administrador de tareas; no hay error fatal silencioso.
 
 ---
 
@@ -406,6 +408,8 @@
 **Precondiciones:**
 - Equipo donde uno de los servicios monitoreados está detenido (puede simularse deteniendo `Dnscache` en un ambiente de prueba controlado).
 
+> **Advertencia:** Detener el servicio `Dnscache` en un equipo de producción puede afectar la resolución DNS y la conectividad de red. Realizar esta prueba únicamente en un equipo de prueba aislado o, alternativamente, usar un servicio de bajo impacto disponible en el entorno de prueba. Restaurar el servicio inmediatamente después de validar.
+
 **Resultado esperado:**
 - Hallazgo de severidad "warning" con el nombre del servicio detenido.
 - Acción recomendada con instrucción de revisión del servicio.
@@ -568,7 +572,7 @@
 6. Ejecutar "Inspeccionar licencia" para confirmar la activación.
 
 **Resultado esperado:**
-- Mensaje: "Office activado correctamente con clave XXXXX-XXXXX-XXXXX-XXXXX-YYYYY." (últimos 5 enmascarados con los reales).
+- Mensaje: "Office activado correctamente con clave XXXXX-XXXXX-XXXXX-XXXXX-YYYYY." (los últimos 5 caracteres reales son visibles como YYYYY; los cuatro grupos anteriores están reemplazados por XXXXX).
 - El campo de clave está vacío.
 - La inspección de licencia posterior confirma estado "Licensed".
 
@@ -597,6 +601,8 @@
 - Mensaje de error: "Ingrese una clave completa de 25 caracteres." o "Formato de clave inválido."
 - No se invoca ospp.vbs para ninguno de estos casos.
 - La clave no aparece en logs.
+
+> **Nota — Caso B:** En la interfaz de usuario, `formatKeyInput()` limita automáticamente la entrada a 25 caracteres alfanuméricos, por lo que el Caso B no puede replicarse directamente desde el campo de texto. Para probar el Caso B, enviar la petición directamente a `/office/api/activate` con body `{"key": "AAAAA-BBBBB-CCCCC-DDDDD-EEEEEEXTRA"}` sin pasar por la UI.
 
 ---
 
