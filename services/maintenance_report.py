@@ -1040,8 +1040,8 @@ def _check_cpu_obsolescence(processor_str):
     # Intel Core iX with explicit model number: iN-DDDD[suffix]
     m = re.search(r'CORE\s+(I[3579])-(\d{4,5})', p)
     if m:
-        family    = m.group(1)                              # 'I3', 'I5', 'I7', 'I9'
-        fdisp     = family[0].lower() + family[1:]          # 'i3', 'i5', 'i7', 'i9'
+        family = m.group(1)                              # 'I3', 'I5', 'I7', 'I9'
+        fdisp = family[0].lower() + family[1:]          # 'i3', 'i5', 'i7', 'i9'
         model_num = m.group(2)
 
         if len(model_num) == 5:
@@ -1064,8 +1064,8 @@ def _check_cpu_obsolescence(processor_str):
                 # i3 5th gen is below the threshold (i5 5th gen)
                 obsolete = True
                 reason = (
-                    f'Core i3 de 5\u00aa generaci\u00f3n no alcanza el umbral m\u00ednimo. '
-                    f'Se requiere Core i5 de 5\u00aa generaci\u00f3n o superior.'
+                    'Core i3 de 5\u00aa generaci\u00f3n no alcanza el umbral m\u00ednimo. '
+                    'Se requiere Core i5 de 5\u00aa generaci\u00f3n o superior.'
                 )
             else:
                 # i5/i7/i9 on 5th gen — at or above threshold
@@ -1095,7 +1095,7 @@ def _check_cpu_obsolescence(processor_str):
     m1g = re.search(r'\b(I[3579])\s+CPU\s+(?:[A-Z]\s+)?\d{3}\b', p)
     if m1g:
         family = m1g.group(1)                        # 'I3', 'I5', 'I7'
-        fdisp  = family[0].lower() + family[1:]      # 'i3', 'i5', 'i7'
+        fdisp = family[0].lower() + family[1:]      # 'i3', 'i5', 'i7'
         return {
             'generation': 1, 'family': family, 'obsolete': True,
             'label': f'Intel Core {fdisp} \u2014 Generaci\u00f3n 1',
