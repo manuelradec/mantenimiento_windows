@@ -166,6 +166,7 @@ Este documento cubre las pruebas técnicas del Programa de Mantenimiento RADEC o
 
 **Patrones definidos:**
 ```python
+r'^//nologo\s+.*\\slmgr\.vbs\s+/\w+$'
 r'^//nologo\s+.*\\ospp\.vbs\s+/(?:dstatus|act)$'
 r'^//nologo\s+.*\\ospp\.vbs\s+/inpkey:[a-z0-9]{5}-[a-z0-9]{5}-[a-z0-9]{5}-[a-z0-9]{5}-[a-z0-9]{5}$'
 ```
@@ -198,7 +199,10 @@ r'^//nologo\s+.*\\ospp\.vbs\s+/inpkey:[a-z0-9]{5}-[a-z0-9]{5}-[a-z0-9]{5}-[a-z0-
 | **Objetivo** | Verificar que el motor de comandos respeta el timeout configurado y retorna el estado TIMEOUT correctamente cuando un proceso excede el límite. |
 
 **Método:**
-- Invocar `run_cmd(['timeout', '/t', '120'], timeout=3, description='Test timeout')` donde el proceso tarda más que el timeout.
+- Opción A — revisión estática: Verificar en `command_runner.py` que `subprocess.run` se invoca con el parámetro `timeout`, y que el bloque `except subprocess.TimeoutExpired` termina el proceso con `.kill()` y retorna `CommandStatus.TIMEOUT`.
+- Opción B — prueba funcional: Invocar `run_cmd(['defrag', 'C:', '/O'], timeout=2, description='Test timeout')` — `defrag C: /O` está en la allowlist y tarda más de 2 segundos en cualquier disco, disparando el timeout. Verificar que `CommandResult.status` es `CommandStatus.TIMEOUT`.
+
+> **Nota:** El comando `['timeout', '/t', '120']` original no es válido para esta prueba porque `timeout` no está en `ALLOWED_COMMANDS` y sería bloqueado por la allowlist antes de probar el mecanismo de timeout.
 
 **Resultado esperado:**
 - El proceso es terminado antes de los 120 segundos.

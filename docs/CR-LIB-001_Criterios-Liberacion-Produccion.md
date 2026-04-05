@@ -498,7 +498,7 @@ Las siguientes condiciones implican rechazo automático de la liberación (pilot
 | **Criterios importantes evaluados** | CL-010 al CL-015 |
 | **Criterios importantes aprobados** | ___ / 6 |
 | **Observaciones** | |
-| **Decisión** | ☐ Aprobado para piloto &nbsp;&nbsp; ☐ Aprobado con observaciones &nbsp;&nbsp; ☐ Rechazado |
+| **Decisión** | ☐ Aprobado para piloto   ·   ☐ Aprobado con observaciones   ·   ☐ Rechazado |
 | **Nombre del aprobador** | |
 | **Firma y fecha** | |
 
@@ -517,7 +517,7 @@ Las siguientes condiciones implican rechazo automático de la liberación (pilot
 | **Criterios críticos aprobados** | ___ / 6 |
 | **Canal de distribución aprobado** | |
 | **Observaciones para producción** | |
-| **Decisión** | ☐ Aprobado para despliegue masivo &nbsp;&nbsp; ☐ Aprobado por fases &nbsp;&nbsp; ☐ Rechazado |
+| **Decisión** | ☐ Aprobado para despliegue masivo   ·   ☐ Aprobado por fases   ·   ☐ Rechazado |
 | **Nombre del aprobador** | |
 | **Firma y fecha** | |
 

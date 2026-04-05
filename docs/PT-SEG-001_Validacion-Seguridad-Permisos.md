@@ -353,6 +353,8 @@ En `ALLOWED_COMMANDS['cscript']`:
 - Las peticiones POST sin el token CSRF son rechazadas con HTTP 400 o 403.
 - La función `init_security(app)` en `app.py` está activa y configura la validación CSRF.
 
+> **Nota:** La presencia de `init_security(app)` en el código ha sido verificada. La validación funcional de que las peticiones sin token son efectivamente rechazadas está **pendiente de confirmación en el piloto**.
+
 ---
 
 ### PT-SEG-041 — Cookie de sesión con atributos de seguridad
@@ -400,6 +402,8 @@ PERMANENT_SESSION_LIFETIME = 28800  # 8 horas
 
 **Resultado esperado:**
 - La petición con Origin externo es rechazada con HTTP 403.
+
+> **Nota:** La validación de Origin depende de la implementación interna de `init_security(app)`, cuyo detalle completo no ha sido revisado en este ciclo. La validación funcional de este control está **pendiente de confirmación en el piloto**.
 
 ---
 
@@ -465,7 +469,7 @@ PERMANENT_SESSION_LIFETIME = 28800  # 8 horas
 | Bloqueo de inyección de comandos | Implementado | `DANGEROUS_PATTERNS` |
 | Admin-required honesto (no false positive) | Implementado | `REQUIRES_ADMIN` no es `is_error` |
 | Servidor solo en localhost | Implementado | `HOST = '127.0.0.1'` |
-| CSRF en rutas POST | Implementado | `init_security(app)` |
+| CSRF en rutas POST | Implementado (pendiente de validación funcional) | `init_security(app)` |
 | Cookies HttpOnly + SameSite=Strict | Implementado | `Config` |
 | Logs solo en archivo local | Implementado | `RotatingFileHandler` únicamente |
 

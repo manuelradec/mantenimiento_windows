@@ -218,8 +218,9 @@ Este documento cubre las pruebas de integración del Programa de Mantenimiento R
 - Office instalado. Aplicación con Administrador.
 
 **Pasos:**
-1. Hacer POST a `http://127.0.0.1:5000/office/api/inspect` con headers CSRF correctos.
-2. Verificar la respuesta JSON.
+1. Hacer GET a `http://127.0.0.1:5000/office/` y extraer el valor del token CSRF del campo oculto `csrf_token` en el formulario HTML o del header de respuesta.
+2. Hacer POST a `http://127.0.0.1:5000/office/api/inspect` incluyendo el token en el header `X-CSRFToken`.
+3. Verificar la respuesta JSON.
 
 **Resultado esperado:**
 - `status: "success"`.
@@ -242,9 +243,10 @@ Este documento cubre las pruebas de integración del Programa de Mantenimiento R
 - Office instalado. Administrador. Clave válida disponible.
 
 **Pasos:**
-1. Hacer POST a `/office/api/activate` con body `{"key": "XXXXX-XXXXX-XXXXX-XXXXX-YYYYY"}`.
-2. Verificar la respuesta JSON.
-3. Verificar el log de la aplicación.
+1. Hacer GET a `http://127.0.0.1:5000/office/` y extraer el token CSRF del campo oculto `csrf_token` del formulario HTML.
+2. Hacer POST a `/office/api/activate` con body `{"key": "XXXXX-XXXXX-XXXXX-XXXXX-YYYYY"}` e incluyendo el token en el header `X-CSRFToken`.
+3. Verificar la respuesta JSON.
+4. Verificar el log de la aplicación.
 
 **Resultado esperado:**
 - `masked_key` en la respuesta muestra `XXXXX-XXXXX-XXXXX-XXXXX-YYYYY`.
