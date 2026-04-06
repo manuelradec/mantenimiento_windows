@@ -12,7 +12,12 @@
       "Bash(python -m pytest tests/ -q --ignore=tests/test_governance.py --ignore=tests/test_hardening.py)",
       "Bash(python -m pytest tests/test_governance.py tests/test_hardening.py --tb=short)",
       "Bash(python -m pytest tests/test_governance.py tests/test_hardening.py --tb=short -q)",
-      "Bash(python -m pytest tests/test_governance.py tests/test_hardening.py -q --tb=short)"
+      "Bash(python -m pytest tests/test_governance.py tests/test_hardening.py -q --tb=short)",
+      "Bash(python -m flake8 core/ services/ routes/ app.py config.py --count --statistics)",
+      "Bash(python -m flake8 . --max-line-length=120 --extend-ignore=E501)",
+      "Bash(python -m pytest tests/ -q)",
+      "Bash(python -m pytest tests/ --tb=short)",
+      "Bash(python -m pytest tests/test_governance.py -v --no-header)"
     ]
   }
 }

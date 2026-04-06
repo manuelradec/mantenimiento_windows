@@ -347,11 +347,15 @@ async function changeServiceStartup(serviceName, startupType, displayName, btn) 
         });
         const data = await res.json();
 
-        const rawOut = data.output || data.error || '(sin salida)';
-        if (console_) console_.innerHTML = rawOut.replace(/\n/g, '<br>');
-
+        // Set-Service produces no stdout on success; build a meaningful message
+        // instead of falling back to '(sin salida)' for the normal success path.
         const isOk = data.status === 'success' || data.status === 'completed';
-        const msg  = isOk
+        const consoleMsg = isOk
+            ? `Tipo de inicio de "${displayName}" cambiado a ${startupLabel} correctamente.`
+            : `Error al cambiar "${displayName}": ${data.error || data.output || 'desconocido'}`;
+        if (console_) console_.innerHTML = consoleMsg;
+
+        const msg = isOk
             ? `${displayName}: inicio cambiado a ${startupLabel}`
             : `Error al cambiar ${displayName}: ${data.error || data.message || 'desconocido'}`;
 
@@ -493,17 +497,16 @@ async function runCatalogTest(btn) {
         const rawText = data.output || data.error || '(sin salida)';
         if (console_) console_.innerHTML = rawText.replace(/\n/g, '<br>');
 
-        // Determine success from output content
+        // Determine success from output content.
+        // Use regex with \s* to tolerate the variable-width padding that
+        // Test-NetConnection adds between property names and the colon.
         const outLower = (rawText).toLowerCase();
-        const tcpSuccess = outLower.includes('tcptestsucceeded : true');
-        const pingSuccess = outLower.includes('pingsucceeded    : true') ||
-                            outLower.includes('pingsucceeded: true') ||
-                            outLower.includes('pingsucceeded : true');
+        const tcpSuccess  = /tcptestsucceeded\s*:\s*true/.test(outLower);
+        const pingSuccess = /pingsucceeded\s*:\s*true/.test(outLower);
+        const tcpFailed   = /tcptestsucceeded\s*:\s*false/.test(outLower);
+        const pingFailed  = /pingsucceeded\s*:\s*false/.test(outLower);
         const isSuccess = tcpSuccess || (port === null && pingSuccess);
-        const isFailed = outLower.includes('tcptestsucceeded : false') ||
-                         outLower.includes('pingsucceeded    : false') ||
-                         outLower.includes('pingsucceeded: false') ||
-                         data.status === 'error';
+        const isFailed  = tcpFailed || (port === null && pingFailed) || data.status === 'error';
 
         const statusColor = isSuccess ? '#16a34a' : (isFailed ? '#dc2626' : '#ca8a04');
         const statusIcon = isSuccess ? '&#10003;' : (isFailed ? '&#10007;' : '&#63;');
