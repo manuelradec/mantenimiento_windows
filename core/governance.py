@@ -509,6 +509,25 @@ ROLLBACK_STRATEGIES = {
         'needs_reboot': False,
         'restore_point_recommended': False,
     },
+    # startup — registry StartupApproved key or .lnk file rename
+    'startup.disable_item': {
+        'classification': 'manually_reversible',
+        'reversible': 'manual',
+        'instructions': (
+            'Re-enable via the Inicio Automático UI, or manually: '
+            'for registry items restore the StartupApproved binary value to 0x02; '
+            'for folder items rename the .lnk.disabled file back to .lnk.'
+        ),
+        'needs_reboot': False,
+        'restore_point_recommended': False,
+    },
+    'startup.enable_item': {
+        'classification': 'manually_reversible',
+        'reversible': 'manual',
+        'instructions': 'Disable again via the Inicio Automático UI.',
+        'needs_reboot': False,
+        'restore_point_recommended': False,
+    },
 }
 
 

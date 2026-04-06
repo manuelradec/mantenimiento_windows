@@ -17,7 +17,9 @@
       "Bash(python -m flake8 . --max-line-length=120 --extend-ignore=E501)",
       "Bash(python -m pytest tests/ -q)",
       "Bash(python -m pytest tests/ --tb=short)",
-      "Bash(python -m pytest tests/test_governance.py -v --no-header)"
+      "Bash(python -m pytest tests/test_governance.py -v --no-header)",
+      "Bash(python -m flake8 services/startup_tools.py routes/startup.py core/action_registry.py core/governance.py routes/__init__.py --max-line-length=120 --extend-ignore=E501)",
+      "Bash(python -m pytest tests/test_governance.py -q --no-header)"
     ]
   }
 }
