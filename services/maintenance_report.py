@@ -515,7 +515,8 @@ def generate_fo_ti_19_html(system_info, steps, session_data,
                            maint_type='preventivo', model_override='',
                            tech_address='', tech_phone='', tech_email='',
                            operator_name='', op_address='', op_phone='', op_email='',
-                           accessories_override='', drive_overrides=None):
+                           accessories_override='', drive_overrides=None,
+                           office_license=None):
     """
     Generate FO-TI-19 Hoja de Servicio Mantenimiento de Equipo de Cómputo.
     Matches the official RADEC format with all fields.
@@ -619,6 +620,9 @@ def generate_fo_ti_19_html(system_info, steps, session_data,
     upgrades = system_info.get('upgrade_opportunities', {})
     cpu_obs = _check_cpu_obsolescence(system_info.get('processor', ''))
     mejoras_html = _build_mejoras_section(upgrades, cpu_obsolescence=cpu_obs)
+
+    # Office license block (from session inspection result)
+    office_html = _build_office_license_section(office_license)
 
     html = f'''<!DOCTYPE html>
 <html lang="es">
@@ -872,6 +876,9 @@ def generate_fo_ti_19_html(system_info, steps, session_data,
     <!-- MEJORAS Section -->
     {mejoras_html}
 
+    <!-- LICENCIA OFFICE Section -->
+    {office_html}
+
 </div>
 
 <div class="footer-version">
@@ -1040,8 +1047,8 @@ def _check_cpu_obsolescence(processor_str):
     # Intel Core iX with explicit model number: iN-DDDD[suffix]
     m = re.search(r'CORE\s+(I[3579])-(\d{4,5})', p)
     if m:
-        family    = m.group(1)                              # 'I3', 'I5', 'I7', 'I9'
-        fdisp     = family[0].lower() + family[1:]          # 'i3', 'i5', 'i7', 'i9'
+        family = m.group(1)                              # 'I3', 'I5', 'I7', 'I9'
+        fdisp = family[0].lower() + family[1:]          # 'i3', 'i5', 'i7', 'i9'
         model_num = m.group(2)
 
         if len(model_num) == 5:
@@ -1064,8 +1071,8 @@ def _check_cpu_obsolescence(processor_str):
                 # i3 5th gen is below the threshold (i5 5th gen)
                 obsolete = True
                 reason = (
-                    f'Core i3 de 5\u00aa generaci\u00f3n no alcanza el umbral m\u00ednimo. '
-                    f'Se requiere Core i5 de 5\u00aa generaci\u00f3n o superior.'
+                    'Core i3 de 5\u00aa generaci\u00f3n no alcanza el umbral m\u00ednimo. '
+                    'Se requiere Core i5 de 5\u00aa generaci\u00f3n o superior.'
                 )
             else:
                 # i5/i7/i9 on 5th gen — at or above threshold
@@ -1095,7 +1102,7 @@ def _check_cpu_obsolescence(processor_str):
     m1g = re.search(r'\b(I[3579])\s+CPU\s+(?:[A-Z]\s+)?\d{3}\b', p)
     if m1g:
         family = m1g.group(1)                        # 'I3', 'I5', 'I7'
-        fdisp  = family[0].lower() + family[1:]      # 'i3', 'i5', 'i7'
+        fdisp = family[0].lower() + family[1:]      # 'i3', 'i5', 'i7'
         return {
             'generation': 1, 'family': family, 'obsolete': True,
             'label': f'Intel Core {fdisp} \u2014 Generaci\u00f3n 1',
@@ -1143,6 +1150,125 @@ def _check_cpu_obsolescence(processor_str):
         'label': 'Procesador no reconocido',
         'reason': 'Familia de procesador no reconocida. Revisi\u00f3n manual requerida.',
     }
+
+
+def _build_office_license_section(office_license):
+    """
+    Build the Office License HTML section for FO-TI-19.
+
+    Reads only safe, pre-masked fields from the session inspection result:
+      - product_name, license_status, partial_key (last-5 only), inspected_at
+    The full product key is never stored in the session and is never shown here.
+
+    Returns '' (empty string, section omitted) only when office_license is None.
+    When it is a dict but fields are missing, the section still renders with
+    whatever partial data is available and clearly flags missing fields.
+    """
+    from html import escape as he
+
+    # Always render the section so the technician can see whether inspection ran.
+    # Fallback block when no inspection was performed this session.
+    if not office_license or not isinstance(office_license, dict):
+        return '''
+<div class="section-title">LICENCIA OFFICE</div>
+<div class="row">
+    <div class="cell cell-value" style="color:#888;font-style:italic;padding:8px 10px;">
+        Licencia Office: No inspeccionada en esta sesi&oacute;n.
+        Ejecute &ldquo;Inspeccionar licencia&rdquo; en la secci&oacute;n Office
+        y regenere el reporte.
+    </div>
+</div>'''
+
+    # Extract safe fields defensively — all defaults to '' if absent or None
+    parsed = office_license.get('parsed', {}) or {}
+    product_name = he(str(parsed.get('product_name', '') or ''))
+    license_status = he(str(parsed.get('license_status', '') or ''))
+    partial_key = he(str(parsed.get('partial_key', '') or ''))
+    inspected_at_raw = str(office_license.get('inspected_at', '') or '')
+    status = str(office_license.get('status', '') or '')
+    message = he(str(office_license.get('message', '') or ''))
+
+    # Format inspected_at for display (ISO → readable, best-effort)
+    if inspected_at_raw:
+        try:
+            from datetime import datetime as _dt
+            _ts = _dt.fromisoformat(inspected_at_raw)
+            inspected_at = _ts.strftime('%d/%m/%Y %H:%M')
+        except (ValueError, TypeError):
+            inspected_at = he(inspected_at_raw[:16])
+    else:
+        inspected_at = ''
+
+    # Status badge color
+    _status_colors = {
+        'success': '#006600',
+        'requires_admin': '#CC6600',
+        'ospp_not_found': '#888888',
+        'office_not_found': '#888888',
+        'error': '#CC0000',
+    }
+    status_color = _status_colors.get(status, '#333333')
+
+    # Build display rows — only show rows that have data
+    rows = []
+
+    if product_name:
+        rows.append(
+            f'<div class="row">'
+            f'<div class="cell cell-label" style="min-width:160px;">Producto:</div>'
+            f'<div class="cell cell-value">{product_name}</div>'
+            f'</div>'
+        )
+
+    if license_status:
+        rows.append(
+            f'<div class="row">'
+            f'<div class="cell cell-label" style="min-width:160px;">Estado de licencia:</div>'
+            f'<div class="cell cell-value" style="color:{status_color};font-weight:bold;">'
+            f'{license_status}</div>'
+            f'</div>'
+        )
+
+    if partial_key:
+        rows.append(
+            f'<div class="row">'
+            f'<div class="cell cell-label" style="min-width:160px;">'
+            f'&Uacute;ltimos 5 caracteres:</div>'
+            f'<div class="cell cell-value" style="font-family:monospace;">'
+            f'XXXXX-XXXXX-XXXXX-XXXXX-{partial_key}</div>'
+            f'</div>'
+        )
+
+    if inspected_at:
+        rows.append(
+            f'<div class="row">'
+            f'<div class="cell cell-label" style="min-width:160px;">Inspeccionado:</div>'
+            f'<div class="cell cell-value" style="color:#555;font-size:10px;">'
+            f'{inspected_at}</div>'
+            f'</div>'
+        )
+
+    # When ospp ran but produced no parsed fields, show the summary message
+    if not rows and message:
+        rows.append(
+            f'<div class="row">'
+            f'<div class="cell cell-value" style="color:{status_color};padding:8px 10px;">'
+            f'{message}</div>'
+            f'</div>'
+        )
+
+    if not rows:
+        rows.append(
+            '<div class="row">'
+            '<div class="cell cell-value" style="color:#888;font-style:italic;padding:8px 10px;">'
+            'Sin datos de licencia disponibles.</div>'
+            '</div>'
+        )
+
+    return (
+        '<div class="section-title">LICENCIA OFFICE</div>\n'
+        + '\n'.join(rows)
+    )
 
 
 def _build_mejoras_section(upgrades, cpu_obsolescence=None):
