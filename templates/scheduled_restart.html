@@ -4,35 +4,53 @@
 {% block page_desc %}Administrar tarea de reinicio automático del sistema{% endblock %}
 
 {% block content %}
-<!-- Current Task Status -->
-<div class="section-card" id="task-status-card">
-    <div class="section-header">
-        <h3>Estado actual</h3>
-        <button class="btn btn-outline btn-sm" onclick="checkStatus()">Actualizar</button>
+
+<!-- Uptime Widget -->
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header">
+        <h3>Tiempo de actividad</h3>
+        <button class="btn btn-sm btn-outline" onclick="loadUptime()">Actualizar</button>
     </div>
-    <div id="task-status" style="padding:16px;">
-        <span class="spinner-dark"></span> Verificando...
+    <div class="card-body" id="uptime-area" style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;min-height:56px;">
+        <span style="color:var(--text-muted);font-size:13px;">Consultando&hellip;</span>
     </div>
 </div>
 
-<!-- Create/Update Form -->
-<div class="section-card">
-    <div class="section-header">
-        <h3 id="form-title">Programar reinicio</h3>
+<!-- Current Task Status -->
+<div class="card" id="task-status-card" style="margin-bottom:20px;">
+    <div class="card-header">
+        <h3>Estado de tarea programada</h3>
+        <button class="btn btn-sm btn-outline" onclick="checkStatus()">Actualizar</button>
     </div>
-    <div style="padding:16px;">
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:16px;">
+    <div id="task-status" style="padding:16px;">
+        <span style="color:var(--text-muted);font-size:13px;">Verificando&hellip;</span>
+    </div>
+</div>
+
+<!-- Normal Restart Form -->
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header">
+        <h3 id="form-title">Programar reinicio con aviso</h3>
+        <span class="badge badge-safe">Seguro</span>
+    </div>
+    <div class="card-body">
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">
+            El sistema mostrará un aviso al usuario con el período de gracia seleccionado
+            antes de reiniciar. Las aplicaciones tendrán tiempo de cerrarse.
+        </p>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:16px;">
             <div>
                 <label style="display:block;font-size:13px;margin-bottom:4px;font-weight:600;">Fecha</label>
-                <input type="date" id="restart-date" class="form-input" style="width:100%;">
+                <input type="date" id="restart-date" class="form-input" style="width:100%;box-sizing:border-box;">
             </div>
             <div>
                 <label style="display:block;font-size:13px;margin-bottom:4px;font-weight:600;">Hora (24h)</label>
-                <input type="time" id="restart-time" class="form-input" style="width:100%;">
+                <input type="time" id="restart-time" class="form-input" style="width:100%;box-sizing:border-box;">
             </div>
             <div>
                 <label style="display:block;font-size:13px;margin-bottom:4px;font-weight:600;">Recurrencia</label>
-                <select id="restart-recurrence" class="form-select" style="width:100%;">
+                <select id="restart-recurrence" class="form-select" style="width:100%;box-sizing:border-box;">
                     <option value="Once">Una vez</option>
                     <option value="Daily">Diario</option>
                     <option value="Weekly">Semanal</option>
@@ -40,119 +58,393 @@
                 </select>
             </div>
         </div>
-        <div style="display:flex;gap:10px;">
-            <button class="btn btn-primary" id="save-btn" onclick="saveTask()">Guardar tarea</button>
-            <button class="btn btn-danger" id="delete-btn" onclick="deleteTask()" style="display:none;">Eliminar tarea</button>
+
+        <!-- Grace period selector -->
+        <div style="margin-bottom:20px;">
+            <label style="display:block;font-size:13px;margin-bottom:8px;font-weight:600;">
+                Período de gracia (aviso al usuario antes del reinicio)
+            </label>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;" id="grace-selector">
+                <label class="grace-option" data-value="1">
+                    <input type="radio" name="grace_period" value="1"> 1 min
+                </label>
+                <label class="grace-option" data-value="5">
+                    <input type="radio" name="grace_period" value="5" checked> 5 min
+                </label>
+                <label class="grace-option" data-value="15">
+                    <input type="radio" name="grace_period" value="15"> 15 min
+                </label>
+                <label class="grace-option" data-value="30">
+                    <input type="radio" name="grace_period" value="30"> 30 min
+                </label>
+                <label class="grace-option" data-value="60">
+                    <input type="radio" name="grace_period" value="60"> 60 min
+                </label>
+            </div>
+            <p id="grace-desc" style="font-size:12px;color:var(--text-muted);margin-top:8px;">
+                Windows mostrará una notificación al usuario 5 minutos antes del reinicio.
+            </p>
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn btn-primary" id="save-btn" onclick="saveTask()">
+                Programar reinicio con aviso
+            </button>
+            <button class="btn btn-danger" id="delete-btn" onclick="deleteTask()" style="display:none;">
+                Eliminar tarea programada
+            </button>
         </div>
     </div>
 </div>
 
-<!-- Output Console -->
-<div class="section-card">
-    <div class="section-header"><h3>Consola de salida</h3></div>
-    <pre class="console" id="output-console" style="min-height:80px;max-height:200px;overflow-y:auto;"></pre>
+<!-- Forced Restart Section — visually distinct, red border -->
+<div class="card" style="margin-bottom:20px;border:2px solid #dc2626;">
+    <div class="card-header" style="background:rgba(220,38,38,0.07);border-bottom:1px solid #dc2626;">
+        <h3 style="color:#dc2626;">&#9888; Reinicio Forzado (sin aviso)</h3>
+        <span class="badge badge-danger">Riesgo</span>
+    </div>
+    <div class="card-body">
+        <div style="background:rgba(220,38,38,0.07);border:1px solid #dc2626;border-radius:6px;
+                    padding:12px 16px;margin-bottom:16px;">
+            <strong style="color:#dc2626;">ADVERTENCIA:</strong>
+            <span style="font-size:13px;">
+                El reinicio forzado cierra <em>todos</em> los programas inmediatamente,
+                sin mostrar ningún aviso al usuario. Se perderán todos los cambios no guardados.
+                Use esta opción <strong>únicamente si el equipo no está en uso</strong>.
+            </span>
+        </div>
+
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">
+            Usa la misma fecha, hora y recurrencia configuradas en el formulario de arriba.
+        </p>
+
+        <!-- Checkbox lock — must be checked to enable the force button -->
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;
+                      font-size:13px;margin-bottom:16px;user-select:none;">
+            <input type="checkbox" id="force-confirm-check"
+                   onchange="toggleForceBtn()"
+                   style="margin-top:2px;width:16px;height:16px;cursor:pointer;flex-shrink:0;">
+            <span>
+                Confirmo que el equipo <strong>NO está en uso</strong> en este momento
+                y acepto que todos los programas serán cerrados sin guardar al momento del reinicio.
+            </span>
+        </label>
+
+        <button class="btn btn-danger" id="force-btn"
+                onclick="saveForceTask()"
+                disabled
+                style="opacity:0.5;cursor:not-allowed;">
+            Programar reinicio FORZADO
+        </button>
+    </div>
 </div>
+
+<!-- Output Console -->
+<div class="card">
+    <div class="card-header">
+        <h3>Salida</h3>
+        <button class="btn btn-sm btn-outline"
+                onclick="document.getElementById('output-console').innerHTML='Listo.'">
+            Limpiar
+        </button>
+    </div>
+    <div class="card-body" style="padding:0;">
+        <pre class="console" id="output-console"
+             style="min-height:80px;max-height:220px;overflow-y:auto;margin:0;
+                    border-radius:0 0 8px 8px;padding:12px 16px;">Listo.</pre>
+    </div>
+</div>
+
+<style>
+.grace-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: background 0.15s, border-color 0.15s;
+    user-select: none;
+}
+.grace-option:has(input:checked) {
+    background: var(--primary, #2563eb);
+    border-color: var(--primary, #2563eb);
+    color: #fff;
+}
+.grace-option input[type="radio"] {
+    display: none;
+}
+</style>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
+// ── Uptime ─────────────────────────────────────────────────────────────────
+
+async function loadUptime() {
+    const area = document.getElementById('uptime-area');
+    area.innerHTML = '<span style="color:var(--text-muted);font-size:13px;">Consultando&hellip;</span>';
+    try {
+        const res  = await fetch('/scheduled-restart/api/uptime');
+        const data = await res.json();
+        if (data.status === 'success' && data.days !== null) {
+            area.innerHTML = `
+                <div style="display:flex;gap:24px;flex-wrap:wrap;">
+                    <div>
+                        <div style="font-size:11px;color:var(--text-muted);font-weight:600;
+                                    text-transform:uppercase;letter-spacing:.5px;">Tiempo activo</div>
+                        <div style="font-size:22px;font-weight:700;">
+                            ${data.days}<span style="font-size:13px;font-weight:400;margin-left:3px;">d</span>
+                            ${data.hours}<span style="font-size:13px;font-weight:400;margin-left:3px;">h</span>
+                            ${data.minutes}<span style="font-size:13px;font-weight:400;margin-left:3px;">min</span>
+                        </div>
+                    </div>
+                    <div>
+                        <div style="font-size:11px;color:var(--text-muted);font-weight:600;
+                                    text-transform:uppercase;letter-spacing:.5px;">Último arranque</div>
+                        <div style="font-size:16px;font-weight:600;font-family:monospace;">
+                            ${escapeHtml(data.boot_time)}
+                        </div>
+                    </div>
+                    ${data.days >= 7 ? `
+                    <div style="align-self:center;">
+                        <span style="background:#f59e0b;color:#fff;font-size:11px;font-weight:700;
+                                     padding:4px 10px;border-radius:12px;">
+                            &#9888; ${data.days} días sin reiniciar
+                        </span>
+                    </div>` : ''}
+                </div>`;
+        } else {
+            area.innerHTML = '<span style="color:#888;font-size:13px;">No se pudo leer el tiempo de actividad.</span>';
+        }
+    } catch (e) {
+        area.innerHTML = `<span style="color:#c00;font-size:13px;">Error: ${escapeHtml(e.message)}</span>`;
+    }
+}
+
+// ── Task Status ────────────────────────────────────────────────────────────
+
 async function checkStatus() {
     const statusDiv = document.getElementById('task-status');
     const deleteBtn = document.getElementById('delete-btn');
     const formTitle = document.getElementById('form-title');
-    statusDiv.innerHTML = '<span class="spinner-dark"></span> Verificando...';
+    statusDiv.innerHTML = '<span style="color:var(--text-muted);font-size:13px;">Verificando&hellip;</span>';
 
     try {
-        const response = await fetch('/scheduled-restart/api/status');
-        const data = await response.json();
+        const res  = await fetch('/scheduled-restart/api/status');
+        const data = await res.json();
 
         if (data.exists) {
+            const isForced = (data.description || '').includes('[FORZADO]');
+            const forceBadge = isForced
+                ? '<span style="background:#dc2626;color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:8px;">FORZADO</span>'
+                : '<span style="background:#16a34a;color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:8px;">CON AVISO</span>';
             statusDiv.innerHTML = `
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;">
-                    <div class="stat-box"><div class="stat-label">Estado</div><div class="stat-value" style="font-size:16px;">${escapeHtml(data.state || 'Desconocido')}</div></div>
-                    <div class="stat-box"><div class="stat-label">Próxima ejecución</div><div class="stat-value" style="font-size:16px;">${escapeHtml(data.nextRun || 'N/A')}</div></div>
-                </div>
-            `;
+                    <div>
+                        <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;">Estado</div>
+                        <div style="font-size:16px;font-weight:700;">
+                            ${escapeHtml(data.state || 'Desconocido')}${forceBadge}
+                        </div>
+                    </div>
+                    <div>
+                        <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;">Próxima ejecución</div>
+                        <div style="font-size:16px;font-weight:700;">${escapeHtml(data.nextRun || 'N/A')}</div>
+                    </div>
+                </div>`;
             deleteBtn.style.display = 'inline-block';
-            formTitle.textContent = 'Modificar reinicio programado';
+            formTitle.textContent   = 'Modificar reinicio programado (con aviso)';
         } else {
-            statusDiv.innerHTML = '<div style="opacity:0.7;">No hay tarea de reinicio programada. Cree una a continuación.</div>';
+            statusDiv.innerHTML = '<div style="color:var(--text-muted);font-size:13px;">No hay tarea de reinicio programada.</div>';
             deleteBtn.style.display = 'none';
-            formTitle.textContent = 'Programar reinicio';
+            formTitle.textContent   = 'Programar reinicio con aviso';
         }
     } catch (e) {
-        statusDiv.innerHTML = `<div style="color:var(--color-danger);">Error: ${escapeHtml(e.message)}</div>`;
+        statusDiv.innerHTML = `<div style="color:#c00;font-size:13px;">Error: ${escapeHtml(e.message)}</div>`;
     }
 }
 
+// ── Grace period UI ────────────────────────────────────────────────────────
+
+const _graceDesc = {
+    1:  'Windows mostrará una notificación al usuario 1 minuto antes del reinicio.',
+    5:  'Windows mostrará una notificación al usuario 5 minutos antes del reinicio.',
+    15: 'Windows mostrará una notificación al usuario 15 minutos antes del reinicio.',
+    30: 'Windows mostrará una notificación al usuario 30 minutos antes del reinicio.',
+    60: 'Windows mostrará una notificación al usuario 60 minutos antes del reinicio.',
+};
+
+document.getElementById('grace-selector').addEventListener('change', (e) => {
+    if (e.target.name === 'grace_period') {
+        document.getElementById('grace-desc').textContent = _graceDesc[parseInt(e.target.value)] || '';
+    }
+});
+
+function getGracePeriod() {
+    const checked = document.querySelector('input[name="grace_period"]:checked');
+    return checked ? parseInt(checked.value, 10) : 5;
+}
+
+// ── Normal restart ─────────────────────────────────────────────────────────
+
 async function saveTask() {
-    const date = document.getElementById('restart-date').value;
-    const time = document.getElementById('restart-time').value;
+    const date       = document.getElementById('restart-date').value;
+    const time       = document.getElementById('restart-time').value;
     const recurrence = document.getElementById('restart-recurrence').value;
+    const grace      = getGracePeriod();
 
     if (!date || !time) {
-        displayResult({status: 'error', error: 'Debe especificar fecha y hora.'});
+        if (typeof showToast === 'function') showToast('Debe especificar fecha y hora.', 'warning');
         return;
     }
 
-    const btn = document.getElementById('save-btn');
-    btn.disabled = true;
-    btn.textContent = 'Guardando...';
-
-    try {
-        const response = await fetch('/scheduled-restart/api/create', {
-            method: 'POST',
-            headers: getDefaultHeaders(),
-            body: JSON.stringify({date, time, recurrence}),
-        });
-        const data = await response.json();
-
-        if (data.status === 'success') {
-            displayResult({status: 'success', output: data.message});
-            checkStatus();
-        } else {
-            displayResult({status: 'error', error: data.error});
-        }
-    } catch (e) {
-        displayResult({status: 'error', error: e.message});
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'Guardar tarea';
-    }
-}
-
-async function deleteTask() {
-    const confirmed = await showConfirm(
-        'Eliminar reinicio programado',
-        '¿Está seguro de que desea eliminar la tarea de reinicio programado?',
-        'danger'
+    const graceLabel = grace === 1 ? '1 minuto' : `${grace} minutos`;
+    const confirmed  = confirm(
+        `¿Programar reinicio con aviso de ${graceLabel}?\n\n` +
+        `Fecha/hora: ${date} ${time}  |  Recurrencia: ${recurrence}\n\n` +
+        `El sistema mostrará un aviso al usuario ${graceLabel} antes de reiniciar.`
     );
     if (!confirmed) return;
 
-    try {
-        const response = await fetch('/scheduled-restart/api/delete', {
-            method: 'POST',
-            headers: getDefaultHeaders(),
-        });
-        const data = await response.json();
+    const btn = document.getElementById('save-btn');
+    btn.disabled    = true;
+    btn.textContent = 'Guardando…';
 
+    try {
+        const res  = await fetch('/scheduled-restart/api/create', {
+            method:  'POST',
+            headers: {'Content-Type': 'application/json'},
+            body:    JSON.stringify({ date, time, recurrence, grace_period: grace, force: false }),
+        });
+        const data = await res.json();
+
+        const console_ = document.getElementById('output-console');
         if (data.status === 'success') {
-            displayResult({status: 'success', output: data.message});
+            if (console_) console_.textContent = data.message;
+            if (typeof showToast === 'function') showToast(data.message, 'success');
             checkStatus();
         } else {
-            displayResult({status: 'error', error: data.error});
+            if (console_) console_.textContent = 'Error: ' + (data.error || 'desconocido');
+            if (typeof showToast === 'function') showToast(data.error || 'Error al programar', 'error');
         }
     } catch (e) {
-        displayResult({status: 'error', error: e.message});
+        document.getElementById('output-console').textContent = 'Error: ' + e.message;
+        if (typeof showToast === 'function') showToast('Error de comunicación', 'error');
+    } finally {
+        btn.disabled    = false;
+        btn.textContent = 'Programar reinicio con aviso';
     }
 }
 
+// ── Forced restart ─────────────────────────────────────────────────────────
+
+function toggleForceBtn() {
+    const check = document.getElementById('force-confirm-check');
+    const btn   = document.getElementById('force-btn');
+    btn.disabled = !check.checked;
+    btn.style.opacity = check.checked ? '1' : '0.5';
+    btn.style.cursor  = check.checked ? 'pointer' : 'not-allowed';
+}
+
+async function saveForceTask() {
+    const check = document.getElementById('force-confirm-check');
+    if (!check.checked) return;
+
+    const date       = document.getElementById('restart-date').value;
+    const time       = document.getElementById('restart-time').value;
+    const recurrence = document.getElementById('restart-recurrence').value;
+
+    if (!date || !time) {
+        if (typeof showToast === 'function') showToast('Especifique fecha y hora en el formulario de arriba.', 'warning');
+        return;
+    }
+
+    // Second explicit confirmation — distinct wording, different from the normal path
+    const confirmed = confirm(
+        '⚠ ADVERTENCIA — REINICIO FORZADO\n\n' +
+        `Fecha/hora: ${date} ${time}  |  Recurrencia: ${recurrence}\n\n` +
+        'Todos los programas serán cerrados INMEDIATAMENTE sin ningún aviso.\n' +
+        'Se perderán todos los cambios no guardados.\n\n' +
+        '¿Confirma que el equipo NO está en uso y desea continuar?'
+    );
+    if (!confirmed) return;
+
+    const btn = document.getElementById('force-btn');
+    btn.disabled    = true;
+    btn.textContent = 'Programando reinicio forzado…';
+
+    try {
+        const res  = await fetch('/scheduled-restart/api/create', {
+            method:  'POST',
+            headers: {'Content-Type': 'application/json'},
+            body:    JSON.stringify({
+                date, time, recurrence,
+                force: true, force_confirmed: true,
+            }),
+        });
+        const data = await res.json();
+
+        const console_ = document.getElementById('output-console');
+        if (data.status === 'success') {
+            if (console_) console_.textContent = data.message;
+            if (typeof showToast === 'function') showToast(data.message, 'warning');
+            // Uncheck the lock after scheduling so the technician must re-confirm next time
+            check.checked = false;
+            toggleForceBtn();
+            checkStatus();
+        } else {
+            if (console_) console_.textContent = 'Error: ' + (data.error || 'desconocido');
+            if (typeof showToast === 'function') showToast(data.error || 'Error al programar', 'error');
+        }
+    } catch (e) {
+        document.getElementById('output-console').textContent = 'Error: ' + e.message;
+        if (typeof showToast === 'function') showToast('Error de comunicación', 'error');
+    } finally {
+        btn.disabled    = false;
+        btn.textContent = 'Programar reinicio FORZADO';
+    }
+}
+
+// ── Delete ─────────────────────────────────────────────────────────────────
+
+async function deleteTask() {
+    const confirmed = confirm('¿Eliminar la tarea de reinicio programado?');
+    if (!confirmed) return;
+
+    try {
+        const res  = await fetch('/scheduled-restart/api/delete', {
+            method:  'POST',
+            headers: {'Content-Type': 'application/json'},
+        });
+        const data = await res.json();
+
+        const console_ = document.getElementById('output-console');
+        if (data.status === 'success') {
+            if (console_) console_.textContent = data.message;
+            if (typeof showToast === 'function') showToast(data.message, 'success');
+            checkStatus();
+        } else {
+            if (console_) console_.textContent = 'Error: ' + (data.error || 'desconocido');
+            if (typeof showToast === 'function') showToast(data.error || 'Error al eliminar', 'error');
+        }
+    } catch (e) {
+        document.getElementById('output-console').textContent = 'Error: ' + e.message;
+        if (typeof showToast === 'function') showToast('Error de comunicación', 'error');
+    }
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+
 document.addEventListener('DOMContentLoaded', () => {
-    checkStatus();
-    // Set default date to today
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('restart-date').value = today;
-    document.getElementById('restart-date').min = today;
+    document.getElementById('restart-date').min   = today;
+    loadUptime();
+    checkStatus();
 });
 </script>
 {% endblock %}

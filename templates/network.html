@@ -84,9 +84,9 @@
                 <div class="action-item">
                     <div class="action-info">
                         <div class="action-name">Prueba de conectividad</div>
-                        <div class="action-desc">Probar conexión a 8.8.8.8:443</div>
+                        <div class="action-desc">Probar conexión a 8.8.8.8 (DNS Google)</div>
                     </div>
-                    <button class="btn btn-sm btn-primary" onclick="executeAction('/network/api/test-connectivity', this, {body: {host: '8.8.8.8', port: 443}})">Probar</button>
+                    <button class="btn btn-sm btn-primary" onclick="executeAction('/network/api/test-connectivity', this, {body: {host: '8.8.8.8', port: 53}})">Probar</button>
                 </div>
             </div>
 
@@ -143,6 +143,96 @@
     </div>
 </div>
 
+<!-- Managed Services -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h3>Servicios de Red</h3>
+        <div style="display:flex;gap:8px;align-items:center;">
+            <span class="badge badge-admin">Admin</span>
+            <button class="btn btn-sm btn-outline" onclick="loadManagedServices()">Actualizar</button>
+        </div>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        <div id="services-loading" style="padding:14px;color:var(--text-muted);font-size:13px;">
+            Cargando estado de servicios&hellip;
+        </div>
+        <table id="services-table" style="display:none;width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+                <tr style="background:var(--bg-secondary);border-bottom:2px solid var(--border);">
+                    <th style="padding:10px 14px;text-align:left;font-weight:600;">Servicio</th>
+                    <th style="padding:10px 14px;text-align:center;font-weight:600;width:110px;">Estado</th>
+                    <th style="padding:10px 14px;text-align:center;font-weight:600;width:110px;">Inicio</th>
+                    <th style="padding:10px 14px;text-align:center;font-weight:600;width:200px;">Acción</th>
+                </tr>
+            </thead>
+            <tbody id="services-body"></tbody>
+        </table>
+        <div id="services-error" style="display:none;padding:14px;color:#c00;font-size:13px;"></div>
+    </div>
+</div>
+
+<!-- RADEC Connectivity Catalog -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h3>Prueba de Conectividad RADEC</h3>
+        <span class="badge badge-safe">Solo lectura</span>
+    </div>
+    <div class="card-body">
+        <div class="grid grid-2" style="gap: 16px; align-items: start;">
+
+            <!-- Target list -->
+            <div>
+                <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">
+                    Seleccione un destino para probar su conectividad.
+                </p>
+                <div id="catalog-list"
+                     style="max-height:320px;overflow-y:auto;border:1px solid var(--border);
+                            border-radius:6px;background:var(--bg-secondary);">
+                    <div style="padding:10px;color:var(--text-muted);font-size:12px;">
+                        Cargando catálogo&hellip;
+                    </div>
+                </div>
+            </div>
+
+            <!-- Test controls -->
+            <div style="display:flex;flex-direction:column;gap:12px;">
+                <div>
+                    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">
+                        Destino seleccionado
+                    </label>
+                    <input id="catalog-host" type="text" readonly
+                           placeholder="Haz clic en un destino de la lista"
+                           style="width:100%;padding:7px 10px;border:1px solid var(--border);
+                                  border-radius:5px;background:var(--bg-secondary);
+                                  color:var(--text-primary);font-size:13px;box-sizing:border-box;">
+                </div>
+                <div>
+                    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">
+                        Puerto TCP (opcional &mdash; vacío = prueba ICMP/ping)
+                    </label>
+                    <input id="catalog-port" type="number" min="1" max="65535"
+                           placeholder="Ej: 443, 25, 80 — dejar vacío para ping"
+                           style="width:100%;padding:7px 10px;border:1px solid var(--border);
+                                  border-radius:5px;background:var(--bg);
+                                  color:var(--text-primary);font-size:13px;box-sizing:border-box;">
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <button id="catalog-btn" class="btn btn-primary"
+                            onclick="runCatalogTest(this)"
+                            disabled style="flex:1;">
+                        Probar conectividad
+                    </button>
+                    <button class="btn btn-outline" onclick="clearCatalogSelection()">
+                        Limpiar
+                    </button>
+                </div>
+                <div id="catalog-status" style="font-size:12px;color:var(--text-muted);
+                                                min-height:18px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="card">
     <div class="card-header">
         <h3>Salida</h3>
@@ -153,4 +243,319 @@
         <div id="output-console" class="console" style="min-height: 150px;">Listo.</div>
     </div>
 </div>
+
+<script>
+// ── Managed Services ───────────────────────────────────────────────────────
+
+async function loadManagedServices() {
+    const loading = document.getElementById('services-loading');
+    const table   = document.getElementById('services-table');
+    const errDiv  = document.getElementById('services-error');
+    const tbody   = document.getElementById('services-body');
+
+    if (loading) loading.style.display = 'block';
+    if (table)   table.style.display   = 'none';
+    if (errDiv)  errDiv.style.display  = 'none';
+
+    try {
+        const res  = await fetch('/network/api/managed-services');
+        const data = await res.json();
+
+        if (data.status === 'error' && (!data.services || !data.services.length)) {
+            if (errDiv) { errDiv.textContent = data.message || 'Error al cargar servicios.'; errDiv.style.display = 'block'; }
+            if (loading) loading.style.display = 'none';
+            return;
+        }
+
+        if (tbody) tbody.innerHTML = (data.services || []).map(renderServiceRow).join('');
+        if (loading) loading.style.display = 'none';
+        if (table)   table.style.display   = 'table';
+    } catch (e) {
+        if (errDiv) { errDiv.textContent = 'Error de comunicación al cargar servicios.'; errDiv.style.display = 'block'; }
+        if (loading) loading.style.display = 'none';
+    }
+}
+
+function renderServiceRow(svc) {
+    if (!svc.exists) {
+        const note = svc.deprecated_note
+            ? `<br><span style="font-size:10px;color:#888;">${svc.deprecated_note}</span>`
+            : '';
+        return `<tr style="border-bottom:1px solid var(--border);opacity:0.6;">
+            <td style="padding:10px 14px;">${svc.display_name}${note}</td>
+            <td style="padding:10px 14px;text-align:center;">
+                <span class="badge" style="background:#888;color:#fff;font-size:10px;">No disponible</span>
+            </td>
+            <td style="padding:10px 14px;text-align:center;">—</td>
+            <td style="padding:10px 14px;text-align:center;">—</td>
+        </tr>`;
+    }
+
+    const stateColor = svc.state === 'Running' ? '#16a34a' : '#6b7280';
+    const stateLabel = svc.state === 'Running' ? 'Activo' : (svc.state || 'Detenido');
+
+    // StartMode: 'Auto' → 'Automático', 'Manual' → 'Manual', 'Disabled' → 'Desactivado'
+    const modeMap = { 'Auto': 'Automático', 'Manual': 'Manual', 'Disabled': 'Desactivado' };
+    const modeLabel = modeMap[svc.start_mode] || svc.start_mode || '—';
+    const modeColor = svc.start_mode === 'Auto' ? '#2563eb' : '#6b7280';
+
+    // Action button: only Manual ↔ Auto toggling; no action for Disabled
+    let actionHtml = '—';
+    if (svc.start_mode === 'Auto') {
+        actionHtml = `<button class="btn btn-sm btn-warning"
+            onclick="changeServiceStartup('${svc.name}', 'Manual', '${svc.display_name}', this)">
+            → Manual</button>`;
+    } else if (svc.start_mode === 'Manual') {
+        actionHtml = `<button class="btn btn-sm btn-primary"
+            onclick="changeServiceStartup('${svc.name}', 'Automatic', '${svc.display_name}', this)">
+            → Automático</button>`;
+    }
+
+    return `<tr style="border-bottom:1px solid var(--border);" id="svc-row-${svc.name}">
+        <td style="padding:10px 14px;font-weight:500;">${svc.display_name}
+            <br><span style="font-size:10px;color:var(--text-muted);font-family:monospace;">${svc.name}</span>
+        </td>
+        <td style="padding:10px 14px;text-align:center;">
+            <span style="color:${stateColor};font-weight:600;">${stateLabel}</span>
+        </td>
+        <td style="padding:10px 14px;text-align:center;">
+            <span style="color:${modeColor};font-weight:600;">${modeLabel}</span>
+        </td>
+        <td style="padding:10px 14px;text-align:center;">${actionHtml}</td>
+    </tr>`;
+}
+
+async function changeServiceStartup(serviceName, startupType, displayName, btn) {
+    const startupLabel = startupType === 'Automatic' ? 'Automático' : 'Manual';
+    const confirmed = confirm(
+        `¿Cambiar el inicio de "${displayName}" a ${startupLabel}?\n\n` +
+        `Esto puede afectar la disponibilidad de recursos de red compartidos.`
+    );
+    if (!confirmed) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Aplicando…';
+
+    const console_ = document.getElementById('output-console');
+    if (console_) console_.innerHTML = `Cambiando tipo de inicio de ${displayName} a ${startupLabel}…`;
+
+    try {
+        const res = await fetch('/network/api/set-service-startup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ service_name: serviceName, startup_type: startupType }),
+        });
+        const data = await res.json();
+
+        // Set-Service produces no stdout on success; build a meaningful message
+        // instead of falling back to '(sin salida)' for the normal success path.
+        const isOk = data.status === 'success' || data.status === 'completed';
+        const consoleMsg = isOk
+            ? `Tipo de inicio de "${displayName}" cambiado a ${startupLabel} correctamente.`
+            : `Error al cambiar "${displayName}": ${data.error || data.output || 'desconocido'}`;
+        if (console_) console_.innerHTML = consoleMsg;
+
+        const msg = isOk
+            ? `${displayName}: inicio cambiado a ${startupLabel}`
+            : `Error al cambiar ${displayName}: ${data.error || data.message || 'desconocido'}`;
+
+        if (typeof showToast === 'function') showToast(msg, isOk ? 'success' : 'error');
+
+        // Reload the table to reflect new state
+        await loadManagedServices();
+    } catch (e) {
+        btn.disabled = false;
+        btn.textContent = startupType === 'Automatic' ? '→ Automático' : '→ Manual';
+        if (typeof showToast === 'function') showToast(`Error de comunicación: ${e.message}`, 'error');
+    }
+}
+
+// ── RADEC Catalog ──────────────────────────────────────────────────────────
+
+let _catalogTargets = [];
+let _selectedTarget = null;
+
+async function loadTargets() {
+    try {
+        const res = await fetch('/network/api/targets');
+        _catalogTargets = await res.json();
+        renderCatalog(_catalogTargets);
+    } catch (e) {
+        document.getElementById('catalog-list').innerHTML =
+            '<div style="padding:10px;color:#c00;font-size:12px;">Error al cargar el catálogo.</div>';
+    }
+}
+
+function renderCatalog(targets) {
+    const list = document.getElementById('catalog-list');
+    if (!targets || targets.length === 0) {
+        list.innerHTML = '<div style="padding:10px;color:var(--text-muted);font-size:12px;">Sin destinos.</div>';
+        return;
+    }
+
+    // Group by category (infrastructure vs sucursales)
+    const infra = targets.filter(t => !t.host.startsWith('192.168.1') ||
+        ['192.168.103.25','192.168.198.14','192.168.198.15','192.168.198.16',
+         '192.168.122.215','192.168.100.116','192.168.100.8','192.168.103.72'].includes(t.host));
+    const sucursales = targets.filter(t => !infra.includes(t));
+
+    let html = '';
+
+    html += '<div style="padding:6px 10px;font-size:10px;font-weight:700;'
+          + 'color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;'
+          + 'background:var(--bg-secondary);border-bottom:1px solid var(--border);">'
+          + 'Infraestructura</div>';
+    for (const t of infra) {
+        html += catalogRow(t);
+    }
+
+    html += '<div style="padding:6px 10px;font-size:10px;font-weight:700;'
+          + 'color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;'
+          + 'background:var(--bg-secondary);border-bottom:1px solid var(--border);'
+          + 'border-top:1px solid var(--border);">Sucursales</div>';
+    for (const t of sucursales) {
+        html += catalogRow(t);
+    }
+
+    list.innerHTML = html;
+}
+
+function catalogRow(t) {
+    const portBadge = t.default_port
+        ? `<span style="font-size:10px;color:var(--text-muted);margin-left:6px;">:${t.default_port}</span>`
+        : '';
+    const safeHost = t.host.replace(/'/g, "\\'");
+    const safeLabel = t.label.replace(/'/g, "\\'");
+    const safePort = t.default_port !== null && t.default_port !== undefined
+        ? t.default_port : 'null';
+    return `<div class="catalog-row" data-host="${t.host}"
+                onclick="selectTarget('${safeHost}','${safeLabel}',${safePort})"
+                style="padding:7px 12px;cursor:pointer;border-bottom:1px solid var(--border);
+                       display:flex;justify-content:space-between;align-items:center;
+                       font-size:13px;transition:background 0.15s;">
+        <span>${t.label}${portBadge}</span>
+        <span style="font-size:11px;color:var(--text-muted);font-family:monospace;">${t.host}</span>
+    </div>`;
+}
+
+function selectTarget(host, label, defaultPort) {
+    _selectedTarget = { host, label, port: defaultPort !== 'null' ? defaultPort : null };
+
+    document.getElementById('catalog-host').value = `${label}  (${host})`;
+    const portEl = document.getElementById('catalog-port');
+    portEl.value = (_selectedTarget.port !== null && _selectedTarget.port !== undefined)
+        ? _selectedTarget.port : '';
+    document.getElementById('catalog-btn').disabled = false;
+    document.getElementById('catalog-status').textContent = '';
+
+    // Highlight selected row
+    document.querySelectorAll('.catalog-row').forEach(r => {
+        r.style.background = r.dataset.host === host
+            ? 'var(--primary-light, rgba(59,130,246,0.12))'
+            : '';
+    });
+}
+
+function clearCatalogSelection() {
+    _selectedTarget = null;
+    document.getElementById('catalog-host').value = '';
+    document.getElementById('catalog-port').value = '';
+    document.getElementById('catalog-btn').disabled = true;
+    document.getElementById('catalog-status').textContent = '';
+    document.querySelectorAll('.catalog-row').forEach(r => { r.style.background = ''; });
+}
+
+async function runCatalogTest(btn) {
+    if (!_selectedTarget) return;
+
+    const portInput = document.getElementById('catalog-port').value.trim();
+    const port = portInput !== '' ? parseInt(portInput, 10) : null;
+    const label = _selectedTarget.label;
+    const host = _selectedTarget.host;
+
+    const statusEl = document.getElementById('catalog-status');
+    const portLabel = port !== null ? `:${port}` : ' (ICMP/ping)';
+
+    btn.disabled = true;
+    btn.textContent = 'Probando…';
+    statusEl.textContent = `Probando ${label}${portLabel}…`;
+    statusEl.style.color = 'var(--text-muted)';
+
+    const console_ = document.getElementById('output-console');
+    const outputArea = document.getElementById('output-area');
+    if (console_) console_.innerHTML = `Ejecutando Test-NetConnection hacia ${host}${portLabel}…`;
+
+    try {
+        const res = await fetch('/network/api/test-catalog', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ host, label, port }),
+        });
+        const data = await res.json();
+
+        // Render raw output to console
+        const rawText = data.output || data.error || '(sin salida)';
+        if (console_) console_.innerHTML = rawText.replace(/\n/g, '<br>');
+
+        // Determine success from output content.
+        // Use regex with \s* to tolerate the variable-width padding that
+        // Test-NetConnection adds between property names and the colon.
+        const outLower = (rawText).toLowerCase();
+        const tcpSuccess  = /tcptestsucceeded\s*:\s*true/.test(outLower);
+        const pingSuccess = /pingsucceeded\s*:\s*true/.test(outLower);
+        const tcpFailed   = /tcptestsucceeded\s*:\s*false/.test(outLower);
+        const pingFailed  = /pingsucceeded\s*:\s*false/.test(outLower);
+        const isSuccess = tcpSuccess || (port === null && pingSuccess);
+        const isFailed  = tcpFailed || (port === null && pingFailed) || data.status === 'error';
+
+        const statusColor = isSuccess ? '#16a34a' : (isFailed ? '#dc2626' : '#ca8a04');
+        const statusIcon = isSuccess ? '&#10003;' : (isFailed ? '&#10007;' : '&#63;');
+        const statusText = isSuccess
+            ? 'Alcanzable'
+            : (isFailed ? 'Sin respuesta / bloqueado' : 'Resultado indeterminado');
+
+        // Structured result card in output-area
+        if (outputArea) {
+            const ts = new Date().toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+            outputArea.innerHTML = `
+<div style="border:1px solid var(--border);border-left:4px solid ${statusColor};
+            border-radius:6px;padding:12px 16px;margin-bottom:12px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+    <span style="font-weight:700;font-size:14px;">${label}</span>
+    <span style="font-size:18px;color:${statusColor};">${statusIcon}</span>
+  </div>
+  <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">
+    <strong>Host:</strong> ${host} &nbsp;&nbsp;
+    <strong>Puerto:</strong> ${port !== null ? port : 'ICMP/ping'} &nbsp;&nbsp;
+    <strong>Hora:</strong> ${ts}
+  </div>
+  <div style="font-weight:600;color:${statusColor};">${statusIcon} ${statusText}</div>
+</div>`;
+        }
+
+        // Toast feedback
+        const toastMsg = `${label}: ${statusText}`;
+        const toastType = isSuccess ? 'success' : (isFailed ? 'warning' : 'info');
+        if (typeof showToast === 'function') showToast(toastMsg, toastType);
+
+        statusEl.textContent = statusText;
+        statusEl.style.color = statusColor;
+
+    } catch (e) {
+        if (console_) console_.innerHTML = `Error de comunicación: ${e.message}`;
+        statusEl.textContent = 'Error de comunicación';
+        statusEl.style.color = '#dc2626';
+        if (typeof showToast === 'function') showToast(`${label}: Error de comunicación`, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Probar conectividad';
+    }
+}
+
+// Load both on page ready
+document.addEventListener('DOMContentLoaded', () => {
+    loadManagedServices();
+    loadTargets();
+});
+</script>
 {% endblock %}

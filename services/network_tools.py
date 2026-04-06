@@ -21,12 +21,73 @@ _HOSTNAME_RE = re.compile(
     r'(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$'
 )
 
+# ---------------------------------------------------------------------------
+# RADEC target catalog — predefined connectivity test endpoints.
+# Fields: label (display name), host (IP or FQDN), default_port (int or None).
+# default_port=None → ICMP/ping-style test (Test-NetConnection without -Port).
+# ---------------------------------------------------------------------------
+RADEC_TARGETS = [
+    # Infrastructure / internet
+    {'label': 'Correo (mail.radec.com.mx)', 'host': 'mail.radec.com.mx', 'default_port': 25},
+    {'label': 'DNS pública (Google)', 'host': '8.8.8.8', 'default_port': 53},
+    {'label': 'Internet (google.com)', 'host': 'google.com', 'default_port': 443},
+    {'label': 'Intranet', 'host': '192.168.103.25', 'default_port': None},
+    # SAP / servers
+    {'label': 'SAP', 'host': '192.168.198.14', 'default_port': None},
+    {'label': 'SAP DB', 'host': '192.168.198.14', 'default_port': None},
+    {'label': 'SAP Aplicativo 1', 'host': '192.168.198.15', 'default_port': None},
+    {'label': 'SAP Aplicativo 2', 'host': '192.168.198.16', 'default_port': None},
+    {'label': 'Sygnology CLJ', 'host': '192.168.122.215', 'default_port': None},
+    {'label': 'Sygnology Matriz (1)', 'host': '192.168.100.116', 'default_port': None},
+    {'label': 'Sygnology Matriz (2)', 'host': '192.168.100.8', 'default_port': None},
+    {'label': 'OCS Inventory NG', 'host': '192.168.103.72', 'default_port': 80},
+    # Sucursales
+    {'label': '16 de Septiembre', 'host': '192.168.102.17', 'default_port': None},
+    {'label': 'QAS', 'host': '192.168.103.207', 'default_port': None},
+    {'label': 'CDG1', 'host': '192.168.103.17', 'default_port': None},
+    {'label': 'Central', 'host': '192.168.103.70', 'default_port': None},
+    {'label': 'Refacturación', 'host': '192.168.103.90', 'default_port': None},
+    {'label': 'Laureles', 'host': '192.168.104.17', 'default_port': None},
+    {'label': 'Peralvillo', 'host': '192.168.105.17', 'default_port': None},
+    {'label': 'Ejército', 'host': '192.168.106.16', 'default_port': None},
+    {'label': 'Monterrey', 'host': '192.168.107.17', 'default_port': None},
+    {'label': 'Juárez', 'host': '192.168.108.17', 'default_port': None},
+    {'label': 'Bulgaria', 'host': '192.168.109.17', 'default_port': None},
+    {'label': 'Villahermosa', 'host': '192.168.110.17', 'default_port': None},
+    {'label': 'León', 'host': '192.168.111.17', 'default_port': None},
+    {'label': 'Tijuana CR', 'host': '192.168.112.17', 'default_port': None},
+    {'label': 'Tultitlán', 'host': '192.168.113.17', 'default_port': None},
+    {'label': 'Chihuahua', 'host': '192.168.115.17', 'default_port': None},
+    {'label': 'Tijuana CN', 'host': '192.168.116.17', 'default_port': None},
+    {'label': 'Mexicali', 'host': '192.168.117.17', 'default_port': None},
+    {'label': 'Cancún', 'host': '192.168.118.17', 'default_port': None},
+    {'label': 'Veracruz', 'host': '192.168.119.17', 'default_port': None},
+    {'label': 'Mérida', 'host': '192.168.120.17', 'default_port': None},
+    {'label': 'Puebla', 'host': '192.168.121.17', 'default_port': None},
+    {'label': 'SLP', 'host': '192.168.124.17', 'default_port': None},
+    {'label': 'Tecámac', 'host': '192.168.125.17', 'default_port': None},
+    {'label': 'Querétaro', 'host': '192.168.126.17', 'default_port': None},
+    {'label': 'Hermosillo', 'host': '192.168.127.17', 'default_port': None},
+    {'label': 'Torreón', 'host': '192.168.128.17', 'default_port': None},
+    {'label': 'Toluca', 'host': '192.168.129.17', 'default_port': None},
+    {'label': 'Morelia', 'host': '192.168.130.17', 'default_port': None},
+    {'label': 'Saltillo', 'host': '192.168.131.17', 'default_port': None},
+    {'label': 'Reynosa', 'host': '192.168.132.17', 'default_port': None},
+    {'label': 'Tuxtla', 'host': '192.168.133.17', 'default_port': None},
+    {'label': 'Guadalupe', 'host': '192.168.134.17', 'default_port': None},
+    {'label': 'Culiacán', 'host': '192.168.135.17', 'default_port': None},
+    {'label': 'Tampico', 'host': '192.168.140.17', 'default_port': None},
+    {'label': 'Acapulco', 'host': '192.168.141.17', 'default_port': None},
+    {'label': 'Iztapalapa', 'host': '192.168.143.17', 'default_port': None},
+]
+
 
 def _validate_connection_params(host: str, port) -> Optional[str]:
     """
-    Validate host and port for test_connectivity.
+    Validate host and optional port for test_connectivity.
 
-    Returns an error message string if invalid, or None if both are valid.
+    port=None means host-only (ICMP) test — port validation is skipped.
+    Returns an error message string if invalid, or None if valid.
     Separated from business logic so it can be tested independently.
     """
     try:
@@ -35,6 +96,9 @@ def _validate_connection_params(host: str, port) -> Optional[str]:
         # Not an IP — validate as RFC 1123 hostname
         if not _HOSTNAME_RE.match(host) or len(host) > 253:
             return 'Invalid host. Must be a valid IP address or hostname.'
+
+    if port is None:
+        return None  # Host-only test — no port needed
 
     try:
         port_int = int(port)
@@ -101,16 +165,162 @@ def set_autotuning_normal():
 
 
 def test_connectivity(host='8.8.8.8', port=443):
-    """Test network connectivity to a specific host and port."""
+    """
+    Test network connectivity to a specific host, optionally on a TCP port.
+
+    port=None  → ICMP/ping-style test via Test-NetConnection (no -Port flag).
+                 Reports PingSucceeded and RoundTripTime.
+    port=<int> → TCP port reachability test via Test-NetConnection -Port.
+                 Reports TcpTestSucceeded in addition to ping result.
+    """
     host = str(host).strip()
     error = _validate_connection_params(host, port)
     if error:
         return CommandResult(status=CommandStatus.ERROR, error=error)
-    port = int(port)  # Safe after validation
+
+    if port is None:
+        ps = f'Test-NetConnection -ComputerName {host} -InformationLevel Detailed'
+        desc = f'Test connectivity (ICMP) to {host}'
+    else:
+        port = int(port)  # Safe after validation
+        ps = f'Test-NetConnection -ComputerName {host} -Port {port}'
+        desc = f'Test connectivity to {host}:{port}'
+
+    return run_powershell(ps, timeout=30, description=desc)
+
+
+def get_radec_targets():
+    """Return the RADEC target catalog as a list of dicts."""
+    return list(RADEC_TARGETS)  # Shallow copy — caller cannot mutate the constant
+
+
+# ---------------------------------------------------------------------------
+# Managed service startup mode switching — Phase 6.
+# Strictly scoped to 7 network-discovery / file-sharing services.
+# No other services can be targeted through these functions.
+# ---------------------------------------------------------------------------
+
+# Windows service name → Spanish display label
+_MANAGED_SERVICES = {
+    'fdphost': 'Function Discovery Provider Host',
+    'FDResPub': 'Function Discovery Resource Publication',
+    'SSDPSRV': 'SSDP Discovery',
+    'upnphost': 'UPnP Device Host',
+    'LanmanServer': 'Servidor',
+    'LanmanWorkstation': 'Estación de trabajo',
+    'Browser': 'Exploración de equipos',
+}
+
+# Services known to be deprecated / removed in modern Windows versions.
+# Shown with an explanatory note rather than just "not found".
+_DEPRECATED_SERVICES = {
+    'Browser': (
+        'El servicio "Exploración de equipos" (Computer Browser) fue eliminado '
+        'en Windows 10 versión 1803 junto con SMBv1. '
+        'Si no aparece, es el comportamiento esperado.'
+    ),
+}
+
+
+def get_managed_services() -> dict:
+    """
+    Query the current state and startup type of the 7 managed services.
+
+    Uses Get-CimInstance Win32_Service — compatible with PS 3+ / Win 8+.
+    Services that do not exist on this machine are returned with exists=False.
+
+    Returns:
+        status: 'success' | 'error'
+        services: list of dicts with keys:
+            name, display_name, state, start_mode, exists, deprecated_note
+    """
+    # Build a WQL filter: Name='a' OR Name='b' OR ...
+    wql_filter = ' OR '.join(f"Name='{n}'" for n in _MANAGED_SERVICES)
+
+    result = run_powershell_json(
+        f'Get-CimInstance Win32_Service -Filter "{wql_filter}" '
+        '| Select-Object Name, DisplayName, State, StartMode '
+        '| Sort-Object Name',
+        description='Query managed network service states',
+    )
+
+    # Build a lookup from the PS result (handle single-dict vs list)
+    raw = result.details.get('data') if result.details else None
+    if isinstance(raw, dict):
+        raw = [raw]
+    found = {}
+    for item in (raw if isinstance(raw, list) else []):
+        svc_name = item.get('Name', '')
+        if svc_name:
+            found[svc_name] = item
+
+    services = []
+    for svc_name, display in _MANAGED_SERVICES.items():
+        deprecated_note = _DEPRECATED_SERVICES.get(svc_name, '')
+        if svc_name in found:
+            item = found[svc_name]
+            services.append({
+                'name': svc_name,
+                'display_name': item.get('DisplayName') or display,
+                'state': item.get('State', ''),
+                'start_mode': item.get('StartMode', ''),
+                'exists': True,
+                'deprecated_note': '',
+            })
+        else:
+            services.append({
+                'name': svc_name,
+                'display_name': display,
+                'state': '',
+                'start_mode': '',
+                'exists': False,
+                'deprecated_note': deprecated_note,
+            })
+
+    if result.is_error and not found:
+        return {
+            'status': 'error',
+            'message': f'Error al consultar servicios: {result.error or "desconocido"}',
+            'services': services,
+        }
+
+    return {'status': 'success', 'services': services}
+
+
+def set_service_startup(service_name: str, startup_type: str) -> CommandResult:
+    """
+    Change the startup type of one of the 7 managed services.
+
+    service_name: must be an exact key in _MANAGED_SERVICES (enforced).
+    startup_type: 'Automatic' or 'Manual' only (enforced).
+
+    Requires admin (run_powershell with requires_admin=True).
+    Returns a CommandResult; caller should check .is_error.
+    """
+    if service_name not in _MANAGED_SERVICES:
+        return CommandResult(
+            status=CommandStatus.ERROR,
+            error=(
+                f'Servicio \'{service_name}\' no está en la lista de servicios '
+                'gestionados. Solo se permiten los 7 servicios predefinidos.'
+            ),
+        )
+
+    valid_types = {'Automatic', 'Manual'}
+    if startup_type not in valid_types:
+        return CommandResult(
+            status=CommandStatus.ERROR,
+            error=(
+                f'Tipo de inicio \'{startup_type}\' no válido. '
+                'Debe ser Automatic o Manual.'
+            ),
+        )
+
+    display = _MANAGED_SERVICES[service_name]
     return run_powershell(
-        f'Test-NetConnection -ComputerName {host} -Port {port}',
-        timeout=30,
-        description=f'Test connectivity to {host}:{port}',
+        f"Set-Service -Name '{service_name}' -StartupType {startup_type}",
+        requires_admin=True,
+        description=f'Set {display} startup type to {startup_type}',
     )
 
 

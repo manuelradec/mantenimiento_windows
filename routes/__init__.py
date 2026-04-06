@@ -16,6 +16,7 @@ from routes.logs import logs_bp
 from routes.scheduled_restart import scheduled_restart_bp
 from routes.maintenance import maintenance_bp
 from routes.office import office_bp
+from routes.startup import startup_bp
 
 
 def register_blueprints(app):
@@ -35,3 +36,4 @@ def register_blueprints(app):
     app.register_blueprint(scheduled_restart_bp, url_prefix='/scheduled-restart')
     app.register_blueprint(maintenance_bp, url_prefix='/maintenance')
     app.register_blueprint(office_bp, url_prefix='/office')
+    app.register_blueprint(startup_bp, url_prefix='/startup')

@@ -453,6 +453,81 @@ ROLLBACK_STRATEGIES = {
         'needs_reboot': False,
         'restore_point_recommended': False,
     },
+    # office — GUI launchers (no persistent system change)
+    'office.safe_mode': {
+        'classification': 'not_applicable',
+        'reversible': 'n/a',
+        'instructions': 'Launches Outlook with /safe flag only. Close the window to undo.',
+        'needs_reboot': False,
+        'restore_point_recommended': False,
+    },
+    'office.configure_mail': {
+        'classification': 'not_applicable',
+        'reversible': 'n/a',
+        'instructions': 'Opens the mail profile manager GUI. No change is made unless the technician acts inside the tool.',
+        'needs_reboot': False,
+        'restore_point_recommended': False,
+    },
+    'office.scanpst': {
+        'classification': 'not_applicable',
+        'reversible': 'n/a',
+        'instructions': 'Launches SCANPST.EXE GUI only. No change is made unless the technician runs a repair inside the tool.',
+        'needs_reboot': False,
+        'restore_point_recommended': False,
+    },
+    # office — repair (modifies Office installation files)
+    'office.repair_quick': {
+        'classification': 'manually_reversible',
+        'reversible': 'manual',
+        'instructions': 'If the quick repair causes issues, run an online repair or reinstall Office.',
+        'needs_reboot': False,
+        'restore_point_recommended': True,
+    },
+    'office.repair_online': {
+        'classification': 'manually_reversible',
+        'reversible': 'manual',
+        'instructions': 'If the online repair causes issues, reinstall Office from scratch.',
+        'needs_reboot': False,
+        'restore_point_recommended': True,
+    },
+    # network — service startup type
+    'network.service_startup': {
+        'classification': 'manually_reversible',
+        'reversible': 'manual',
+        'instructions': (
+            'Run the same action again and select the opposite startup type '
+            '(Automatic → Manual or Manual → Automatic) to revert.'
+        ),
+        'needs_reboot': False,
+        'restore_point_recommended': False,
+    },
+    # office — search index (cleared and auto-rebuilt by Windows Search)
+    'office.rebuild_index': {
+        'classification': 'not_reversible',
+        'reversible': 'no',
+        'instructions': 'The previous index is deleted. Windows Search rebuilds it automatically after restart (may take several minutes).',
+        'needs_reboot': False,
+        'restore_point_recommended': False,
+    },
+    # startup — registry StartupApproved key or .lnk file rename
+    'startup.disable_item': {
+        'classification': 'manually_reversible',
+        'reversible': 'manual',
+        'instructions': (
+            'Re-enable via the Inicio Automático UI, or manually: '
+            'for registry items restore the StartupApproved binary value to 0x02; '
+            'for folder items rename the .lnk.disabled file back to .lnk.'
+        ),
+        'needs_reboot': False,
+        'restore_point_recommended': False,
+    },
+    'startup.enable_item': {
+        'classification': 'manually_reversible',
+        'reversible': 'manual',
+        'instructions': 'Disable again via the Inicio Automático UI.',
+        'needs_reboot': False,
+        'restore_point_recommended': False,
+    },
 }
 
 

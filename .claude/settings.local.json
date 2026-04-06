@@ -18,7 +18,10 @@
       "Bash(python -m flake8 services/office_tools.py services/command_runner.py --max-line-length=120)",
       "Bash(python -)",
       "Bash(python -m flake8 services/office_tools.py services/command_runner.py services/system_inventory.py services/maintenance_report.py routes/office.py routes/__init__.py --max-line-length=120)",
-      "Bash(python -m flake8 routes/maintenance.py --max-line-length=120)"
+      "Bash(python -m flake8 routes/maintenance.py --max-line-length=120)",
+      "Bash(gh run:*)",
+      "Bash(python -m flake8 core/ services/ routes/ app.py config.py --count --show-source --statistics)",
+      "Bash(python -m pytest tests/test_governance.py::TestGovernanceRollback::test_rollback_strategies_cover_registered_actions tests/test_hardening.py::TestRollbackClassification::test_rollback_strategies_cover_registered_actions -v)"
     ]
   }
 }

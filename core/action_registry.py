@@ -300,6 +300,10 @@ def _register_all_actions():
         ('network.repair', 'Network Repair Sequence', 'network',
          'Flush DNS + Release/Renew IP + Autotuning', 60,
          'Brief disconnection possible during network repair. Continue?', False, False, False),
+        ('network.service_startup', 'Cambiar inicio de servicio de red', 'network',
+         'Change startup type (Manual/Automatic) of a managed network service', 30,
+         'Esto cambiará el tipo de inicio del servicio seleccionado. '
+         'Puede afectar la conectividad de red. ¿Continuar?', False, False, False),
     ]:
         registry.register(ActionDef(
             action_id=aid, name=name, module=module,
@@ -413,5 +417,39 @@ def _register_office_actions():
         ))
 
 
+def _register_startup_actions():
+    """Register Wave 2 Phase 1 startup management actions."""
+
+    # RISKY — persistent system-level change affecting every boot
+    for aid, name, desc, confirm_msg in [
+        (
+            'startup.disable_item',
+            'Deshabilitar inicio automático',
+            'Deshabilitar un programa del inicio automático de Windows',
+            'Esto deshabilitará el inicio automático de este programa. '
+            'No se iniciará al arrancar Windows. ¿Continuar?',
+        ),
+        (
+            'startup.enable_item',
+            'Habilitar inicio automático',
+            'Volver a habilitar un programa del inicio automático de Windows',
+            'Esto habilitará el inicio automático de este programa. '
+            'Se iniciará automáticamente al arrancar Windows. ¿Continuar?',
+        ),
+    ]:
+        registry.register(ActionDef(
+            action_id=aid,
+            name=name,
+            module='startup',
+            risk_class=RiskClass.RISKY,
+            requires_admin=True,
+            requires_confirmation=True,
+            confirm_message=confirm_msg,
+            default_timeout=30,
+            description=desc,
+        ))
+
+
 _register_all_actions()
 _register_office_actions()
+_register_startup_actions()

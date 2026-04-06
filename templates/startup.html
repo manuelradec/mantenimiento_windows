@@ -1,0 +1,281 @@
+{% extends "base.html" %}
+{% block title %}CleanCPU — Inicio automático{% endblock %}
+{% block page_title %}Inicio automático{% endblock %}
+{% block page_desc %}Gestión de programas que se inician con Windows{% endblock %}
+
+{% block content %}
+
+<!-- Info card -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h3>Información</h3>
+        <span class="badge badge-admin">Admin</span>
+    </div>
+    <div class="card-body" style="font-size: 13px; color: var(--text-muted); line-height: 1.6;">
+        <p style="margin: 0 0 8px 0;">
+            Esta herramienta lista los programas configurados para iniciarse automáticamente con Windows,
+            leídos directamente de las claves del registro <code>Run</code> (equipo y usuario)
+            y las carpetas de Inicio del usuario y del sistema.
+        </p>
+        <p style="margin: 0;">
+            <strong>Alcance de esta vista:</strong> solo se muestran entradas de las claves
+            <code>HKLM\...\Run</code>, <code>HKCU\...\Run</code> y las carpetas de Inicio.
+            Entradas de Programador de tareas, directivas de grupo (GPO) y aplicaciones de la
+            Tienda <strong>no están incluidas</strong> en este listado.
+            Para verlas o modificarlas use el Administrador de tareas o la Configuración de Windows.
+        </p>
+    </div>
+</div>
+
+<!-- Startup table card -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h3>Programas de inicio</h3>
+        <button class="btn btn-sm btn-outline" onclick="loadStartupItems()">Actualizar</button>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        <div id="startup-loading" style="padding: 14px; color: var(--text-muted); font-size: 13px;">
+            Cargando elementos de inicio&hellip;
+        </div>
+        <table id="startup-table"
+               style="display: none; width: 100%; border-collapse: collapse; font-size: 13px;">
+            <thead>
+                <tr style="background: var(--bg-secondary); border-bottom: 2px solid var(--border);">
+                    <th style="padding: 10px 14px; text-align: left; font-weight: 600;">Nombre</th>
+                    <th style="padding: 10px 14px; text-align: left; font-weight: 600;">Origen</th>
+                    <th style="padding: 10px 14px; text-align: left; font-weight: 600;">Usuario</th>
+                    <th style="padding: 10px 14px; text-align: center; font-weight: 600; width: 100px;">Estado</th>
+                    <th style="padding: 10px 14px; text-align: center; font-weight: 600; width: 160px;">Acción</th>
+                </tr>
+            </thead>
+            <tbody id="startup-body"></tbody>
+        </table>
+        <div id="startup-error"
+             style="display: none; padding: 14px; color: #c00; font-size: 13px;"></div>
+        <div id="startup-empty"
+             style="display: none; padding: 14px; color: var(--text-muted); font-size: 13px;">
+            No se encontraron elementos de inicio en las ubicaciones supervisadas.
+        </div>
+    </div>
+</div>
+
+<!-- Output / console card -->
+<div class="card">
+    <div class="card-header">
+        <h3>Salida</h3>
+        <button class="btn btn-sm btn-outline"
+                onclick="document.getElementById('startup-console').innerHTML='Listo.'">
+            Limpiar
+        </button>
+    </div>
+    <div class="card-body">
+        <div id="startup-console" class="console" style="min-height: 100px;">Listo.</div>
+    </div>
+</div>
+
+<script>
+// ── Startup Management ─────────────────────────────────────────────────────
+
+async function loadStartupItems() {
+    const loading = document.getElementById('startup-loading');
+    const table   = document.getElementById('startup-table');
+    const errDiv  = document.getElementById('startup-error');
+    const emptyDiv= document.getElementById('startup-empty');
+    const tbody   = document.getElementById('startup-body');
+
+    if (loading)  loading.style.display  = 'block';
+    if (table)    table.style.display    = 'none';
+    if (errDiv)   errDiv.style.display   = 'none';
+    if (emptyDiv) emptyDiv.style.display = 'none';
+
+    try {
+        const res  = await fetch('/startup/api/items');
+        const data = await res.json();
+
+        if (data.status === 'error') {
+            if (errDiv) {
+                errDiv.textContent   = data.error || 'Error al cargar los elementos de inicio.';
+                errDiv.style.display = 'block';
+            }
+            if (loading) loading.style.display = 'none';
+            return;
+        }
+
+        const items = data.items || [];
+        if (items.length === 0) {
+            if (emptyDiv) emptyDiv.style.display = 'block';
+            if (loading)  loading.style.display  = 'none';
+            return;
+        }
+
+        if (tbody) tbody.innerHTML = items.map(renderRow).join('');
+        if (loading) loading.style.display = 'none';
+        if (table)   table.style.display   = 'table';
+
+    } catch (e) {
+        if (errDiv) {
+            errDiv.textContent   = 'Error de comunicación al cargar el inicio automático.';
+            errDiv.style.display = 'block';
+        }
+        if (loading) loading.style.display = 'none';
+    }
+}
+
+function renderRow(item) {
+    const stateColor  = item.enabled ? '#16a34a' : '#6b7280';
+    const stateLabel  = item.enabled ? 'Habilitado' : 'Deshabilitado';
+
+    // Truncate long command paths for display — show full path in tooltip
+    const cmdDisplay = item.command.length > 60
+        ? item.command.slice(0, 57) + '…'
+        : item.command;
+
+    let actionHtml;
+    if (!item.manageable) {
+        // Non-manageable: show read-only badge with brief reason
+        actionHtml = `<span class="badge" style="background:#9ca3af;color:#fff;font-size:10px;"
+            title="Origen no gestionable: ${escapeHtml(item.source_label)}">Solo lectura</span>`;
+    } else if (item.enabled) {
+        actionHtml = `<button class="btn btn-sm btn-warning"
+            onclick="changeStartupState(
+                ${JSON.stringify(item.name)},
+                ${JSON.stringify(item.location)},
+                false, this)">
+            Deshabilitar</button>`;
+    } else {
+        actionHtml = `<button class="btn btn-sm btn-primary"
+            onclick="changeStartupState(
+                ${JSON.stringify(item.name)},
+                ${JSON.stringify(item.location)},
+                true, this)">
+            Habilitar</button>`;
+    }
+
+    // Non-manageable rows shown at reduced opacity
+    const rowOpacity = item.manageable ? '1' : '0.65';
+
+    return `<tr style="border-bottom:1px solid var(--border);opacity:${rowOpacity};">
+        <td style="padding:10px 14px;">
+            <span style="font-weight:500;">${escapeHtml(item.name)}</span>
+            <br>
+            <span style="font-size:10px;color:var(--text-muted);font-family:monospace;"
+                  title="${escapeHtml(item.command)}">${escapeHtml(cmdDisplay)}</span>
+        </td>
+        <td style="padding:10px 14px;">
+            <span style="font-size:12px;">${escapeHtml(item.source_label)}</span>
+        </td>
+        <td style="padding:10px 14px;font-size:12px;">
+            ${escapeHtml(item.user)}
+        </td>
+        <td style="padding:10px 14px;text-align:center;">
+            <span style="color:${stateColor};font-weight:600;font-size:12px;">
+                ${stateLabel}
+            </span>
+        </td>
+        <td style="padding:10px 14px;text-align:center;">
+            ${actionHtml}
+        </td>
+    </tr>`;
+}
+
+async function changeStartupState(name, location, enable, btn) {
+    // Pre-submission UX confirmation via the global governance modal.
+    const preConfirmed = await showConfirm(
+        enable ? 'Habilitar inicio automático' : 'Deshabilitar inicio automático',
+        enable
+            ? `¿Desea habilitar el inicio automático de "${name}"?\n` +
+              'Este programa se iniciará automáticamente al arrancar Windows.'
+            : `¿Desea deshabilitar el inicio automático de "${name}"?\n` +
+              'Este programa NO se iniciará al arrancar Windows.',
+        'warning'
+    );
+    if (!preConfirmed) return;
+
+    await _doStartupChange(name, location, enable, btn, null);
+}
+
+async function _doStartupChange(name, location, enable, btn, confirmationToken) {
+    // Preserve original label before disabling the button.
+    const originalText = btn.textContent;
+    btn.disabled    = true;
+    btn.textContent = 'Aplicando…';
+
+    const console_ = document.getElementById('startup-console');
+    if (console_) {
+        console_.innerHTML =
+            `${enable ? 'Habilitando' : 'Deshabilitando'} "${escapeHtml(name)}"…`;
+    }
+
+    const endpoint = enable ? '/startup/api/enable' : '/startup/api/disable';
+    const body = { name, location };
+    if (confirmationToken) body.confirmation_token = confirmationToken;
+
+    // Always include CSRF + Content-Type headers.
+    const headers = typeof getDefaultHeaders === 'function'
+        ? getDefaultHeaders()
+        : { 'Content-Type': 'application/json' };
+
+    try {
+        const res  = await fetch(endpoint, {
+            method: 'POST', headers, body: JSON.stringify(body),
+        });
+        const data = await res.json();
+
+        // ── Governance: server-side confirmation required ─────────────────
+        // The governance engine returns this on the FIRST call when the action
+        // has requires_confirmation=True and no token has been registered yet.
+        // Show the server's confirm_message, register the token, then retry.
+        if (data.status === 'needs_confirmation') {
+            btn.disabled    = false;
+            btn.textContent = originalText;
+            const warnings = data.warnings || [];
+            if (data.needs_reboot)         warnings.push('Esta acción puede requerir reinicio.');
+            if (data.needs_restore_point)  warnings.push('Se recomienda crear un punto de restauración.');
+
+            const serverConfirmed = await showConfirm(
+                data.action_id || 'Confirmar acción',
+                data.confirm_message || 'Esta acción requiere confirmación.',
+                data.risk_class === 'destructive' ? 'danger' : 'warning',
+                warnings
+            );
+            if (!serverConfirmed) return;
+
+            // Register the confirmation token with the policy engine.
+            await fetch('/api/policy/confirm', {
+                method: 'POST', headers,
+                body: JSON.stringify({ token: data.action_id }),
+            });
+
+            // Retry the original request with the token — this call will succeed.
+            await _doStartupChange(name, location, enable, btn, data.action_id);
+            return;
+        }
+
+        // ── Normal result ─────────────────────────────────────────────────
+        const isOk = data.status === 'success' || data.status === 'completed';
+        const consoleMsg = isOk
+            ? `"${escapeHtml(name)}" ${enable ? 'habilitado' : 'deshabilitado'} correctamente.`
+            : `Error: ${escapeHtml(data.error || data.output || data.reason || 'desconocido')}`;
+
+        if (console_) console_.innerHTML = consoleMsg;
+
+        const toastMsg = isOk
+            ? `Inicio automático ${enable ? 'habilitado' : 'deshabilitado'}: ${name}`
+            : `Error al modificar "${name}": ${data.error || data.reason || 'desconocido'}`;
+
+        if (typeof showToast === 'function') showToast(toastMsg, isOk ? 'success' : 'error');
+
+        await loadStartupItems();
+
+    } catch (e) {
+        btn.disabled    = false;
+        btn.textContent = originalText;
+        if (console_)  console_.innerHTML = `Error de comunicación: ${escapeHtml(e.message)}`;
+        if (typeof showToast === 'function') showToast(`Error de comunicación: ${e.message}`, 'error');
+    }
+}
+
+// Load on page ready
+document.addEventListener('DOMContentLoaded', loadStartupItems);
+</script>
+{% endblock %}
