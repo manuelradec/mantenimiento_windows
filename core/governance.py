@@ -490,6 +490,17 @@ ROLLBACK_STRATEGIES = {
         'needs_reboot': False,
         'restore_point_recommended': True,
     },
+    # network — service startup type
+    'network.service_startup': {
+        'classification': 'manually_reversible',
+        'reversible': 'manual',
+        'instructions': (
+            'Run the same action again and select the opposite startup type '
+            '(Automatic → Manual or Manual → Automatic) to revert.'
+        ),
+        'needs_reboot': False,
+        'restore_point_recommended': False,
+    },
     # office — search index (cleared and auto-rebuilt by Windows Search)
     'office.rebuild_index': {
         'classification': 'not_reversible',

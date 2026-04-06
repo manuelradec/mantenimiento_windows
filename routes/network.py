@@ -121,6 +121,12 @@ def api_set_autotuning():
     return jsonify(result)
 
 
+@network_bp.route('/api/targets')
+def api_targets():
+    """Return the RADEC predefined connectivity target catalog."""
+    return jsonify(net_svc.get_radec_targets())
+
+
 @network_bp.route('/api/test-connectivity', methods=['POST'])
 def api_test_connectivity():
     data = request.get_json(silent=True) or {}
@@ -132,6 +138,64 @@ def api_test_connectivity():
 
     result = execute_governed_action(
         'network.test_connectivity', handler,
+        confirmation_token=data.get('confirmation_token'),
+    )
+    return jsonify(result)
+
+
+@network_bp.route('/api/test-catalog', methods=['POST'])
+def api_test_catalog():
+    """
+    Run a connectivity test for a RADEC catalog target.
+    Body: { host, label, port (optional, null for ICMP) }
+    """
+    data = request.get_json(silent=True) or {}
+    host = str(data.get('host', '')).strip()
+    port = data.get('port')  # None or int
+    label = str(data.get('label', host)).strip()
+
+    # Normalize port: empty string / null / 0 → None (ICMP test)
+    if port is not None:
+        try:
+            port = int(port)
+            if port <= 0:
+                port = None
+        except (ValueError, TypeError):
+            port = None
+
+    def handler():
+        return net_svc.test_connectivity(host, port)
+
+    result = execute_governed_action(
+        'network.test_connectivity', handler,
+        confirmation_token=data.get('confirmation_token'),
+    )
+    # Attach label to result so the frontend can use it in the toast/output
+    if isinstance(result, dict):
+        result['_label'] = label
+        result['_host'] = host
+        result['_port'] = port
+    return jsonify(result)
+
+
+@network_bp.route('/api/managed-services')
+def api_managed_services():
+    """Return current status and startup type of the 7 managed network services."""
+    return jsonify(net_svc.get_managed_services())
+
+
+@network_bp.route('/api/set-service-startup', methods=['POST'])
+def api_set_service_startup():
+    """Change startup type (Manual/Automatic) of a managed network service."""
+    data = request.get_json(silent=True) or {}
+    service_name = str(data.get('service_name', '')).strip()
+    startup_type = str(data.get('startup_type', '')).strip()
+
+    def handler():
+        return net_svc.set_service_startup(service_name, startup_type)
+
+    result = execute_governed_action(
+        'network.service_startup', handler,
         confirmation_token=data.get('confirmation_token'),
     )
     return jsonify(result)

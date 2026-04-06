@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 from html import escape as html_escape
 
-from flask import Blueprint, render_template, jsonify, send_file, current_app
+from flask import Blueprint, render_template, jsonify, send_file, current_app, session
 
 from core.persistence import AuditStore, JobStore, SessionStore, SnapshotStore, EventViewerStore
 from config import Config
@@ -192,6 +192,8 @@ def api_export_fo_ti_19():
             'message': entry.get('stdout_preview', '') or entry.get('stderr_preview', '') or '',
         })
 
+    office_license = session.get('office_license_last', None)
+
     html = generate_fo_ti_19_html(
         system_info, steps, {},
         sucursal=sucursal,
@@ -207,6 +209,7 @@ def api_export_fo_ti_19():
         op_email=op_email,
         accessories_override=accessories,
         drive_overrides=drive_overrides,
+        office_license=office_license,
     )
 
     filename = f'FO-TI-19_{system_info.get("hostname", "EQUIPO")}_{datetime.now().strftime("%Y-%m-%d")}.html'
@@ -252,6 +255,8 @@ def api_download_fo_ti_19():
             'message': entry.get('stdout_preview', '') or '',
         })
 
+    office_license = session.get('office_license_last', None)
+
     html = generate_fo_ti_19_html(
         system_info, steps, {},
         sucursal=sucursal,
@@ -267,6 +272,7 @@ def api_download_fo_ti_19():
         op_email=op_email,
         accessories_override=accessories,
         drive_overrides={},
+        office_license=office_license,
     )
 
     filename = f'FO-TI-19_{system_info.get("hostname", "EQUIPO")}_{datetime.now().strftime("%Y-%m-%d")}.html'

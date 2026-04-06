@@ -300,6 +300,10 @@ def _register_all_actions():
         ('network.repair', 'Network Repair Sequence', 'network',
          'Flush DNS + Release/Renew IP + Autotuning', 60,
          'Brief disconnection possible during network repair. Continue?', False, False, False),
+        ('network.service_startup', 'Cambiar inicio de servicio de red', 'network',
+         'Change startup type (Manual/Automatic) of a managed network service', 30,
+         'Esto cambiará el tipo de inicio del servicio seleccionado. '
+         'Puede afectar la conectividad de red. ¿Continuar?', False, False, False),
     ]:
         registry.register(ActionDef(
             action_id=aid, name=name, module=module,
