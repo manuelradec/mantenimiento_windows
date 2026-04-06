@@ -304,6 +304,15 @@ def _register_all_actions():
          'Change startup type (Manual/Automatic) of a managed network service', 30,
          'Esto cambiará el tipo de inicio del servicio seleccionado. '
          'Puede afectar la conectividad de red. ¿Continuar?', False, False, False),
+        ('network.enable_adapter', 'Habilitar adaptador de red', 'network',
+         'Habilitar un adaptador de red desactivado', 30,
+         'Esto habilitará el adaptador de red seleccionado. ¿Continuar?',
+         False, False, False),
+        ('network.disable_adapter', 'Deshabilitar adaptador de red', 'network',
+         'Deshabilitar un adaptador de red activo', 30,
+         'ADVERTENCIA: Deshabilitar este adaptador interrumpirá la conectividad de red '
+         'a través de él. ¿Continuar?',
+         False, False, False),
     ]:
         registry.register(ActionDef(
             action_id=aid, name=name, module=module,

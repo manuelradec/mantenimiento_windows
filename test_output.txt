@@ -1,0 +1,14 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.3, pytest-8.4.2, pluggy-1.6.0
+rootdir: D:\MANUEL SEDANO LUNA\Desarrollos\MANTENIMIENTO\mantenimiento_windows
+plugins: anyio-4.9.0, cov-5.0.0
+collected 204 items
+
+tests\test_governance.py ..........................................      [ 20%]
+tests\test_hardening.py .......................................          [ 39%]
+tests\test_policy_engine.py .......................                      [ 50%]
+tests\test_routes.py .....................................               [ 69%]
+tests\test_smart_app_control.py s.....s.........................         [ 84%]
+tests\test_snapshots.py ...............................                  [100%]
+
+================== 202 passed, 2 skipped in 86.88s (0:01:26) ==================

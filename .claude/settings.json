@@ -19,7 +19,21 @@
       "Bash(python -m pytest tests/ --tb=short)",
       "Bash(python -m pytest tests/test_governance.py -v --no-header)",
       "Bash(python -m flake8 services/startup_tools.py routes/startup.py core/action_registry.py core/governance.py routes/__init__.py --max-line-length=120 --extend-ignore=E501)",
-      "Bash(python -m pytest tests/test_governance.py -q --no-header)"
+      "Bash(python -m pytest tests/test_governance.py -q --no-header)",
+      "Bash(python -m pytest tests/ -x -q)",
+      "Bash(python -m pytest tests/ -x -q --tb=short)",
+      "Bash(python -m pytest tests/)",
+      "Bash(python -c \"from services.network_tools import get_manageable_adapters, enable_adapter, disable_adapter; print\\('imports ok'\\)\")",
+      "Bash(python -c \"from core.action_registry import registry; a=registry.get\\('network.enable_adapter'\\); b=registry.get\\('network.disable_adapter'\\); print\\('enable:', a.action_id, a.requires_confirmation\\); print\\('disable:', b.action_id, b.requires_confirmation\\)\")",
+      "Bash(python -c \"from core.governance import ROLLBACK_STRATEGIES; print\\('enable:', ROLLBACK_STRATEGIES['network.enable_adapter']['classification']\\); print\\('disable:', ROLLBACK_STRATEGIES['network.disable_adapter']['classification']\\)\")",
+      "Bash(python -m pytest tests/ -v)",
+      "Bash(python -m pytest tests/test_governance.py tests/test_action_registry.py -v)",
+      "Bash(tee /tmp/pytest_out.txt)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(python -m pytest tests/test_governance.py tests/test_hardening.py tests/test_routes.py -v)",
+      "Bash(python -m pytest tests/test_governance.py -v)",
+      "Bash(python -m pytest tests/test_hardening.py tests/test_routes.py tests/test_policy_engine.py -v)",
+      "Bash(python -m pytest tests/test_hardening.py -v)"
     ]
   }
 }

@@ -143,6 +143,40 @@
     </div>
 </div>
 
+<!-- Adapter Management -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h3>Adaptadores de Red</h3>
+        <div style="display:flex;gap:8px;align-items:center;">
+            <span class="badge badge-admin">Admin</span>
+            <button class="btn btn-sm btn-outline" onclick="loadManagedAdapters()">Actualizar</button>
+        </div>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        <div style="padding:9px 14px;background:#fef3c7;border-bottom:1px solid #fde68a;
+                    font-size:12px;color:#92400e;">
+            <strong>Aviso:</strong> Deshabilitar un adaptador interrumpirá la conectividad
+            de red a través de él hasta que se vuelva a habilitar.
+            La sesión de CleanCPU (localhost) no se verá afectada.
+        </div>
+        <div id="adapters-loading" style="padding:14px;color:var(--text-muted);font-size:13px;">
+            Cargando adaptadores&hellip;
+        </div>
+        <table id="adapters-table" style="display:none;width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+                <tr style="background:var(--bg-secondary);border-bottom:2px solid var(--border);">
+                    <th style="padding:10px 14px;text-align:left;font-weight:600;">Adaptador</th>
+                    <th style="padding:10px 14px;text-align:center;font-weight:600;width:110px;">Tipo</th>
+                    <th style="padding:10px 14px;text-align:center;font-weight:600;width:110px;">Estado</th>
+                    <th style="padding:10px 14px;text-align:center;font-weight:600;width:180px;">Acción</th>
+                </tr>
+            </thead>
+            <tbody id="adapters-body"></tbody>
+        </table>
+        <div id="adapters-error" style="display:none;padding:14px;color:#c00;font-size:13px;"></div>
+    </div>
+</div>
+
 <!-- Managed Services -->
 <div class="card" style="margin-bottom: 20px;">
     <div class="card-header">
@@ -245,6 +279,148 @@
 </div>
 
 <script>
+// ── Adapter Management ─────────────────────────────────────────────────────
+
+async function loadManagedAdapters() {
+    const loading = document.getElementById('adapters-loading');
+    const table   = document.getElementById('adapters-table');
+    const errDiv  = document.getElementById('adapters-error');
+    const tbody   = document.getElementById('adapters-body');
+
+    if (loading) loading.style.display = 'block';
+    if (table)   table.style.display   = 'none';
+    if (errDiv)  errDiv.style.display  = 'none';
+
+    try {
+        const res  = await fetch('/network/api/managed-adapters');
+        const data = await res.json();
+
+        if (data.status === 'error') {
+            if (errDiv) { errDiv.textContent = data.message || 'Error al cargar adaptadores.'; errDiv.style.display = 'block'; }
+            if (loading) loading.style.display = 'none';
+            return;
+        }
+
+        if (tbody) tbody.innerHTML = (data.adapters || []).map(renderAdapterRow).join('');
+        if (loading) loading.style.display = 'none';
+        if (table)   table.style.display   = 'table';
+    } catch (e) {
+        if (errDiv) { errDiv.textContent = 'Error de comunicación al cargar adaptadores.'; errDiv.style.display = 'block'; }
+        if (loading) loading.style.display = 'none';
+    }
+}
+
+function renderAdapterRow(adp) {
+    const rowStyle = adp.manageable ? '' : 'opacity:0.65;';
+
+    const statusColor = adp.status === 'Up' ? '#16a34a'
+                      : adp.status === 'Down' ? '#dc2626' : '#6b7280';
+    const statusLabel = adp.status === 'Up'   ? 'Activo'
+                      : adp.status === 'Down' ? 'Inactivo'
+                      : (adp.status || 'Desconocido');
+
+    const macHtml = adp.mac_address
+        ? `<br><span style="font-size:10px;color:var(--text-muted);font-family:monospace;">${escapeHtml(adp.mac_address)}</span>`
+        : '';
+
+    let actionHtml;
+    if (!adp.manageable) {
+        actionHtml = '<span class="badge" style="background:#888;color:#fff;font-size:10px;">Solo lectura</span>';
+    } else if (adp.status === 'Up') {
+        actionHtml = `<button class="btn btn-sm btn-warning"
+            onclick="changeAdapterState('${adp.name.replace(/'/g, "\\'")}', false, this)">
+            Deshabilitar</button>`;
+    } else {
+        actionHtml = `<button class="btn btn-sm btn-primary"
+            onclick="changeAdapterState('${adp.name.replace(/'/g, "\\'")}', true, this)">
+            Habilitar</button>`;
+    }
+
+    return `<tr style="border-bottom:1px solid var(--border);${rowStyle}">
+        <td style="padding:10px 14px;font-weight:500;">${escapeHtml(adp.name)}${macHtml}
+            <br><span style="font-size:10px;color:var(--text-muted);">${escapeHtml(adp.description)}</span>
+        </td>
+        <td style="padding:10px 14px;text-align:center;color:var(--text-muted);">${escapeHtml(adp.media_type)}</td>
+        <td style="padding:10px 14px;text-align:center;">
+            <span style="color:${statusColor};font-weight:600;">${statusLabel}</span>
+        </td>
+        <td style="padding:10px 14px;text-align:center;">${actionHtml}</td>
+    </tr>`;
+}
+
+async function changeAdapterState(adapterName, enable, btn) {
+    const actionCap = enable ? 'Habilitar' : 'Deshabilitar';
+    const dangerLvl = enable ? 'safe' : 'warning';
+
+    const preConfirmed = await showConfirm(
+        `${actionCap} adaptador`,
+        `¿${actionCap} el adaptador "${adapterName}"?`,
+        dangerLvl
+    );
+    if (!preConfirmed) return;
+
+    await _doAdapterChange(adapterName, enable, btn, null);
+}
+
+async function _doAdapterChange(adapterName, enable, btn, confirmationToken) {
+    const originalText = btn.textContent;
+    btn.disabled  = true;
+    btn.textContent = 'Aplicando\u2026';
+
+    const console_  = document.getElementById('output-console');
+    const endpoint  = enable ? '/network/api/enable-adapter' : '/network/api/disable-adapter';
+    const body      = { adapter_name: adapterName };
+    if (confirmationToken) body.confirmation_token = confirmationToken;
+
+    const verb = enable ? 'Habilitando' : 'Deshabilitando';
+    if (console_) console_.innerHTML = `${verb} "${escapeHtml(adapterName)}"&hellip;`;
+
+    try {
+        const res  = await fetch(endpoint, {
+            method: 'POST',
+            headers: getDefaultHeaders(),
+            body: JSON.stringify(body),
+        });
+        const data = await res.json();
+
+        if (data.status === 'needs_confirmation') {
+            btn.disabled    = false;
+            btn.textContent = originalText;
+
+            const confirmed = await showConfirm(
+                data.action_id || 'Confirmar acción',
+                data.confirm_message || `¿${enable ? 'Habilitar' : 'Deshabilitar'} "${escapeHtml(adapterName)}"?`,
+                data.risk_class === 'destructive' ? 'danger' : 'warning'
+            );
+            if (!confirmed) return;
+
+            await fetch('/api/policy/confirm', {
+                method: 'POST',
+                headers: getDefaultHeaders(),
+                body: JSON.stringify({ token: data.action_id }),
+            });
+            await _doAdapterChange(adapterName, enable, btn, data.action_id);
+            return;
+        }
+
+        const isOk = data.status === 'success' || data.status === 'completed';
+        const actionLabel = enable ? 'habilitado' : 'deshabilitado';
+        const consoleMsg  = isOk
+            ? `Adaptador "${escapeHtml(adapterName)}" ${actionLabel} correctamente.`
+            : `Error al ${enable ? 'habilitar' : 'deshabilitar'} "${escapeHtml(adapterName)}": ${data.error || data.output || 'desconocido'}`;
+
+        if (console_) console_.innerHTML = consoleMsg;
+        if (typeof showToast === 'function') showToast(consoleMsg, isOk ? 'success' : 'error');
+        await loadManagedAdapters();
+    } catch (e) {
+        btn.disabled    = false;
+        btn.textContent = originalText;
+        const msg = `Error de comunicación: ${e.message}`;
+        if (console_) console_.innerHTML = msg;
+        if (typeof showToast === 'function') showToast(msg, 'error');
+    }
+}
+
 // ── Managed Services ───────────────────────────────────────────────────────
 
 async function loadManagedServices() {
@@ -552,8 +728,9 @@ async function runCatalogTest(btn) {
     }
 }
 
-// Load both on page ready
+// Load all on page ready
 document.addEventListener('DOMContentLoaded', () => {
+    loadManagedAdapters();
     loadManagedServices();
     loadTargets();
 });
