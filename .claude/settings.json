@@ -33,7 +33,9 @@
       "Bash(python -m pytest tests/test_governance.py tests/test_hardening.py tests/test_routes.py -v)",
       "Bash(python -m pytest tests/test_governance.py -v)",
       "Bash(python -m pytest tests/test_hardening.py tests/test_routes.py tests/test_policy_engine.py -v)",
-      "Bash(python -m pytest tests/test_hardening.py -v)"
+      "Bash(python -m pytest tests/test_hardening.py -v)",
+      "Bash(python -m flake8 services/network_tools.py --count --show-source --statistics)",
+      "Bash(gh pr create --title 'Wave 2 Phase 2: Network adapter enable/disable management' --body ':*)"
     ]
   }
 }
