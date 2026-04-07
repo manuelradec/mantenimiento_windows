@@ -1,0 +1,433 @@
+{% extends "base.html" %}
+{% block title %}CleanCPU - Uso compartido{% endblock %}
+{% block page_title %}Uso compartido y NetBIOS{% endblock %}
+{% block page_desc %}Estado de recursos compartidos y configuración de NetBIOS por adaptador{% endblock %}
+
+{% block content %}
+
+<!-- Limitations notice -->
+<div style="padding:10px 14px;background:#fef3c7;border:1px solid #fde68a;border-radius:6px;
+            font-size:12px;color:#92400e;margin-bottom:20px;">
+    <strong>Aviso:</strong>
+    En equipos unidos a un dominio, la <strong>Directiva de Grupo (GPO)</strong> puede
+    sobrescribir los cambios locales de detección de redes en el siguiente ciclo de actualización.
+    La configuración de <strong>Carpetas públicas</strong> y
+    <strong>Uso compartido con contraseña</strong> se muestra como referencia y no puede
+    modificarse desde aquí.
+</div>
+
+<!-- Sharing settings overview -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h3>Estado de uso compartido</h3>
+        <div style="display:flex;gap:8px;align-items:center;">
+            <span class="badge badge-safe">Solo lectura</span>
+            <button class="btn btn-sm btn-outline" onclick="loadSharingSettings()">Actualizar</button>
+        </div>
+    </div>
+    <div class="card-body" style="padding:0;">
+        <div id="sharing-loading" style="padding:14px;color:var(--text-muted);font-size:13px;">
+            Cargando configuración&hellip;
+        </div>
+        <table id="sharing-table" style="display:none;width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+                <tr style="background:var(--bg-secondary);border-bottom:2px solid var(--border);">
+                    <th style="padding:10px 14px;text-align:left;font-weight:600;">Configuración</th>
+                    <th style="padding:10px 14px;text-align:center;font-weight:600;width:130px;">Estado</th>
+                    <th style="padding:10px 14px;text-align:left;font-weight:600;">Detalle</th>
+                </tr>
+            </thead>
+            <tbody id="sharing-body"></tbody>
+        </table>
+        <div id="sharing-error" style="display:none;padding:14px;color:#c00;font-size:13px;"></div>
+    </div>
+</div>
+
+<!-- Network Discovery toggle -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h3>Detección de redes</h3>
+        <span class="badge badge-admin">Admin</span>
+    </div>
+    <div class="card-body">
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">
+            Habilita o deshabilita el grupo de reglas de firewall de detección de redes
+            (<code>@FirewallAPI.dll,-32752</code>) de forma independiente al idioma del sistema.
+            No afecta a reglas gestionadas por Directiva de Grupo.
+        </p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn btn-primary" onclick="changeNetworkDiscovery(true, this)">
+                Habilitar detección de redes
+            </button>
+            <button class="btn btn-warning" onclick="changeNetworkDiscovery(false, this)">
+                Deshabilitar detección de redes
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- NetBIOS per-adapter -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h3>NetBIOS sobre TCP/IP por adaptador</h3>
+        <div style="display:flex;gap:8px;align-items:center;">
+            <span class="badge badge-admin">Admin</span>
+            <button class="btn btn-sm btn-outline" onclick="loadNetbiosAdapters()">Actualizar</button>
+        </div>
+    </div>
+    <div class="card-body" style="padding:0;">
+        <div style="padding:9px 14px;background:#fef3c7;border-bottom:1px solid #fde68a;
+                    font-size:12px;color:#92400e;">
+            <strong>Modo 0 (Predeterminado/DHCP):</strong> sólo aplica cuando el adaptador
+            usa DHCP. En adaptadores con IP estática el servidor no puede entregar la opción
+            NetBIOS, por lo que el sistema usa habilitado como fallback.
+        </div>
+        <div id="netbios-loading" style="padding:14px;color:var(--text-muted);font-size:13px;">
+            Cargando adaptadores&hellip;
+        </div>
+        <table id="netbios-table" style="display:none;width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+                <tr style="background:var(--bg-secondary);border-bottom:2px solid var(--border);">
+                    <th style="padding:10px 14px;text-align:left;font-weight:600;">Adaptador</th>
+                    <th style="padding:10px 14px;text-align:center;font-weight:600;width:120px;">IPs</th>
+                    <th style="padding:10px 14px;text-align:center;font-weight:600;width:160px;">Modo NetBIOS</th>
+                    <th style="padding:10px 14px;text-align:center;font-weight:600;width:240px;">Cambiar a</th>
+                </tr>
+            </thead>
+            <tbody id="netbios-body"></tbody>
+        </table>
+        <div id="netbios-error" style="display:none;padding:14px;color:#c00;font-size:13px;"></div>
+    </div>
+</div>
+
+<!-- Console output -->
+<div class="card">
+    <div class="card-header">
+        <h3>Salida</h3>
+        <button class="btn btn-sm btn-outline"
+                onclick="var c=document.getElementById('sharing-console');if(c)c.innerHTML='Listo.'">
+            Limpiar
+        </button>
+    </div>
+    <div class="card-body">
+        <div id="sharing-console" class="console" style="min-height:120px;">Listo.</div>
+    </div>
+</div>
+
+<script>
+// ── Sharing settings overview ──────────────────────────────────────────────
+
+async function loadSharingSettings() {
+    const loading = document.getElementById('sharing-loading');
+    const table   = document.getElementById('sharing-table');
+    const errDiv  = document.getElementById('sharing-error');
+    const tbody   = document.getElementById('sharing-body');
+
+    if (loading) loading.style.display = 'block';
+    if (table)   table.style.display   = 'none';
+    if (errDiv)  errDiv.style.display  = 'none';
+
+    try {
+        const res  = await fetch('/sharing/api/settings');
+        const data = await res.json();
+
+        if (data.status === 'error') {
+            if (errDiv) { errDiv.textContent = data.message || 'Error al cargar.'; errDiv.style.display = 'block'; }
+            if (loading) loading.style.display = 'none';
+            return;
+        }
+
+        if (tbody) tbody.innerHTML = renderSharingRows(data.settings || {});
+        if (loading) loading.style.display = 'none';
+        if (table)   table.style.display   = 'table';
+    } catch (e) {
+        if (errDiv) { errDiv.textContent = 'Error de comunicación.'; errDiv.style.display = 'block'; }
+        if (loading) loading.style.display = 'none';
+    }
+}
+
+function stateBadge(enabled) {
+    if (enabled === true)  return '<span style="color:#16a34a;font-weight:600;">Activo</span>';
+    if (enabled === false) return '<span style="color:#dc2626;font-weight:600;">Inactivo</span>';
+    return '<span style="color:#6b7280;">Desconocido</span>';
+}
+
+function renderSharingRows(s) {
+    const nd  = s.network_discovery || {};
+    const fp  = s.file_printer_sharing || {};
+    const smb = s.smb || {};
+    const pub = s.public_folder || {};
+
+    const ndDetail = nd.source === 'firewall'
+        ? `${nd.nd_enabled || 0} de ${nd.nd_total || 0} reglas habilitadas`
+        : (nd.service_state ? `Servicio fdphost: ${escapeHtml(nd.service_state)}` : 'Sin información');
+
+    const fpDetail = fp.start_type
+        ? `LanmanServer — Inicio: ${escapeHtml(fp.start_type)}`
+        : 'LanmanServer no encontrado';
+
+    const smb1Color = smb.smb1_enabled === true ? '#dc2626' : '#16a34a';
+    const smb1Label = smb.smb1_enabled === true ? 'SMB1 activo (obsoleto)' :
+                      smb.smb1_enabled === false ? 'SMB1 deshabilitado' : '—';
+    const smb2Label = smb.smb2_enabled === true ? 'SMB2 activo' :
+                      smb.smb2_enabled === false ? 'SMB2 deshabilitado' : '—';
+
+    const pubLabel = pub.detected ? 'Detectada' : 'No detectada';
+
+    const rowStyle = 'border-bottom:1px solid var(--border);';
+    const td = (content, center) =>
+        `<td style="padding:10px 14px;${center ? 'text-align:center;' : ''}">${content}</td>`;
+
+    return [
+        `<tr style="${rowStyle}">
+            ${td('<strong>Detección de redes</strong><br><span style="font-size:11px;color:var(--text-muted);">Firewall — grupo ND</span>')}
+            ${td(stateBadge(nd.enabled), true)}
+            ${td(escapeHtml(ndDetail))}
+        </tr>`,
+        `<tr style="${rowStyle}">
+            ${td('<strong>Compartir archivos e impresoras</strong><br><span style="font-size:11px;color:var(--text-muted);">Servicio LanmanServer</span>')}
+            ${td(stateBadge(fp.enabled), true)}
+            ${td(escapeHtml(fpDetail))}
+        </tr>`,
+        `<tr style="${rowStyle}">
+            ${td('<strong>Versiones SMB</strong><br><span style="font-size:11px;color:var(--text-muted);">Get-SmbServerConfiguration</span>')}
+            ${td(smb.smb1_enabled !== null ? '' : stateBadge(null), true)}
+            ${td(`<span style="color:${smb1Color};">${smb1Label}</span> &nbsp; ${smb2Label}`)}
+        </tr>`,
+        `<tr>
+            ${td('<strong>Carpeta pública compartida</strong><br><span style="font-size:11px;color:var(--text-muted);">Solo lectura — no gestionable aquí</span>')}
+            ${td(stateBadge(pub.detected ? true : false), true)}
+            ${td(escapeHtml(pubLabel) + ' <span style="font-size:10px;color:#888;">(no modificable)</span>')}
+        </tr>`,
+    ].join('');
+}
+
+// ── Network Discovery toggle ───────────────────────────────────────────────
+
+async function changeNetworkDiscovery(enable, btn) {
+    const actionCap = enable ? 'Habilitar' : 'Deshabilitar';
+    const dangerLvl = enable ? 'safe' : 'warning';
+    const confirmed = await showConfirm(
+        `${actionCap} detección de redes`,
+        `¿${actionCap} el grupo de reglas de firewall para detección de redes?`,
+        dangerLvl
+    );
+    if (!confirmed) return;
+    await _doDiscoveryChange(enable, btn, null);
+}
+
+async function _doDiscoveryChange(enable, btn, confirmationToken) {
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Aplicando\u2026';
+
+    const console_ = document.getElementById('sharing-console');
+    const endpoint  = enable
+        ? '/sharing/api/enable-network-discovery'
+        : '/sharing/api/disable-network-discovery';
+    const body = {};
+    if (confirmationToken) body.confirmation_token = confirmationToken;
+
+    const verb = enable ? 'Habilitando' : 'Deshabilitando';
+    if (console_) console_.innerHTML = `${verb} detección de redes&hellip;`;
+
+    try {
+        const res  = await fetch(endpoint, {
+            method: 'POST',
+            headers: getDefaultHeaders(),
+            body: JSON.stringify(body),
+        });
+        const data = await res.json();
+
+        if (data.status === 'needs_confirmation') {
+            btn.disabled    = false;
+            btn.textContent = originalText;
+            const confirmed = await showConfirm(
+                data.action_id || 'Confirmar acción',
+                data.confirm_message || `¿${enable ? 'Habilitar' : 'Deshabilitar'} detección de redes?`,
+                data.risk_class === 'destructive' ? 'danger' : 'warning'
+            );
+            if (!confirmed) return;
+            await fetch('/api/policy/confirm', {
+                method: 'POST',
+                headers: getDefaultHeaders(),
+                body: JSON.stringify({ token: data.action_id }),
+            });
+            await _doDiscoveryChange(enable, btn, data.action_id);
+            return;
+        }
+
+        const isOk = data.status === 'success' || data.status === 'completed';
+        const actionLabel = enable ? 'habilitada' : 'deshabilitada';
+        const consoleMsg = isOk
+            ? `Detección de redes ${actionLabel} correctamente.`
+            : `Error: ${data.error || data.output || 'desconocido'}`;
+
+        if (console_) console_.innerHTML = consoleMsg;
+        if (typeof showToast === 'function') showToast(consoleMsg, isOk ? 'success' : 'error');
+        await loadSharingSettings();
+    } catch (e) {
+        btn.disabled    = false;
+        btn.textContent = originalText;
+        const msg = `Error de comunicación: ${e.message}`;
+        if (console_) console_.innerHTML = msg;
+        if (typeof showToast === 'function') showToast(msg, 'error');
+    } finally {
+        // Re-enable btn only if not already restored in needs_confirmation branch
+        if (btn.disabled) {
+            btn.disabled    = false;
+            btn.textContent = originalText;
+        }
+    }
+}
+
+// ── NetBIOS per-adapter ────────────────────────────────────────────────────
+
+const _NETBIOS_LABELS = {
+    0: 'Predeterminado (DHCP)',
+    1: 'Habilitado',
+    2: 'Deshabilitado',
+};
+
+async function loadNetbiosAdapters() {
+    const loading = document.getElementById('netbios-loading');
+    const table   = document.getElementById('netbios-table');
+    const errDiv  = document.getElementById('netbios-error');
+    const tbody   = document.getElementById('netbios-body');
+
+    if (loading) loading.style.display = 'block';
+    if (table)   table.style.display   = 'none';
+    if (errDiv)  errDiv.style.display  = 'none';
+
+    try {
+        const res  = await fetch('/sharing/api/netbios-adapters');
+        const data = await res.json();
+
+        if (data.status === 'error') {
+            if (errDiv) { errDiv.textContent = data.message || 'Error al cargar.'; errDiv.style.display = 'block'; }
+            if (loading) loading.style.display = 'none';
+            return;
+        }
+
+        if (tbody) tbody.innerHTML = (data.adapters || []).map(renderNetbiosRow).join('');
+        if (loading) loading.style.display = 'none';
+        if (table)   table.style.display   = 'table';
+    } catch (e) {
+        if (errDiv) { errDiv.textContent = 'Error de comunicación.'; errDiv.style.display = 'block'; }
+        if (loading) loading.style.display = 'none';
+    }
+}
+
+function renderNetbiosRow(adp) {
+    const ipHtml = adp.ip_addresses && adp.ip_addresses.length
+        ? adp.ip_addresses.map(ip => `<span style="font-family:monospace;font-size:11px;">${escapeHtml(ip)}</span>`).join('<br>')
+        : '<span style="color:var(--text-muted);">—</span>';
+
+    const currentMode  = adp.netbios_options;
+    const currentLabel = _NETBIOS_LABELS[currentMode] || `Valor ${currentMode}`;
+    const modeColor = currentMode === 2 ? '#dc2626' : currentMode === 1 ? '#16a34a' : '#6b7280';
+
+    const idxSafe = adp.index;
+    const descSafe = (adp.description || '').replace(/'/g, "\\'");
+
+    // Show buttons for the two modes that are NOT the current mode
+    const btnHtml = [0, 1, 2].filter(m => m !== currentMode).map(m => {
+        const btnClass = m === 2 ? 'btn-warning' : m === 1 ? 'btn-primary' : 'btn-outline';
+        return `<button class="btn btn-sm ${btnClass}"
+            onclick="changeNetbiosMode(${idxSafe}, '${descSafe}', ${m}, this)">
+            → ${_NETBIOS_LABELS[m]}</button>`;
+    }).join(' ');
+
+    return `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:10px 14px;font-weight:500;">${escapeHtml(adp.description)}
+            <br><span style="font-size:10px;color:var(--text-muted);">Índice WMI: ${idxSafe}</span>
+        </td>
+        <td style="padding:10px 14px;text-align:center;">${ipHtml}</td>
+        <td style="padding:10px 14px;text-align:center;">
+            <span style="color:${modeColor};font-weight:600;">${escapeHtml(currentLabel)}</span>
+        </td>
+        <td style="padding:10px 14px;text-align:center;">${btnHtml}</td>
+    </tr>`;
+}
+
+async function changeNetbiosMode(adpIndex, adpDesc, mode, btn) {
+    const modeLabel = _NETBIOS_LABELS[mode] || `Modo ${mode}`;
+    const dangerLvl = mode === 2 ? 'warning' : 'safe';
+    const confirmed = await showConfirm(
+        'Cambiar modo NetBIOS',
+        `¿Cambiar NetBIOS de "${adpDesc}" a ${modeLabel}?`,
+        dangerLvl
+    );
+    if (!confirmed) return;
+    await _doNetbiosChange(adpIndex, adpDesc, mode, btn, null);
+}
+
+async function _doNetbiosChange(adpIndex, adpDesc, mode, btn, confirmationToken) {
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Aplicando\u2026';
+
+    const console_ = document.getElementById('sharing-console');
+    const body = { adapter_index: adpIndex, mode };
+    if (confirmationToken) body.confirmation_token = confirmationToken;
+
+    if (console_) console_.innerHTML =
+        `Cambiando NetBIOS de "${escapeHtml(adpDesc)}" a ${_NETBIOS_LABELS[mode] || mode}&hellip;`;
+
+    try {
+        const res  = await fetch('/sharing/api/set-netbios', {
+            method: 'POST',
+            headers: getDefaultHeaders(),
+            body: JSON.stringify(body),
+        });
+        const data = await res.json();
+
+        if (data.status === 'needs_confirmation') {
+            btn.disabled    = false;
+            btn.textContent = originalText;
+            const confirmed = await showConfirm(
+                data.action_id || 'Confirmar acción',
+                data.confirm_message || `¿Cambiar NetBIOS de "${escapeHtml(adpDesc)}"?`,
+                data.risk_class === 'destructive' ? 'danger' : 'warning'
+            );
+            if (!confirmed) return;
+            await fetch('/api/policy/confirm', {
+                method: 'POST',
+                headers: getDefaultHeaders(),
+                body: JSON.stringify({ token: data.action_id }),
+            });
+            await _doNetbiosChange(adpIndex, adpDesc, mode, btn, data.action_id);
+            return;
+        }
+
+        const isOk = data.status === 'success' || data.status === 'completed';
+        const modeLabel = _NETBIOS_LABELS[mode] || `modo ${mode}`;
+        const consoleMsg = isOk
+            ? `NetBIOS de "${escapeHtml(adpDesc)}" cambiado a ${modeLabel} correctamente.`
+            : `Error: ${data.error || data.output || 'desconocido'}`;
+
+        if (console_) console_.innerHTML = consoleMsg;
+        if (typeof showToast === 'function') showToast(consoleMsg, isOk ? 'success' : 'error');
+        await loadNetbiosAdapters();
+    } catch (e) {
+        btn.disabled    = false;
+        btn.textContent = originalText;
+        const msg = `Error de comunicación: ${e.message}`;
+        if (console_) console_.innerHTML = msg;
+        if (typeof showToast === 'function') showToast(msg, 'error');
+    } finally {
+        if (btn.disabled) {
+            btn.disabled    = false;
+            btn.textContent = originalText;
+        }
+    }
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadSharingSettings();
+    loadNetbiosAdapters();
+});
+</script>
+{% endblock %}
