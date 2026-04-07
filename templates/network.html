@@ -313,11 +313,24 @@ async function loadManagedAdapters() {
 function renderAdapterRow(adp) {
     const rowStyle = adp.manageable ? '' : 'opacity:0.65;';
 
+    // Get-NetAdapter Status values: 'Up', 'Disconnected' (enabled/no carrier),
+    // 'Disabled', 'Not Present', 'Lower Layer Down'.  'Down' is NOT a real value.
+    const STATUS_LABEL = {
+        'Up': 'Activo',
+        'Disconnected': 'Sin conexión',
+        'Disabled': 'Deshabilitado',
+        'Not Present': 'No disponible',
+        'Lower Layer Down': 'Sin enlace',
+    };
+    const statusLabel = STATUS_LABEL[adp.status] || adp.status || 'Desconocido';
     const statusColor = adp.status === 'Up' ? '#16a34a'
-                      : adp.status === 'Down' ? '#dc2626' : '#6b7280';
-    const statusLabel = adp.status === 'Up'   ? 'Activo'
-                      : adp.status === 'Down' ? 'Inactivo'
-                      : (adp.status || 'Desconocido');
+        : adp.status === 'Disabled' ? '#dc2626'
+        : adp.status === 'Disconnected' ? '#ca8a04' : '#6b7280';
+
+    // Adapter is "enabled" if Up, Disconnected (no carrier), or Lower Layer Down.
+    // Only 'Disabled' means the OS has administratively disabled the adapter.
+    const adpEnabled = adp.status === 'Up' || adp.status === 'Disconnected'
+        || adp.status === 'Lower Layer Down';
 
     const macHtml = adp.mac_address
         ? `<br><span style="font-size:10px;color:var(--text-muted);font-family:monospace;">${escapeHtml(adp.mac_address)}</span>`
@@ -326,14 +339,16 @@ function renderAdapterRow(adp) {
     let actionHtml;
     if (!adp.manageable) {
         actionHtml = '<span class="badge" style="background:#888;color:#fff;font-size:10px;">Solo lectura</span>';
-    } else if (adp.status === 'Up') {
+    } else if (adpEnabled) {
         actionHtml = `<button class="btn btn-sm btn-warning"
             onclick="changeAdapterState('${adp.name.replace(/'/g, "\\'")}', false, this)">
             Deshabilitar</button>`;
-    } else {
+    } else if (adp.status === 'Disabled') {
         actionHtml = `<button class="btn btn-sm btn-primary"
             onclick="changeAdapterState('${adp.name.replace(/'/g, "\\'")}', true, this)">
             Habilitar</button>`;
+    } else {
+        actionHtml = '<span style="color:var(--text-muted);">—</span>';
     }
 
     return `<tr style="border-bottom:1px solid var(--border);${rowStyle}">

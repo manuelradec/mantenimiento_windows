@@ -17,6 +17,7 @@ from routes.scheduled_restart import scheduled_restart_bp
 from routes.maintenance import maintenance_bp
 from routes.office import office_bp
 from routes.startup import startup_bp
+from routes.sharing import sharing_bp
 
 
 def register_blueprints(app):
@@ -37,3 +38,4 @@ def register_blueprints(app):
     app.register_blueprint(maintenance_bp, url_prefix='/maintenance')
     app.register_blueprint(office_bp, url_prefix='/office')
     app.register_blueprint(startup_bp, url_prefix='/startup')
+    app.register_blueprint(sharing_bp, url_prefix='/sharing')

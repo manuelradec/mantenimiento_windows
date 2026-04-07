@@ -459,6 +459,48 @@ def _register_startup_actions():
         ))
 
 
+def _register_sharing_actions():
+    """Register Wave 2 Phase 3 sharing and NetBIOS actions."""
+    for aid, name, desc, timeout, confirm_msg in [
+        (
+            'sharing.enable_network_discovery',
+            'Habilitar detección de redes',
+            'Habilitar el grupo de reglas de firewall para detección de redes',
+            30,
+            'Esto habilitará la detección de redes en el firewall de Windows. '
+            'Otros equipos podrán descubrir este equipo en la red. ¿Continuar?',
+        ),
+        (
+            'sharing.disable_network_discovery',
+            'Deshabilitar detección de redes',
+            'Deshabilitar el grupo de reglas de firewall para detección de redes',
+            30,
+            'Esto deshabilitará la detección de redes. '
+            'Este equipo no será visible para otros en la red. ¿Continuar?',
+        ),
+        (
+            'sharing.set_netbios',
+            'Cambiar modo NetBIOS',
+            'Cambiar la configuración de NetBIOS sobre TCP/IP de un adaptador',
+            30,
+            'Esto cambiará la configuración de NetBIOS del adaptador seleccionado. '
+            'Puede afectar el acceso a recursos de red por nombre NetBIOS. ¿Continuar?',
+        ),
+    ]:
+        registry.register(ActionDef(
+            action_id=aid,
+            name=name,
+            module='sharing',
+            risk_class=RiskClass.RISKY,
+            requires_admin=True,
+            requires_confirmation=True,
+            confirm_message=confirm_msg,
+            default_timeout=timeout,
+            description=desc,
+        ))
+
+
 _register_all_actions()
 _register_office_actions()
 _register_startup_actions()
+_register_sharing_actions()

@@ -529,6 +529,37 @@ ROLLBACK_STRATEGIES = {
         'needs_reboot': False,
         'restore_point_recommended': False,
     },
+    # sharing — network discovery firewall group and NetBIOS per-adapter
+    'sharing.enable_network_discovery': {
+        'classification': 'manually_reversible',
+        'reversible': 'manual',
+        'instructions': (
+            'Deshabilitar de nuevo via la UI de Uso Compartido, o ejecutar: '
+            "Get-NetFirewallRule -Group '@FirewallAPI.dll,-32752' | Disable-NetFirewallRule"
+        ),
+        'needs_reboot': False,
+        'restore_point_recommended': False,
+    },
+    'sharing.disable_network_discovery': {
+        'classification': 'manually_reversible',
+        'reversible': 'manual',
+        'instructions': (
+            'Habilitar de nuevo via la UI de Uso Compartido, o ejecutar: '
+            "Get-NetFirewallRule -Group '@FirewallAPI.dll,-32752' | Enable-NetFirewallRule"
+        ),
+        'needs_reboot': False,
+        'restore_point_recommended': False,
+    },
+    'sharing.set_netbios': {
+        'classification': 'manually_reversible',
+        'reversible': 'manual',
+        'instructions': (
+            'Revertir via la UI de Uso Compartido seleccionando el modo anterior, '
+            'o via Propiedades de Protocolo de Internet (TCP/IP) del adaptador.'
+        ),
+        'needs_reboot': False,
+        'restore_point_recommended': False,
+    },
     # startup — registry StartupApproved key or .lnk file rename
     'startup.disable_item': {
         'classification': 'manually_reversible',
