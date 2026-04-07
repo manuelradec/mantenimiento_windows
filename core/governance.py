@@ -501,6 +501,26 @@ ROLLBACK_STRATEGIES = {
         'needs_reboot': False,
         'restore_point_recommended': False,
     },
+    # network — adapter enable / disable
+    'network.enable_adapter': {
+        'classification': 'manually_reversible',
+        'reversible': 'manual',
+        'instructions': (
+            'Disable the adapter again via the Adaptadores de Red UI or Device Manager.'
+        ),
+        'needs_reboot': False,
+        'restore_point_recommended': False,
+    },
+    'network.disable_adapter': {
+        'classification': 'manually_reversible',
+        'reversible': 'manual',
+        'instructions': (
+            'Re-enable the adapter via the Adaptadores de Red UI, Device Manager, '
+            'or run: Enable-NetAdapter -Name "nombre" -Confirm:$false'
+        ),
+        'needs_reboot': False,
+        'restore_point_recommended': False,
+    },
     # office — search index (cleared and auto-rebuilt by Windows Search)
     'office.rebuild_index': {
         'classification': 'not_reversible',

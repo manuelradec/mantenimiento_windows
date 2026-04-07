@@ -333,6 +333,106 @@ def get_network_adapters():
     )
 
 
+# ---------------------------------------------------------------------------
+# Network adapter enable / disable — Phase 2 Wave 2.
+# Only physical adapters (HardwareInterface=True or ConnectorPresent=True,
+# and Virtual=False) are considered manageable.
+# ---------------------------------------------------------------------------
+
+# Allowed chars in a Windows adapter name when interpolated into PS single-quotes
+_ADAPTER_NAME_RE = re.compile(r'^[a-zA-Z0-9 \-_.()]{1,64}$')
+
+
+def _is_safe_adapter_name(name: str) -> bool:
+    """Return True if name is safe to interpolate into a PS single-quoted string."""
+    return bool(_ADAPTER_NAME_RE.match(name)) and "'" not in name
+
+
+def get_manageable_adapters() -> dict:
+    """
+    Return all network adapters enriched with manageability metadata.
+
+    Physical adapters (HardwareInterface=True or ConnectorPresent=True,
+    and Virtual=False) are manageable; virtual/software adapters are listed
+    but marked non-manageable so the UI can show them read-only.
+    """
+    result = run_powershell_json(
+        'Get-NetAdapter | Select-Object Name, InterfaceDescription, Status, '
+        'MediaType, MacAddress, Virtual, HardwareInterface, ConnectorPresent',
+        description='List network adapters with manageability info',
+    )
+
+    raw = result.details.get('data') if result.details else None
+    if isinstance(raw, dict):
+        raw = [raw]
+
+    if result.is_error or not isinstance(raw, list):
+        return {
+            'status': 'error',
+            'message': result.error or 'Error al consultar adaptadores de red',
+            'adapters': [],
+        }
+
+    _MEDIA_LABELS = {
+        '802.3': 'Ethernet',
+        'Native 802.11': 'Wi-Fi',
+        'Tunnel': 'Túnel / VPN',
+        'Wireless WAN': 'WWAN',
+        'Bluetooth': 'Bluetooth',
+    }
+
+    adapters = []
+    for item in raw:
+        name = item.get('Name', '') or ''
+        virtual = bool(item.get('Virtual', False))
+        hw_iface = bool(item.get('HardwareInterface', False))
+        connector = bool(item.get('ConnectorPresent', False))
+        manageable = (hw_iface or connector) and not virtual
+
+        media_raw = item.get('MediaType', '') or ''
+        media_label = _MEDIA_LABELS.get(media_raw, media_raw or 'Desconocido')
+
+        adapters.append({
+            'name': name,
+            'description': item.get('InterfaceDescription', '') or '',
+            'status': item.get('Status', '') or '',
+            'media_type': media_label,
+            'mac_address': item.get('MacAddress', '') or '',
+            'virtual': virtual,
+            'manageable': manageable,
+        })
+
+    return {'status': 'success', 'adapters': adapters}
+
+
+def enable_adapter(adapter_name: str) -> CommandResult:
+    """Enable a network adapter by name. Requires admin."""
+    if not _is_safe_adapter_name(adapter_name):
+        return CommandResult(
+            status=CommandStatus.ERROR,
+            error=f"Nombre de adaptador no válido: {adapter_name!r}",
+        )
+    return run_powershell(
+        f"Enable-NetAdapter -Name '{adapter_name}' -Confirm:$false",
+        requires_admin=True,
+        description=f'Enable network adapter: {adapter_name}',
+    )
+
+
+def disable_adapter(adapter_name: str) -> CommandResult:
+    """Disable a network adapter by name. Requires admin."""
+    if not _is_safe_adapter_name(adapter_name):
+        return CommandResult(
+            status=CommandStatus.ERROR,
+            error=f"Nombre de adaptador no válido: {adapter_name!r}",
+        )
+    return run_powershell(
+        f"Disable-NetAdapter -Name '{adapter_name}' -Confirm:$false",
+        requires_admin=True,
+        description=f'Disable network adapter: {adapter_name}',
+    )
+
+
 def get_ip_configuration():
     """Get full IP configuration."""
     return run_cmd('ipconfig /all', description='Full IP configuration')

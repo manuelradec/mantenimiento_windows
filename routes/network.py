@@ -24,6 +24,12 @@ def api_adapters():
     return jsonify(net_svc.get_network_adapters().to_dict())
 
 
+@network_bp.route('/api/managed-adapters')
+def api_managed_adapters():
+    """Return adapters with manageability metadata for the adapter management UI."""
+    return jsonify(net_svc.get_manageable_adapters())
+
+
 @network_bp.route('/api/ip-config')
 def api_ip_config():
     return jsonify(net_svc.get_ip_configuration().to_dict())
@@ -216,6 +222,36 @@ def api_network_repair():
     data = request.get_json(silent=True) or {}
     result = execute_governed_action(
         'network.repair', net_svc.run_network_repair,
+        confirmation_token=data.get('confirmation_token'),
+    )
+    return jsonify(result)
+
+
+@network_bp.route('/api/enable-adapter', methods=['POST'])
+def api_enable_adapter():
+    data = request.get_json(silent=True) or {}
+    adapter_name = str(data.get('adapter_name', '')).strip()
+
+    def handler():
+        return net_svc.enable_adapter(adapter_name)
+
+    result = execute_governed_action(
+        'network.enable_adapter', handler,
+        confirmation_token=data.get('confirmation_token'),
+    )
+    return jsonify(result)
+
+
+@network_bp.route('/api/disable-adapter', methods=['POST'])
+def api_disable_adapter():
+    data = request.get_json(silent=True) or {}
+    adapter_name = str(data.get('adapter_name', '')).strip()
+
+    def handler():
+        return net_svc.disable_adapter(adapter_name)
+
+    result = execute_governed_action(
+        'network.disable_adapter', handler,
         confirmation_token=data.get('confirmation_token'),
     )
     return jsonify(result)
