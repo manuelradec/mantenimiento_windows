@@ -594,6 +594,41 @@ ROLLBACK_STRATEGIES = {
         'needs_reboot': False,
         'restore_point_recommended': False,
     },
+    # windows_features Phase 5 — optional feature enablement
+    'windows_features.enable_dotnet35': {
+        'classification': 'manually_reversible',
+        'reversible': 'manual',
+        'instructions': (
+            'Disable via: '
+            'Disable-WindowsOptionalFeature -Online -FeatureName NetFx3 -NoRestart'
+            ' then reboot, or via Panel de Control > Características de Windows.'
+        ),
+        'needs_reboot': True,
+        'restore_point_recommended': False,
+    },
+    'windows_features.enable_dotnet48_adv': {
+        'classification': 'manually_reversible',
+        'reversible': 'manual',
+        'instructions': (
+            'Disable via: '
+            'Disable-WindowsOptionalFeature -Online -FeatureName NetFx4-AdvSrvs -NoRestart'
+            ' then reboot, or via Panel de Control > Características de Windows.'
+        ),
+        'needs_reboot': True,
+        'restore_point_recommended': False,
+    },
+    'windows_features.enable_smb1': {
+        'classification': 'manually_reversible',
+        'reversible': 'manual',
+        'instructions': (
+            'Disable via: '
+            'Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart'
+            ' then reboot, or via Panel de Control > Características de Windows. '
+            'Disabling SMB1 after it was enabled requires a reboot to take effect.'
+        ),
+        'needs_reboot': True,
+        'restore_point_recommended': True,
+    },
 }
 
 

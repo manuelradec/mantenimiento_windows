@@ -501,7 +501,9 @@ def _register_sharing_actions():
 
 
 def _register_windows_features_actions():
-    """Register Wave 2 Phase 4 shared-folder troubleshooting actions."""
+    """Register Wave 2 Phase 4–5 windows features actions."""
+
+    # Phase 4 — SAFE_MUTATION launchers (no confirmation, no admin)
     for aid, name, desc, timeout in [
         (
             'windows_features.test_unc',
@@ -526,6 +528,61 @@ def _register_windows_features_actions():
             default_timeout=timeout,
             description=desc,
         ))
+
+    # Phase 5 — RISKY: optional feature enablement (.NET 3.5 and .NET 4.8 Adv)
+    for aid, name, desc, timeout, confirm_msg in [
+        (
+            'windows_features.enable_dotnet35',
+            'Habilitar .NET Framework 3.5',
+            'Habilitar .NET Framework 3.5 via DISM (requiere reinicio)',
+            300,
+            'Esto instalará .NET Framework 3.5 mediante DISM. '
+            'Se requiere reinicio para activarlo. '
+            'Puede necesitar conexión a internet si los archivos fuente no están '
+            'en caché local. ¿Continuar?',
+        ),
+        (
+            'windows_features.enable_dotnet48_adv',
+            'Habilitar .NET Framework 4.8 Advanced Services',
+            'Habilitar .NET Framework 4.8 Advanced Services via DISM (requiere reinicio)',
+            300,
+            'Esto instalará los Servicios Avanzados de .NET Framework 4.8 '
+            'mediante DISM. Se requiere reinicio para activarlos. ¿Continuar?',
+        ),
+    ]:
+        registry.register(ActionDef(
+            action_id=aid,
+            name=name,
+            module='windows_features',
+            risk_class=RiskClass.RISKY,
+            requires_admin=True,
+            requires_confirmation=True,
+            confirm_message=confirm_msg,
+            default_timeout=timeout,
+            needs_reboot=True,
+            description=desc,
+        ))
+
+    # Phase 5 — DESTRUCTIVE: SMB1 enablement (explicit security downgrade)
+    registry.register(ActionDef(
+        action_id='windows_features.enable_smb1',
+        name='Habilitar SMB1/CIFS (protocolo legado)',
+        module='windows_features',
+        risk_class=RiskClass.DESTRUCTIVE,
+        requires_admin=True,
+        requires_confirmation=True,
+        confirm_message=(
+            'ADVERTENCIA DE SEGURIDAD: SMB1 es un protocolo obsoleto con '
+            'vulnerabilidades críticas conocidas (EternalBlue / WannaCry). '
+            'Habilítelo SOLO si es estrictamente necesario para acceder a '
+            'recursos legados que no pueden actualizarse. '
+            'Se requiere reinicio. ¿Desea continuar?'
+        ),
+        default_timeout=120,
+        needs_reboot=True,
+        needs_restore_point=True,
+        description='Habilitar SMB1/CIFS via DISM — protocolo legado inseguro',
+    ))
 
 
 _register_all_actions()

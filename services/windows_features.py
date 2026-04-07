@@ -231,3 +231,129 @@ def open_network_path(unc_path: str) -> CommandResult:
         timeout=10,
         description=f'Open {unc_path} in Explorer',
     )
+
+
+# ---------------------------------------------------------------------------
+# Optional Windows Features — Phase 5 Wave 2
+#
+# Detection and enablement of:
+#   - .NET Framework 3.5  (FeatureName: NetFx3)
+#   - .NET Framework 4.8 Advanced Services  (FeatureName: NetFx4-AdvSrvs)
+#   - SMB1/CIFS  (FeatureName: SMB1Protocol) — LEGACY / HIGH-RISK
+#
+# All enablement calls use -NoRestart: the feature is staged but inactive
+# until the operator reboots.  All require admin and a healthy CBS service.
+#
+# Environment limitations:
+#   - .NET 3.5 may need Windows media or WSUS for source files (-All handles
+#     automatic resolution; DISM returns 0x800f0950 if unavailable offline).
+#   - NetFx4-AdvSrvs may be absent on LTSC/IoT editions → state = null.
+#   - SMB1 is disabled-by-default on Windows 10 1709+ / Windows 11.
+#     Enabling it is a deliberate security downgrade; DESTRUCTIVE risk class.
+# ---------------------------------------------------------------------------
+
+_OPTIONAL_FEATURES_PS = (
+    "$r=[PSCustomObject]@{"
+    "dotnet35=$null;dotnet48_adv=$null;smb1_feature=$null;smb1_runtime=$null"
+    "};"
+    "try{$f=Get-WindowsOptionalFeature -Online -FeatureName NetFx3 -EA Stop;"
+    "$r.dotnet35=$f.State.ToString()}catch{};"
+    "try{$f=Get-WindowsOptionalFeature -Online -FeatureName NetFx4-AdvSrvs -EA Stop;"
+    "$r.dotnet48_adv=$f.State.ToString()}catch{};"
+    "try{$f=Get-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -EA Stop;"
+    "$r.smb1_feature=$f.State.ToString()}catch{};"
+    "try{$sc=Get-SmbServerConfiguration -EA Stop;"
+    "$r.smb1_runtime=$sc.EnableSMB1Protocol}catch{};"
+    "$r|ConvertTo-Json -Compress"
+)
+
+
+def get_optional_features_status() -> dict:
+    """
+    Return current state of optional Windows features.
+
+    State values from Get-WindowsOptionalFeature:
+        'Enabled'         — installed and active
+        'Disabled'        — not installed
+        'EnablePending'   — scheduled to enable on next reboot
+        'DisablePending'  — scheduled to disable on next reboot
+        null              — feature not present on this OS edition
+    """
+    result = run_powershell_json(
+        _OPTIONAL_FEATURES_PS,
+        description='Query optional Windows features state',
+    )
+
+    raw = result.details.get('data') if result.details else None
+    if isinstance(raw, list):
+        raw = raw[0] if raw else None
+
+    if result.is_error or not isinstance(raw, dict):
+        return {
+            'status': 'error',
+            'message': result.error or 'Error al consultar características de Windows',
+            'features': {},
+        }
+
+    return {
+        'status': 'success',
+        'features': {
+            'dotnet35': raw.get('dotnet35'),
+            'dotnet48_adv': raw.get('dotnet48_adv'),
+            'smb1_feature': raw.get('smb1_feature'),
+            'smb1_runtime': raw.get('smb1_runtime'),
+        },
+    }
+
+
+def enable_dotnet35() -> CommandResult:
+    """
+    Enable .NET Framework 3.5 via DISM.
+
+    Uses -All to enable parent features automatically.
+    May require internet/WSUS if source files are not cached locally.
+    Reboot required to activate.
+    """
+    return run_powershell(
+        'Enable-WindowsOptionalFeature -Online -FeatureName NetFx3'
+        ' -All -NoRestart',
+        requires_admin=True,
+        timeout=300,
+        description='Enable .NET Framework 3.5 via DISM',
+    )
+
+
+def enable_dotnet48_adv() -> CommandResult:
+    """
+    Enable .NET Framework 4.8 Advanced Services via DISM.
+
+    Enables WCF and related sub-features (-All).
+    May not be available on LTSC/IoT editions.
+    Reboot required to activate.
+    """
+    return run_powershell(
+        'Enable-WindowsOptionalFeature -Online -FeatureName NetFx4-AdvSrvs'
+        ' -All -NoRestart',
+        requires_admin=True,
+        timeout=300,
+        description='Enable .NET Framework 4.8 Advanced Services via DISM',
+    )
+
+
+def enable_smb1() -> CommandResult:
+    """
+    Enable SMB1/CIFS file-sharing protocol via DISM.
+
+    WARNING: SMB1 is a deprecated protocol with critical known vulnerabilities
+    (CVE-2017-0144 EternalBlue / WannaCry).  Only enable when explicitly
+    required for access to legacy resources that cannot be upgraded.
+
+    Reboot required to activate.  DESTRUCTIVE risk class.
+    """
+    return run_powershell(
+        'Enable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol'
+        ' -NoRestart',
+        requires_admin=True,
+        timeout=120,
+        description='Enable SMB1 protocol via DISM (legacy/insecure)',
+    )

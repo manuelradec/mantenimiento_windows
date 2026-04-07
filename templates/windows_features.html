@@ -169,6 +169,68 @@
     </div>
 </div>
 
+<!-- ── Step 4: .NET Framework optional features ───────────────────────────── -->
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header">
+        <h3>Paso 4 — Características opcionales: .NET Framework</h3>
+        <div style="display:flex;gap:8px;align-items:center;">
+            <span class="badge badge-admin">Admin</span>
+            <button class="btn btn-sm btn-outline" onclick="loadOptionalFeatures()">Actualizar</button>
+        </div>
+    </div>
+    <div class="card-body" style="padding:0;">
+        <div id="features-loading" style="padding:14px;color:var(--text-muted);font-size:13px;">
+            Cargando estado de características&hellip;
+        </div>
+        <div id="features-error" style="display:none;padding:14px;color:#c00;font-size:13px;"></div>
+        <table id="features-table" style="display:none;width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+                <tr style="background:var(--bg-secondary);border-bottom:2px solid var(--border);">
+                    <th style="padding:10px 14px;text-align:left;font-weight:600;">Característica</th>
+                    <th style="padding:10px 14px;text-align:center;font-weight:600;width:160px;">Estado</th>
+                    <th style="padding:10px 14px;text-align:center;font-weight:600;width:200px;">Acción</th>
+                </tr>
+            </thead>
+            <tbody id="features-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ── Step 5: SMB1 — danger zone ─────────────────────────────────────────── -->
+<div class="card" style="margin-bottom:20px;border:2px solid #dc2626;">
+    <div class="card-header" style="background:#fef2f2;border-bottom:1px solid #fecaca;">
+        <h3 style="color:#dc2626;">&#9888; SMB1/CIFS — Protocolo legado inseguro</h3>
+        <span class="badge" style="background:#dc2626;color:#fff;">Riesgo alto</span>
+    </div>
+    <div class="card-body">
+        <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;
+                    padding:12px 14px;margin-bottom:14px;font-size:13px;color:#991b1b;
+                    line-height:1.7;">
+            <strong>ADVERTENCIA DE SEGURIDAD</strong><br>
+            SMB1 es un protocolo con más de 30 años de antigüedad que contiene
+            vulnerabilidades críticas conocidas, incluyendo <strong>EternalBlue (CVE-2017-0144)</strong>
+            — el exploit utilizado por WannaCry y NotPetya.<br>
+            <strong>Microsoft recomienda no habilitar SMB1 bajo ninguna circunstancia.</strong>
+            Habilitarlo solo es justificable para acceder temporalmente a recursos de red
+            extremadamente legados que no pueden actualizarse y que no tienen alternativa viable.
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+            <div id="smb1-status-inline" style="font-size:13px;color:var(--text-muted);">
+                Cargando estado&hellip;
+            </div>
+            <button id="smb1-enable-btn" class="btn btn-danger"
+                    onclick="doEnableSMB1(this)" disabled>
+                Habilitar SMB1 (operación de riesgo)
+            </button>
+        </div>
+        <div style="margin-top:10px;font-size:11px;color:#6b7280;">
+            Requiere modo de operación <strong>EXPERT</strong> y privilegios de administrador.
+            Se requiere reinicio para activar.
+            Deshabilite SMB1 en cuanto ya no sea necesario.
+        </div>
+    </div>
+</div>
+
 <!-- ── Console ────────────────────────────────────────────────────────────── -->
 <div class="card">
     <div class="card-header">
@@ -464,10 +526,176 @@ async function runOpenPath(btn) {
     }
 }
 
+// ── Optional features (.NET 3.5, .NET 4.8 Adv, SMB1 status) ──────────────
+
+async function loadOptionalFeatures() {
+    const loading = document.getElementById('features-loading');
+    const errDiv  = document.getElementById('features-error');
+    const table   = document.getElementById('features-table');
+    const tbody   = document.getElementById('features-body');
+
+    if (loading) loading.style.display = 'block';
+    if (errDiv)  errDiv.style.display  = 'none';
+    if (table)   table.style.display   = 'none';
+
+    try {
+        const res  = await fetch('/windows-features/api/optional-features');
+        const data = await res.json();
+
+        if (data.status === 'error') {
+            if (errDiv) { errDiv.textContent = data.message || 'Error al consultar características.'; errDiv.style.display = 'block'; }
+            if (loading) loading.style.display = 'none';
+            return;
+        }
+
+        const f = data.features || {};
+
+        if (tbody) {
+            tbody.innerHTML = [
+                renderFeatureRow('.NET Framework 3.5',
+                    'windows_features.enable_dotnet35', f.dotnet35),
+                renderFeatureRow('.NET Framework 4.8 Advanced Services',
+                    'windows_features.enable_dotnet48_adv', f.dotnet48_adv),
+            ].join('');
+        }
+
+        // Update SMB1 inline status (Step 5 card)
+        const smb1El  = document.getElementById('smb1-status-inline');
+        const smb1Btn = document.getElementById('smb1-enable-btn');
+        const smb1Feature = f.smb1_feature;
+        const smb1Runtime = f.smb1_runtime;
+
+        if (smb1El) {
+            if (smb1Feature === null || smb1Feature === undefined) {
+                smb1El.innerHTML = '<span style="color:#6b7280;">Característica no disponible en esta edición de Windows.</span>';
+            } else if (smb1Feature === 'Enabled') {
+                smb1El.innerHTML = '<span style="color:#dc2626;font-weight:600;">&#9888; SMB1 habilitado</span>' +
+                    (smb1Runtime === true ? ' <span style="color:#dc2626;">(activo en tiempo de ejecución)</span>' : '');
+            } else if (smb1Feature === 'EnablePending') {
+                smb1El.innerHTML = '<span style="color:#ca8a04;font-weight:600;">Habilitación pendiente de reinicio</span>';
+            } else {
+                smb1El.innerHTML = '<span style="color:#16a34a;font-weight:600;">&#10003; Deshabilitado</span>';
+            }
+        }
+
+        // Enable SMB1 button only when feature is currently Disabled (not Enabled / Pending / null)
+        if (smb1Btn) smb1Btn.disabled = (smb1Feature !== 'Disabled');
+
+        if (loading) loading.style.display = 'none';
+        if (table)   table.style.display   = 'table';
+    } catch (e) {
+        if (errDiv) { errDiv.textContent = 'Error de comunicación.'; errDiv.style.display = 'block'; }
+        if (loading) loading.style.display = 'none';
+    }
+}
+
+function renderFeatureRow(featureName, actionId, state) {
+    const stateHtml = state === 'Enabled'
+        ? '<span style="color:#16a34a;font-weight:600;">&#10003; Habilitado</span>'
+        : state === 'Disabled'
+        ? '<span style="color:#6b7280;">Deshabilitado</span>'
+        : state === 'EnablePending'
+        ? '<span style="color:#ca8a04;font-weight:600;">Pendiente de reinicio</span>'
+        : state === 'DisablePending'
+        ? '<span style="color:#ca8a04;font-weight:600;">Deshab. pendiente reinicio</span>'
+        : '<span style="color:#6b7280;">—</span>';
+
+    const safeAction = actionId.replace(/'/g, '');
+    const safeName   = featureName.replace(/'/g, '&#39;');
+    const btnHtml = state === 'Disabled'
+        ? `<button class="btn btn-sm btn-primary"
+               onclick="_doEnableFeature('${safeAction}','${safeName}',this,null)">
+               Habilitar
+           </button>`
+        : '<span style="color:var(--text-muted);font-size:12px;">—</span>';
+
+    return `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:10px 14px;font-weight:500;">${escapeHtml(featureName)}</td>
+        <td style="padding:10px 14px;text-align:center;">${stateHtml}</td>
+        <td style="padding:10px 14px;text-align:center;">${btnHtml}</td>
+    </tr>`;
+}
+
+async function _doEnableFeature(actionId, featureName, btn, confirmationToken) {
+    const endpointMap = {
+        'windows_features.enable_dotnet35':     '/windows-features/api/enable-dotnet35',
+        'windows_features.enable_dotnet48_adv': '/windows-features/api/enable-dotnet48-adv',
+        'windows_features.enable_smb1':         '/windows-features/api/enable-smb1',
+    };
+    const endpoint = endpointMap[actionId];
+    if (!endpoint) return;
+
+    const originalText = btn.textContent;
+    btn.disabled    = true;
+    btn.textContent = 'Procesando\u2026';
+
+    const console_ = document.getElementById('wf-console');
+    const body     = {};
+    if (confirmationToken) body.confirmation_token = confirmationToken;
+
+    try {
+        const res  = await fetch(endpoint, {
+            method:  'POST',
+            headers: getDefaultHeaders(),
+            body:    JSON.stringify(body),
+        });
+        const data = await res.json();
+
+        if (data.status === 'needs_confirmation') {
+            btn.disabled    = false;
+            btn.textContent = originalText;
+
+            const confirmed = await showConfirm(
+                data.action_id || actionId,
+                data.confirm_message || `¿Habilitar ${escapeHtml(featureName)}?`,
+                data.risk_class === 'destructive' ? 'danger' : 'warning'
+            );
+            if (!confirmed) return;
+
+            await fetch('/api/policy/confirm', {
+                method:  'POST',
+                headers: getDefaultHeaders(),
+                body:    JSON.stringify({ token: data.action_id }),
+            });
+            await _doEnableFeature(actionId, featureName, btn, data.action_id);
+            return;
+        }
+
+        const isOk = data.status === 'success' || data.status === 'completed';
+        const msg  = isOk
+            ? `${escapeHtml(featureName)} habilitado. Reinicio requerido para activar.`
+            : (data.error || data.output || `Error al habilitar ${escapeHtml(featureName)}`);
+
+        if (console_) console_.innerHTML = (data.output || msg).replace(/\n/g, '<br>');
+        if (typeof showToast === 'function') showToast(msg, isOk ? 'success' : 'error');
+        if (isOk) await loadOptionalFeatures();
+    } catch (e) {
+        btn.disabled    = false;
+        btn.textContent = originalText;
+        const errMsg = `Error de comunicación: ${e.message}`;
+        if (console_) console_.innerHTML = errMsg;
+        if (typeof showToast === 'function') showToast(errMsg, 'error');
+    }
+}
+
+async function doEnableSMB1(btn) {
+    const preConfirmed = await showConfirm(
+        'Habilitar SMB1 — Riesgo de seguridad crítico',
+        'SMB1 contiene vulnerabilidades críticas conocidas (EternalBlue / CVE-2017-0144). ' +
+        'Microsoft recomienda no habilitarlo bajo ninguna circunstancia. ' +
+        '¿Confirma que necesita SMB1 para acceder a un recurso legado sin alternativa viable?',
+        'danger'
+    );
+    if (!preConfirmed) return;
+
+    await _doEnableFeature('windows_features.enable_smb1', 'SMB1/CIFS', btn, null);
+}
+
 // ── Init ───────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
     loadSharedFolderDiag();
+    loadOptionalFeatures();
 });
 </script>
 {% endblock %}

@@ -43,7 +43,9 @@
       "Bash(python _test_unc.py)",
       "Bash(python -c \"from core.action_registry import registry; a=registry.get\\('windows_features.open_network_path'\\); b=registry.get\\('windows_features.test_unc'\\); print\\('open_path:', a.risk_class, a.requires_confirmation\\); print\\('test_unc:', b.risk_class, b.requires_confirmation\\)\")",
       "Bash(python -c \"from core.governance import ROLLBACK_STRATEGIES; print\\(ROLLBACK_STRATEGIES['windows_features.test_unc']['classification']\\); print\\(ROLLBACK_STRATEGIES['windows_features.open_network_path']['classification']\\)\")",
-      "Bash(del _test_unc.py)"
+      "Bash(del _test_unc.py)",
+      "Bash(python -m flake8 services/windows_features.py routes/windows_features.py core/action_registry.py core/governance.py services/network_tools.py --max-line-length=120)",
+      "Bash(python -m pytest tests/test_governance.py tests/test_hardening.py -v)"
     ]
   }
 }
