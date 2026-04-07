@@ -1,0 +1,473 @@
+{% extends "base.html" %}
+{% block title %}CleanCPU - Carpetas compartidas{% endblock %}
+{% block page_title %}Diagnóstico de carpetas compartidas{% endblock %}
+{% block page_desc %}Flujo guiado para resolver problemas de acceso a recursos de red compartidos{% endblock %}
+
+{% block content %}
+
+<!-- ── Step 1: System diagnostic ─────────────────────────────────────────── -->
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header">
+        <h3>Paso 1 — Estado del sistema</h3>
+        <div style="display:flex;gap:8px;align-items:center;">
+            <span class="badge badge-safe">Solo lectura</span>
+            <button class="btn btn-sm btn-outline" onclick="loadSharedFolderDiag()">Actualizar</button>
+        </div>
+    </div>
+    <div class="card-body" style="padding:0;">
+        <div id="diag-loading" style="padding:14px;color:var(--text-muted);font-size:13px;">
+            Ejecutando diagnóstico&hellip;
+        </div>
+        <div id="diag-error" style="display:none;padding:14px;color:#c00;font-size:13px;"></div>
+        <div id="diag-content" style="display:none;">
+
+            <!-- Services + SMB config summary -->
+            <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <thead>
+                    <tr style="background:var(--bg-secondary);border-bottom:2px solid var(--border);">
+                        <th style="padding:10px 14px;text-align:left;font-weight:600;">Componente</th>
+                        <th style="padding:10px 14px;text-align:center;font-weight:600;width:120px;">Estado</th>
+                        <th style="padding:10px 14px;text-align:left;font-weight:600;">Detalle</th>
+                    </tr>
+                </thead>
+                <tbody id="diag-summary-body"></tbody>
+            </table>
+
+            <!-- Shares -->
+            <div style="padding:12px 14px;border-top:1px solid var(--border);">
+                <div style="font-size:12px;font-weight:600;color:var(--text-muted);
+                            text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">
+                    Recursos compartidos publicados (no administr.)
+                </div>
+                <div id="diag-shares"></div>
+            </div>
+
+            <!-- SMB connections -->
+            <div style="padding:12px 14px;border-top:1px solid var(--border);">
+                <div style="font-size:12px;font-weight:600;color:var(--text-muted);
+                            text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">
+                    Conexiones SMB activas (este equipo → servidor)
+                </div>
+                <div id="diag-connections"></div>
+            </div>
+
+            <!-- Mapped drives -->
+            <div style="padding:12px 14px;border-top:1px solid var(--border);">
+                <div style="font-size:12px;font-weight:600;color:var(--text-muted);
+                            text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">
+                    Unidades de red mapeadas
+                </div>
+                <div id="diag-drives"></div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ── Step 2: Target UNC path ────────────────────────────────────────────── -->
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header">
+        <h3>Paso 2 — Diagnóstico de ruta UNC</h3>
+        <span class="badge badge-safe">Solo lectura</span>
+    </div>
+    <div class="card-body">
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">
+            Ingrese la ruta completa al recurso compartido que no es accesible.
+            Solo se admiten rutas ASCII (sin caracteres especiales ni Unicode).
+        </p>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input id="unc-input" type="text"
+                   placeholder="\\servidor\recurso  o  \\192.168.1.10\datos"
+                   style="flex:1;min-width:280px;padding:7px 10px;
+                          border:1px solid var(--border);border-radius:5px;
+                          background:var(--bg);color:var(--text-primary);
+                          font-size:13px;font-family:monospace;"
+                   oninput="onUncInput()">
+            <button id="unc-test-btn" class="btn btn-primary" disabled
+                    onclick="runUncTest(this)">
+                Probar TCP 445
+            </button>
+            <button id="unc-open-btn" class="btn btn-outline" disabled
+                    onclick="runOpenPath(this)">
+                Abrir en Explorador
+            </button>
+        </div>
+        <div id="unc-validation-msg" style="font-size:11px;color:#dc2626;min-height:16px;margin-top:4px;"></div>
+        <div id="unc-test-result" style="margin-top:12px;display:none;font-size:13px;"></div>
+    </div>
+</div>
+
+<!-- ── Step 3: Guided reference ───────────────────────────────────────────── -->
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header">
+        <h3>Paso 3 — Guía de diagnóstico</h3>
+        <span class="badge badge-safe">Referencia</span>
+    </div>
+    <div class="card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:13px;">
+
+            <div>
+                <div style="font-weight:600;margin-bottom:6px;color:var(--text-primary);">
+                    Causas comunes de error de acceso
+                </div>
+                <ul style="margin:0;padding-left:18px;color:var(--text-muted);line-height:1.8;">
+                    <li>Servicio <strong>LanmanWorkstation</strong> detenido o desactivado</li>
+                    <li>Reglas de firewall de <strong>Detección de redes</strong> deshabilitadas</li>
+                    <li>TCP 445 bloqueado por firewall intermedio</li>
+                    <li>El servidor no está activo o no responde en la red</li>
+                    <li>Credenciales caducadas o cuenta bloqueada en el servidor</li>
+                    <li>Restricciones de directiva de grupo (GPO)</li>
+                </ul>
+            </div>
+
+            <div>
+                <div style="font-weight:600;margin-bottom:6px;color:var(--text-primary);">
+                    Pasos de verificación recomendados
+                </div>
+                <ol style="margin:0;padding-left:18px;color:var(--text-muted);line-height:1.8;">
+                    <li>Confirmar que <strong>LanmanWorkstation</strong> está en ejecución (Paso 1)</li>
+                    <li>Probar TCP 445 al servidor objetivo (Paso 2)</li>
+                    <li>Verificar resolución de nombre DNS con <code>ping servidor</code></li>
+                    <li>Revisar firewall local y remoto para puerto 445</li>
+                    <li>Comprobar permisos NTFS y permisos de recurso compartido</li>
+                    <li>Verificar en el servidor: <code>Get-SmbShare</code> / <code>net share</code></li>
+                </ol>
+            </div>
+
+            <div>
+                <div style="font-weight:600;margin-bottom:6px;color:var(--text-primary);">
+                    SMB versiones — advertencias
+                </div>
+                <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:5px;
+                            padding:8px 10px;color:#92400e;line-height:1.7;">
+                    <strong>SMB1 está obsoleto y es inseguro (EternalBlue/WannaCry).</strong><br>
+                    Si el Paso 1 muestra SMB1 activo, se recomienda desactivarlo desde
+                    <em>Características de Windows</em> o via PowerShell:<br>
+                    <code style="font-size:11px;">
+                        Set-SmbServerConfiguration -EnableSMB1Protocol $false -Force
+                    </code><br>
+                    <span style="font-size:11px;">La desactivación de SMB1 no está disponible en
+                    esta versión de CleanCPU — úsala solo desde una sesión de PowerShell elevada
+                    si el diagnóstico lo requiere.</span>
+                </div>
+            </div>
+
+            <div>
+                <div style="font-weight:600;margin-bottom:6px;color:var(--text-primary);">
+                    Limitaciones de este diagnóstico
+                </div>
+                <ul style="margin:0;padding-left:18px;color:var(--text-muted);line-height:1.8;">
+                    <li>La prueba TCP 445 verifica conectividad de red — no valida credenciales</li>
+                    <li>Las conexiones SMB muestran lo que <em>este equipo</em> tiene abierto,
+                        no lo que el servidor ve</li>
+                    <li>GPO puede bloquear el acceso aunque los servicios estén activos</li>
+                    <li>Rutas con caracteres Unicode o especiales no son admitidas por esta herramienta</li>
+                    <li>Abrir en Explorador no garantiza éxito si fallan las credenciales</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Console ────────────────────────────────────────────────────────────── -->
+<div class="card">
+    <div class="card-header">
+        <h3>Salida</h3>
+        <button class="btn btn-sm btn-outline"
+                onclick="var c=document.getElementById('wf-console');if(c)c.innerHTML='Listo.'">
+            Limpiar
+        </button>
+    </div>
+    <div class="card-body">
+        <div id="wf-console" class="console" style="min-height:120px;">Listo.</div>
+    </div>
+</div>
+
+<script>
+// ── UNC input validation ───────────────────────────────────────────────────
+
+// Conservative mirror of the Python _UNC_RE / _UNC_FORBIDDEN patterns
+const _UNC_RE = /^\\\\[a-zA-Z0-9._-]{1,253}\\[a-zA-Z0-9 ._-]{1,80}(\\[a-zA-Z0-9 ._-]{1,260})*$/;
+const _UNC_FORBIDDEN = /["'`$;|&<>()\n\r]/;
+
+function isValidUnc(v) {
+    return v && !_UNC_FORBIDDEN.test(v) && _UNC_RE.test(v);
+}
+
+function onUncInput() {
+    const v = document.getElementById('unc-input').value.trim();
+    const testBtn = document.getElementById('unc-test-btn');
+    const openBtn = document.getElementById('unc-open-btn');
+    const msg     = document.getElementById('unc-validation-msg');
+
+    if (!v) {
+        testBtn.disabled = true;
+        openBtn.disabled = true;
+        msg.textContent = '';
+        document.getElementById('unc-test-result').style.display = 'none';
+        return;
+    }
+
+    if (isValidUnc(v)) {
+        testBtn.disabled = false;
+        openBtn.disabled = false;
+        msg.textContent = '';
+    } else {
+        testBtn.disabled = true;
+        openBtn.disabled = true;
+        msg.textContent = 'Formato no válido. Use \\\\servidor\\recurso con solo letras, números, puntos, guiones.';
+    }
+}
+
+// ── Shared-folder diagnostic ───────────────────────────────────────────────
+
+async function loadSharedFolderDiag() {
+    const loading  = document.getElementById('diag-loading');
+    const errDiv   = document.getElementById('diag-error');
+    const content  = document.getElementById('diag-content');
+
+    if (loading) loading.style.display = 'block';
+    if (errDiv)  errDiv.style.display  = 'none';
+    if (content) content.style.display = 'none';
+
+    try {
+        const res  = await fetch('/windows-features/api/shared-folder-diag');
+        const data = await res.json();
+
+        if (data.status === 'error') {
+            if (errDiv) { errDiv.textContent = data.message || 'Error al ejecutar diagnóstico.'; errDiv.style.display = 'block'; }
+            if (loading) loading.style.display = 'none';
+            return;
+        }
+
+        renderDiag(data.diag || {});
+        if (loading) loading.style.display = 'none';
+        if (content) content.style.display = 'block';
+    } catch (e) {
+        if (errDiv) { errDiv.textContent = 'Error de comunicación.'; errDiv.style.display = 'block'; }
+        if (loading) loading.style.display = 'none';
+    }
+}
+
+function svcBadge(state) {
+    if (!state) return '<span style="color:#6b7280;">—</span>';
+    if (state === 'Running') return '<span style="color:#16a34a;font-weight:600;">Activo</span>';
+    if (state === 'Stopped') return '<span style="color:#dc2626;font-weight:600;">Detenido</span>';
+    return `<span style="color:#ca8a04;font-weight:600;">${escapeHtml(state)}</span>`;
+}
+
+function boolBadge(val, trueLabel, falseLabel, falseColor) {
+    if (val === null || val === undefined)
+        return '<span style="color:#6b7280;">—</span>';
+    if (val === true)
+        return `<span style="color:#16a34a;font-weight:600;">${trueLabel}</span>`;
+    return `<span style="color:${falseColor || '#dc2626'};font-weight:600;">${falseLabel}</span>`;
+}
+
+function renderDiag(d) {
+    const tbody = document.getElementById('diag-summary-body');
+    if (!tbody) return;
+
+    const row = (label, badgeHtml, detail) =>
+        `<tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:10px 14px;font-weight:500;">${label}</td>
+            <td style="padding:10px 14px;text-align:center;">${badgeHtml}</td>
+            <td style="padding:10px 14px;color:var(--text-muted);font-size:12px;">${detail}</td>
+        </tr>`;
+
+    const smbServerDetail = d.smb_server_start
+        ? `Inicio: ${escapeHtml(d.smb_server_start)}`
+        : '(no encontrado)';
+    const smbClientDetail = d.smb_client_start
+        ? `Inicio: ${escapeHtml(d.smb_client_start)}`
+        : '(no encontrado)';
+
+    // SMB1 badge: active = bad (red), disabled = good (green)
+    const smb1Badge = d.smb1 === true
+        ? '<span style="color:#dc2626;font-weight:600;">&#9888; Activo (inseguro)</span>'
+        : d.smb1 === false
+        ? '<span style="color:#16a34a;font-weight:600;">Deshabilitado</span>'
+        : '<span style="color:#6b7280;">—</span>';
+
+    tbody.innerHTML = [
+        row('LanmanServer (servidor SMB)',
+            svcBadge(d.smb_server_svc), smbServerDetail),
+        row('LanmanWorkstation (cliente SMB)',
+            svcBadge(d.smb_client_svc), smbClientDetail),
+        row('Puerto TCP 445 escuchando',
+            boolBadge(d.port445, 'Sí', 'No'),
+            d.port445 ? 'Este equipo está sirviendo SMB' : 'LanmanServer posiblemente detenido'),
+        row('Detección de redes (firewall)',
+            boolBadge(d.nd_enabled, 'Activa', 'Inactiva'),
+            'Grupo @FirewallAPI.dll,-32752'),
+        row('SMB1 (protocolo legado)',
+            smb1Badge,
+            d.smb1 === true
+                ? 'SMB1 está activo. Se recomienda desactivarlo (ver guía abajo).'
+                : 'SMB1 deshabilitado — correcto.'),
+        row('SMB2',
+            boolBadge(d.smb2, 'Activo', 'Deshabilitado'),
+            d.smb2 === true ? 'Protocolo SMB2 disponible' : ''),
+    ].join('');
+
+    // Shares
+    const sharesEl = document.getElementById('diag-shares');
+    if (sharesEl) {
+        const shares = d.shares || [];
+        if (!shares.length) {
+            sharesEl.innerHTML = '<span style="color:var(--text-muted);font-size:12px;">Sin recursos no administrativos publicados.</span>';
+        } else {
+            sharesEl.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px;">
+                <tr style="background:var(--bg-secondary);">
+                    <th style="padding:6px 10px;text-align:left;">Nombre</th>
+                    <th style="padding:6px 10px;text-align:left;">Ruta</th>
+                    <th style="padding:6px 10px;text-align:left;">Descripción</th>
+                </tr>
+                ${shares.map(s => `<tr style="border-bottom:1px solid var(--border);">
+                    <td style="padding:6px 10px;font-family:monospace;">${escapeHtml(s.Name || '')}</td>
+                    <td style="padding:6px 10px;">${escapeHtml(s.Path || '')}</td>
+                    <td style="padding:6px 10px;color:var(--text-muted);">${escapeHtml(s.Description || '')}</td>
+                </tr>`).join('')}
+            </table>`;
+        }
+    }
+
+    // Connections
+    const connEl = document.getElementById('diag-connections');
+    if (connEl) {
+        const conns = d.connections || [];
+        if (!conns.length) {
+            connEl.innerHTML = '<span style="color:var(--text-muted);font-size:12px;">Sin conexiones SMB activas.</span>';
+        } else {
+            connEl.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px;">
+                <tr style="background:var(--bg-secondary);">
+                    <th style="padding:6px 10px;text-align:left;">Servidor</th>
+                    <th style="padding:6px 10px;text-align:left;">Recurso</th>
+                    <th style="padding:6px 10px;text-align:center;">Dialecto</th>
+                    <th style="padding:6px 10px;text-align:center;">Archivos abiertos</th>
+                </tr>
+                ${conns.map(c => `<tr style="border-bottom:1px solid var(--border);">
+                    <td style="padding:6px 10px;font-family:monospace;">${escapeHtml(c.ServerName || '')}</td>
+                    <td style="padding:6px 10px;font-family:monospace;">${escapeHtml(c.ShareName || '')}</td>
+                    <td style="padding:6px 10px;text-align:center;">${escapeHtml(c.Dialect || '—')}</td>
+                    <td style="padding:6px 10px;text-align:center;">${c.NumOpens !== null && c.NumOpens !== undefined ? c.NumOpens : '—'}</td>
+                </tr>`).join('')}
+            </table>`;
+        }
+    }
+
+    // Mapped drives
+    const drivesEl = document.getElementById('diag-drives');
+    if (drivesEl) {
+        const drives = d.mapped_drives || [];
+        if (!drives.length) {
+            drivesEl.innerHTML = '<span style="color:var(--text-muted);font-size:12px;">Sin unidades de red mapeadas.</span>';
+        } else {
+            drivesEl.innerHTML = drives.map(dr =>
+                `<span style="display:inline-block;margin:2px 4px;padding:3px 8px;
+                             background:var(--bg-secondary);border:1px solid var(--border);
+                             border-radius:4px;font-size:12px;font-family:monospace;">
+                    ${escapeHtml(dr.Name || '')}:\\ &rarr; ${escapeHtml(dr.DisplayRoot || '')}
+                </span>`
+            ).join('');
+        }
+    }
+}
+
+// ── UNC connectivity test ──────────────────────────────────────────────────
+
+async function runUncTest(btn) {
+    const unc = document.getElementById('unc-input').value.trim();
+    if (!isValidUnc(unc)) return;
+
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Probando\u2026';
+    document.getElementById('unc-test-result').style.display = 'none';
+
+    const console_ = document.getElementById('wf-console');
+    if (console_) console_.innerHTML = `Probando TCP 445 hacia "${escapeHtml(unc)}"&hellip;`;
+
+    try {
+        const res  = await fetch('/windows-features/api/test-unc', {
+            method: 'POST',
+            headers: getDefaultHeaders(),
+            body: JSON.stringify({ unc_path: unc }),
+        });
+        const data = await res.json();
+
+        const rawOut = data.output || data.error || '';
+        if (console_) console_.innerHTML = rawOut.replace(/\n/g, '<br>') || '(sin salida)';
+
+        // Parse TcpTestSucceeded from Test-NetConnection output
+        const outLow = rawOut.toLowerCase();
+        const tcpOk  = /tcptestsucceeded\s*:\s*true/.test(outLow);
+        const tcpFail = /tcptestsucceeded\s*:\s*false/.test(outLow);
+        const isOk   = data.status === 'success' || data.status === 'completed';
+        const reached = tcpOk;
+        const failed  = tcpFail || data.status === 'error';
+
+        const color = reached ? '#16a34a' : (failed ? '#dc2626' : '#ca8a04');
+        const label = reached ? '&#10003; Puerto 445 alcanzable'
+                    : (failed ? '&#10007; Puerto 445 no alcanzable / bloqueado'
+                    : (isOk ? 'Resultado indeterminado' : 'Error al ejecutar la prueba'));
+
+        const resultEl = document.getElementById('unc-test-result');
+        resultEl.innerHTML = `<div style="color:${color};font-weight:600;font-size:13px;">${label}</div>`;
+        resultEl.style.display = 'block';
+
+        const toastMsg = `TCP 445 a ${unc}: ${reached ? 'alcanzable' : 'no alcanzable'}`;
+        if (typeof showToast === 'function')
+            showToast(toastMsg, reached ? 'success' : (failed ? 'warning' : 'info'));
+    } catch (e) {
+        if (console_) console_.innerHTML = `Error de comunicación: ${e.message}`;
+        if (typeof showToast === 'function') showToast('Error al probar conectividad', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+}
+
+// ── Open network path launcher ─────────────────────────────────────────────
+
+async function runOpenPath(btn) {
+    const unc = document.getElementById('unc-input').value.trim();
+    if (!isValidUnc(unc)) return;
+
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Abriendo\u2026';
+
+    const console_ = document.getElementById('wf-console');
+    if (console_) console_.innerHTML = `Abriendo "${escapeHtml(unc)}" en Explorador&hellip;`;
+
+    try {
+        const res  = await fetch('/windows-features/api/open-network-path', {
+            method: 'POST',
+            headers: getDefaultHeaders(),
+            body: JSON.stringify({ unc_path: unc }),
+        });
+        const data = await res.json();
+
+        const isOk = data.status === 'success' || data.status === 'completed';
+        const msg  = isOk
+            ? `Explorador lanzado hacia "${escapeHtml(unc)}". Si no hay acceso, revise credenciales y el Paso 2.`
+            : `Error al abrir "${escapeHtml(unc)}": ${data.error || data.output || 'desconocido'}`;
+        if (console_) console_.innerHTML = msg;
+        if (typeof showToast === 'function') showToast(msg, isOk ? 'success' : 'error');
+    } catch (e) {
+        if (console_) console_.innerHTML = `Error de comunicación: ${e.message}`;
+        if (typeof showToast === 'function') showToast('Error al abrir ruta', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadSharedFolderDiag();
+});
+</script>
+{% endblock %}

@@ -500,7 +500,36 @@ def _register_sharing_actions():
         ))
 
 
+def _register_windows_features_actions():
+    """Register Wave 2 Phase 4 shared-folder troubleshooting actions."""
+    for aid, name, desc, timeout in [
+        (
+            'windows_features.test_unc',
+            'Probar conectividad TCP 445 a ruta UNC',
+            'Test-NetConnection TCP 445 al servidor de una ruta UNC (sólo lectura)',
+            30,
+        ),
+        (
+            'windows_features.open_network_path',
+            'Abrir ruta de red en Explorador',
+            'Lanzar Windows Explorer con una ruta UNC (sin cambios de estado)',
+            10,
+        ),
+    ]:
+        registry.register(ActionDef(
+            action_id=aid,
+            name=name,
+            module='windows_features',
+            risk_class=RiskClass.SAFE_MUTATION,
+            requires_admin=False,
+            requires_confirmation=False,
+            default_timeout=timeout,
+            description=desc,
+        ))
+
+
 _register_all_actions()
 _register_office_actions()
 _register_startup_actions()
 _register_sharing_actions()
+_register_windows_features_actions()

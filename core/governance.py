@@ -579,6 +579,21 @@ ROLLBACK_STRATEGIES = {
         'needs_reboot': False,
         'restore_point_recommended': False,
     },
+    # windows_features — shared-folder diagnostic launcher (no state change)
+    'windows_features.test_unc': {
+        'classification': 'not_applicable',
+        'reversible': 'n/a',
+        'instructions': 'Read-only connectivity test. Nothing changed.',
+        'needs_reboot': False,
+        'restore_point_recommended': False,
+    },
+    'windows_features.open_network_path': {
+        'classification': 'not_applicable',
+        'reversible': 'n/a',
+        'instructions': 'Opens Explorer window only. Close the window to undo.',
+        'needs_reboot': False,
+        'restore_point_recommended': False,
+    },
 }
 
 

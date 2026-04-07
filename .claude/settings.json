@@ -37,7 +37,13 @@
       "Bash(python -m flake8 services/network_tools.py --count --show-source --statistics)",
       "Bash(gh pr create --title 'Wave 2 Phase 2: Network adapter enable/disable management' --body ':*)",
       "Bash(python -m flake8 services/sharing_tools.py routes/sharing.py core/action_registry.py core/governance.py --count --show-source --statistics)",
-      "Bash(python -c \"from services.sharing_tools import get_sharing_settings, get_netbios_adapters, enable_network_discovery, disable_network_discovery, set_netbios_mode; print\\('imports ok'\\)\")"
+      "Bash(python -c \"from services.sharing_tools import get_sharing_settings, get_netbios_adapters, enable_network_discovery, disable_network_discovery, set_netbios_mode; print\\('imports ok'\\)\")",
+      "Bash(python -m flake8 services/windows_features.py routes/windows_features.py core/action_registry.py core/governance.py routes/__init__.py --count --show-source --statistics)",
+      "Bash(python)",
+      "Bash(python _test_unc.py)",
+      "Bash(python -c \"from core.action_registry import registry; a=registry.get\\('windows_features.open_network_path'\\); b=registry.get\\('windows_features.test_unc'\\); print\\('open_path:', a.risk_class, a.requires_confirmation\\); print\\('test_unc:', b.risk_class, b.requires_confirmation\\)\")",
+      "Bash(python -c \"from core.governance import ROLLBACK_STRATEGIES; print\\(ROLLBACK_STRATEGIES['windows_features.test_unc']['classification']\\); print\\(ROLLBACK_STRATEGIES['windows_features.open_network_path']['classification']\\)\")",
+      "Bash(del _test_unc.py)"
     ]
   }
 }
