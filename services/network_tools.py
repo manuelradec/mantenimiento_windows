@@ -374,32 +374,32 @@ def get_manageable_adapters() -> dict:
         }
 
     _MEDIA_LABELS = {
-        '802.3':         'Ethernet',
+        '802.3': 'Ethernet',
         'Native 802.11': 'Wi-Fi',
-        'Tunnel':        'Túnel / VPN',
-        'Wireless WAN':  'WWAN',
-        'Bluetooth':     'Bluetooth',
+        'Tunnel': 'Túnel / VPN',
+        'Wireless WAN': 'WWAN',
+        'Bluetooth': 'Bluetooth',
     }
 
     adapters = []
     for item in raw:
-        name      = item.get('Name', '') or ''
-        virtual   = bool(item.get('Virtual', False))
-        hw_iface  = bool(item.get('HardwareInterface', False))
+        name = item.get('Name', '') or ''
+        virtual = bool(item.get('Virtual', False))
+        hw_iface = bool(item.get('HardwareInterface', False))
         connector = bool(item.get('ConnectorPresent', False))
         manageable = (hw_iface or connector) and not virtual
 
-        media_raw   = item.get('MediaType', '') or ''
+        media_raw = item.get('MediaType', '') or ''
         media_label = _MEDIA_LABELS.get(media_raw, media_raw or 'Desconocido')
 
         adapters.append({
-            'name':        name,
+            'name': name,
             'description': item.get('InterfaceDescription', '') or '',
-            'status':      item.get('Status', '') or '',
-            'media_type':  media_label,
+            'status': item.get('Status', '') or '',
+            'media_type': media_label,
             'mac_address': item.get('MacAddress', '') or '',
-            'virtual':     virtual,
-            'manageable':  manageable,
+            'virtual': virtual,
+            'manageable': manageable,
         })
 
     return {'status': 'success', 'adapters': adapters}
