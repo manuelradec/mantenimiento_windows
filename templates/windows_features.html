@@ -5,6 +5,84 @@
 
 {% block content %}
 
+<!-- ── Workflow control bar ───────────────────────────────────────────────── -->
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header">
+        <h3>&#128295; Diagnóstico SMB — flujo de trabajo</h3>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <button class="btn btn-primary" onclick="runFullDiagnosis()">
+                &#9654; Diagnóstico completo
+            </button>
+            <button id="repair-btn" class="btn btn-danger" onclick="applyRecommendedFix()" disabled>
+                &#128293; Aplicar corrección recomendada
+            </button>
+        </div>
+    </div>
+    <div class="card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div>
+                <label style="font-size:12px;font-weight:600;color:var(--text-muted);">
+                    Servidor (IP o nombre de host)
+                </label>
+                <input id="smb-host-input" type="text"
+                       placeholder="192.168.1.10  o  servidor.local"
+                       style="width:100%;box-sizing:border-box;margin-top:4px;padding:7px 10px;
+                              border:1px solid var(--border);border-radius:5px;
+                              background:var(--bg);color:var(--text-primary);font-size:13px;"
+                       oninput="onSmbHostInput()">
+            </div>
+            <div>
+                <label style="font-size:12px;font-weight:600;color:var(--text-muted);">
+                    Recurso compartido (opcional, sin barras)
+                </label>
+                <input id="smb-share-input" type="text"
+                       placeholder="datos"
+                       style="width:100%;box-sizing:border-box;margin-top:4px;padding:7px 10px;
+                              border:1px solid var(--border);border-radius:5px;
+                              background:var(--bg);color:var(--text-primary);font-size:13px;"
+                       oninput="onSmbHostInput()">
+            </div>
+        </div>
+        <div id="smb-target-msg" style="font-size:11px;color:var(--text-muted);min-height:16px;margin-top:4px;"></div>
+    </div>
+</div>
+
+<!-- ── Verdict panel ──────────────────────────────────────────────────────── -->
+<div id="verdict-panel" class="card"
+     style="display:none;margin-bottom:20px;border-left:4px solid var(--border);">
+    <div class="card-header">
+        <h3>&#128270; Resultado del diagnóstico</h3>
+        <span id="verdict-ts" style="font-size:11px;color:var(--text-muted);"></span>
+    </div>
+    <div class="card-body">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+                    gap:14px;font-size:13px;">
+            <div>
+                <div style="font-size:11px;font-weight:600;color:var(--text-muted);
+                            text-transform:uppercase;margin-bottom:4px;">Objetivo</div>
+                <div id="verdict-target" style="font-family:monospace;word-break:break-all;"></div>
+            </div>
+            <div>
+                <div style="font-size:11px;font-weight:600;color:var(--text-muted);
+                            text-transform:uppercase;margin-bottom:4px;">Clasificación</div>
+                <div id="verdict-cause"></div>
+            </div>
+            <div>
+                <div style="font-size:11px;font-weight:600;color:var(--text-muted);
+                            text-transform:uppercase;margin-bottom:4px;">Acción recomendada</div>
+                <div id="verdict-action" style="font-size:12px;"></div>
+            </div>
+            <div>
+                <div style="font-size:11px;font-weight:600;color:var(--text-muted);
+                            text-transform:uppercase;margin-bottom:4px;">Nivel de riesgo</div>
+                <div id="verdict-risk"></div>
+            </div>
+        </div>
+        <div id="verdict-details"
+             style="margin-top:10px;font-size:12px;color:var(--text-muted);line-height:1.7;"></div>
+    </div>
+</div>
+
 <!-- ── Step 1: System diagnostic ─────────────────────────────────────────── -->
 <div class="card" style="margin-bottom:20px;">
     <div class="card-header">
@@ -64,6 +142,36 @@
     </div>
 </div>
 
+<!-- ── Paso 1b: SMB client configuration ──────────────────────────────────── -->
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header">
+        <h3>Paso 1b — Configuración del cliente SMB</h3>
+        <div style="display:flex;gap:8px;align-items:center;">
+            <span class="badge badge-safe">Solo lectura</span>
+            <button class="btn btn-sm btn-outline" onclick="runSmbClientConfig()">Actualizar</button>
+        </div>
+    </div>
+    <div class="card-body" style="padding:0;">
+        <div id="smb-cfg-loading"
+             style="padding:14px;color:var(--text-muted);font-size:13px;">
+            Cargando configuración SMB&hellip;
+        </div>
+        <div id="smb-cfg-error"
+             style="display:none;padding:14px;color:#c00;font-size:13px;"></div>
+        <table id="smb-cfg-table"
+               style="display:none;width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+                <tr style="background:var(--bg-secondary);border-bottom:2px solid var(--border);">
+                    <th style="padding:10px 14px;text-align:left;font-weight:600;">Parámetro</th>
+                    <th style="padding:10px 14px;text-align:center;font-weight:600;width:100px;">Valor</th>
+                    <th style="padding:10px 14px;text-align:left;font-weight:600;">Implicación</th>
+                </tr>
+            </thead>
+            <tbody id="smb-cfg-body"></tbody>
+        </table>
+    </div>
+</div>
+
 <!-- ── Step 2: Target UNC path ────────────────────────────────────────────── -->
 <div class="card" style="margin-bottom:20px;">
     <div class="card-header">
@@ -87,6 +195,10 @@
                     onclick="runUncTest(this)">
                 Probar TCP 445
             </button>
+            <button id="unc-access-btn" class="btn btn-outline" disabled
+                    onclick="runUncAccessTest(this)">
+                Probar acceso UNC
+            </button>
             <button id="unc-open-btn" class="btn btn-outline" disabled
                     onclick="runOpenPath(this)">
                 Abrir en Explorador
@@ -94,6 +206,90 @@
         </div>
         <div id="unc-validation-msg" style="font-size:11px;color:#dc2626;min-height:16px;margin-top:4px;"></div>
         <div id="unc-test-result" style="margin-top:12px;display:none;font-size:13px;"></div>
+    </div>
+</div>
+
+<!-- ── Remediación: firma SMB (corrección principal) ──────────────────────── -->
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header">
+        <h3>&#128293; Remediación — Firma SMB (corrección principal)</h3>
+        <div style="display:flex;gap:8px;align-items:center;">
+            <span class="badge badge-admin">Admin</span>
+            <span class="badge" style="background:#f59e0b;color:#fff;">RISKY</span>
+        </div>
+    </div>
+    <div class="card-body">
+        <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:6px;
+                    padding:12px 14px;margin-bottom:14px;font-size:13px;color:#92400e;line-height:1.7;">
+            <strong>Corrección para: "configured to require SMB signing"</strong><br>
+            Deshabilita <code>RequireSecuritySignature</code> pero mantiene
+            <code>EnableSecuritySignature = True</code>.
+            La firma SMB sigue siendo ofrecida y aceptada cuando el servidor la soporta;
+            solo se elimina el requisito local obligatorio.<br>
+            <strong>Solo aplicar cuando el diagnóstico confirme incompatibilidad de firma.</strong>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <button class="btn btn-primary"
+                    onclick="runDisableRequireSigning(this)">
+                Deshabilitar RequireSecuritySignature
+            </button>
+            <button class="btn btn-outline"
+                    onclick="runRestartLanman(this)">
+                Reiniciar LanmanWorkstation
+            </button>
+        </div>
+        <div style="margin-top:10px;font-size:11px;color:var(--text-muted);">
+            Revertir:
+            <code>Set-SmbClientConfiguration -RequireSecuritySignature $true -Force</code>
+        </div>
+    </div>
+</div>
+
+<!-- ── Unidades de red y sesiones SMB ─────────────────────────────────────── -->
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header">
+        <h3>Unidades de red / Sesiones SMB</h3>
+        <button class="btn btn-sm btn-outline" onclick="runMappedDrives()">Actualizar</button>
+    </div>
+    <div class="card-body">
+        <div id="drives-loading"
+             style="color:var(--text-muted);font-size:13px;margin-bottom:8px;">
+            Cargando unidades&hellip;
+        </div>
+        <div id="drives-table-container" style="display:none;margin-bottom:14px;"></div>
+
+        <!-- Map drive -->
+        <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px;">
+            <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px;">
+                Mapear nueva unidad
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <select id="drive-letter-select"
+                        style="padding:6px 8px;border:1px solid var(--border);border-radius:5px;
+                               background:var(--bg);color:var(--text-primary);font-size:13px;">
+                </select>
+                <input id="map-unc-input" type="text"
+                       placeholder="\\servidor\recurso"
+                       style="flex:1;min-width:200px;padding:7px 10px;
+                              border:1px solid var(--border);border-radius:5px;
+                              background:var(--bg);color:var(--text-primary);
+                              font-size:13px;font-family:monospace;">
+                <button class="btn btn-primary btn-sm"
+                        onclick="runMapDrive(this)">Mapear</button>
+            </div>
+        </div>
+
+        <!-- Clear sessions -->
+        <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:12px;">
+            <button class="btn btn-outline"
+                    style="border-color:#f59e0b;color:#92400e;"
+                    onclick="runClearSessions(this)">
+                Limpiar sesiones y unidades (net use * /delete)
+            </button>
+            <span style="font-size:11px;color:var(--text-muted);margin-left:8px;">
+                Desconecta todas las unidades mapeadas actualmente
+            </span>
+        </div>
     </div>
 </div>
 
@@ -231,6 +427,34 @@
     </div>
 </div>
 
+<!-- ── Acción legada: acceso de invitado inseguro ─────────────────────────── -->
+<div class="card" style="margin-bottom:20px;border:1px solid #f59e0b;">
+    <div class="card-header" style="background:#fffbeb;border-bottom:1px solid #fde68a;">
+        <h3 style="color:#92400e;">&#128274; Acceso de invitado inseguro (solo compatibilidad legada)</h3>
+        <span class="badge" style="background:#dc2626;color:#fff;">DESTRUCTIVO</span>
+    </div>
+    <div class="card-body">
+        <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:6px;
+                    padding:12px 14px;margin-bottom:14px;font-size:13px;
+                    color:#92400e;line-height:1.7;">
+            <strong>Esta NO es la corrección principal para incompatibilidad de firma SMB.</strong><br>
+            El acceso de invitado inseguro permite conexiones sin autenticación, lo que representa
+            un riesgo de seguridad significativo. Úselo ÚNICAMENTE si el diagnóstico confirma que
+            el servidor requiere acceso de invitado sin autenticación y no existe alternativa viable.
+            La corrección para la firma SMB es la remediación anterior.
+        </div>
+        <button id="guest-auth-btn" class="btn btn-danger"
+                onclick="runAllowInsecureGuest(this)">
+            Habilitar acceso de invitado inseguro
+        </button>
+        <div style="margin-top:10px;font-size:11px;color:var(--text-muted);">
+            Requiere modo <strong>EXPERT</strong> y privilegios de administrador.
+            Modifica el registro y reinicia LanmanWorkstation.
+            Deshabilitar en cuanto ya no sea necesario.
+        </div>
+    </div>
+</div>
+
 <!-- ── Console ────────────────────────────────────────────────────────────── -->
 <div class="card">
     <div class="card-header">
@@ -270,13 +494,16 @@ function onUncInput() {
         return;
     }
 
+    const accessBtn = document.getElementById('unc-access-btn');
     if (isValidUnc(v)) {
         testBtn.disabled = false;
         openBtn.disabled = false;
+        if (accessBtn) accessBtn.disabled = false;
         msg.textContent = '';
     } else {
         testBtn.disabled = true;
         openBtn.disabled = true;
+        if (accessBtn) accessBtn.disabled = true;
         msg.textContent = 'Formato no válido. Use \\\\servidor\\recurso con solo letras, números, puntos, guiones.';
     }
 }
@@ -526,6 +753,492 @@ async function runOpenPath(btn) {
     }
 }
 
+// ── SMB Repair Workflow ────────────────────────────────────────────────────
+
+// --- State ---
+let _smbFindings = {};
+let _lastClassification = null;
+
+// --- Cause labels / action hints ---
+const _CAUSE_LABELS = {
+    smb_signing_mismatch:       { label: 'Incompatibilidad de firma SMB', color: '#ca8a04' },
+    host_unreachable:           { label: 'Servidor no alcanzable',         color: '#dc2626' },
+    tcp_445_blocked:            { label: 'Puerto TCP 445 bloqueado',       color: '#dc2626' },
+    share_not_found:            { label: 'Recurso compartido no encontrado', color: '#ca8a04' },
+    access_denied_credentials:  { label: 'Acceso denegado / credenciales', color: '#dc2626' },
+    guest_access_blocked:       { label: 'Acceso de invitado bloqueado',   color: '#dc2626' },
+    smb_services_down:          { label: 'Servicio SMB cliente detenido',  color: '#dc2626' },
+    accessible:                 { label: 'Acceso exitoso',                 color: '#16a34a' },
+    unknown:                    { label: 'Causa desconocida',              color: '#6b7280' },
+};
+
+const _ACTION_LABELS = {
+    'smb.disable_require_signing': 'Deshabilitar RequireSecuritySignature (Remediación abajo)',
+    'smb.restart_lanman':          'Reiniciar servicio LanmanWorkstation (Remediación abajo)',
+    'smb.allow_insecure_guest':    'Habilitar acceso de invitado (Acción legada, final de página)',
+};
+
+// --- Target input helpers ---
+function _buildSmbTarget() {
+    const host  = (document.getElementById('smb-host-input')?.value  || '').trim();
+    const share = (document.getElementById('smb-share-input')?.value || '').trim();
+    if (!host) return { host: '', unc: '' };
+    const unc = share ? `\\\\${host}\\${share}` : '';
+    return { host, unc };
+}
+
+function onSmbHostInput() {
+    const { host, unc } = _buildSmbTarget();
+    const msg = document.getElementById('smb-target-msg');
+    if (msg) msg.textContent = unc ? `Objetivo: ${unc}` : (host ? `Servidor: ${host}` : '');
+}
+
+// --- Verdict panel ---
+function updateVerdictPanel(cls, host, unc, ts) {
+    _lastClassification = cls;
+    const panel = document.getElementById('verdict-panel');
+    if (!panel) return;
+
+    const cause    = cls?.cause || 'unknown';
+    const info     = _CAUSE_LABELS[cause] || { label: cause, color: '#6b7280' };
+    const conf     = cls?.confidence || 'low';
+    const recAction = cls?.recommended_action;
+    const details  = cls?.details || [];
+
+    panel.style.display     = 'block';
+    panel.style.borderLeftColor = info.color;
+
+    const el = id => document.getElementById(id);
+
+    if (el('verdict-target')) {
+        el('verdict-target').textContent = unc || host || '—';
+    }
+    if (el('verdict-cause')) {
+        el('verdict-cause').innerHTML =
+            `<span style="color:${info.color};font-weight:600;">${escapeHtml(info.label)}</span>` +
+            `<span style="font-size:11px;color:var(--text-muted);margin-left:6px;">` +
+            `(confianza: ${escapeHtml(conf)})</span>`;
+    }
+    if (el('verdict-action')) {
+        el('verdict-action').textContent = recAction
+            ? (_ACTION_LABELS[recAction] || recAction)
+            : 'Ninguna — revisión manual';
+    }
+    if (el('verdict-risk')) {
+        const risk = cls?.risk_level || 'INFO';
+        const rc   = risk === 'DESTRUCTIVE' ? '#dc2626'
+                   : risk === 'RISKY'       ? '#ca8a04'
+                   : '#6b7280';
+        el('verdict-risk').innerHTML =
+            `<span style="color:${rc};font-weight:600;">${escapeHtml(risk)}</span>`;
+    }
+    if (el('verdict-ts') && ts) {
+        el('verdict-ts').textContent = ts.replace('T', ' ').slice(0, 19);
+    }
+    if (el('verdict-details') && details.length) {
+        el('verdict-details').innerHTML = details
+            .filter(Boolean)
+            .map(d => `<div>&#x2022; ${escapeHtml(d)}</div>`)
+            .join('');
+    }
+
+    // Enable recommended fix button (skip guest — requires deliberate EXPERT action)
+    const repairBtn = document.getElementById('repair-btn');
+    if (repairBtn) {
+        repairBtn.disabled = !recAction || recAction === 'smb.allow_insecure_guest';
+    }
+}
+
+// --- Orchestrated full diagnosis ---
+async function runFullDiagnosis() {
+    const { host, unc } = _buildSmbTarget();
+    const console_ = document.getElementById('wf-console');
+    if (console_) console_.innerHTML = 'Ejecutando diagnóstico completo&hellip;';
+
+    try {
+        const body = {};
+        if (host) body.host = host;
+        if (unc)  body.unc_path = unc;
+
+        const res  = await fetch('/windows-features/api/smb/run-full-diagnosis', {
+            method: 'POST', headers: getDefaultHeaders(), body: JSON.stringify(body),
+        });
+        const data = await res.json();
+
+        if (data.status !== 'success') {
+            if (console_) console_.innerHTML = `Error: ${escapeHtml(data.message || 'desconocido')}`;
+            return;
+        }
+
+        _smbFindings = data.findings || {};
+        const cls   = data.classification || {};
+        updateVerdictPanel(cls, data.host, data.unc_path, data.timestamp);
+
+        // Refresh sub-sections
+        await runSmbClientConfig();
+        await runMappedDrives();
+
+        const msg = `Diagnóstico completo — clasificación: ${escapeHtml(cls.label || cls.cause || '?')}`;
+        if (console_) console_.innerHTML = msg;
+        if (typeof showToast === 'function') showToast(msg, 'info');
+    } catch (e) {
+        if (console_) console_.innerHTML = `Error de comunicación: ${escapeHtml(e.message)}`;
+        if (typeof showToast === 'function') showToast('Error al ejecutar diagnóstico', 'error');
+    }
+}
+
+// --- Apply recommended fix ---
+async function applyRecommendedFix() {
+    const cause = _lastClassification?.cause;
+    if (cause === 'smb_signing_mismatch') {
+        const btn = document.querySelector('button[onclick="runDisableRequireSigning(this)"]');
+        if (btn) await runDisableRequireSigning(btn);
+    } else if (cause === 'smb_services_down') {
+        const btn = document.querySelector('button[onclick="runRestartLanman(this)"]');
+        if (btn) await runRestartLanman(btn);
+    }
+}
+
+// --- SMB client config card ---
+async function runSmbClientConfig() {
+    const loading = document.getElementById('smb-cfg-loading');
+    const errDiv  = document.getElementById('smb-cfg-error');
+    const table   = document.getElementById('smb-cfg-table');
+    const tbody   = document.getElementById('smb-cfg-body');
+
+    if (loading) loading.style.display = 'block';
+    if (errDiv)  errDiv.style.display  = 'none';
+    if (table)   table.style.display   = 'none';
+
+    try {
+        const res  = await fetch('/windows-features/api/smb/client-config');
+        const data = await res.json();
+
+        if (data.status !== 'success') {
+            if (errDiv) { errDiv.textContent = data.message || 'Error'; errDiv.style.display = 'block'; }
+            if (loading) loading.style.display = 'none';
+            return;
+        }
+
+        const cfg = data.config || {};
+        _smbFindings.client_config = cfg;
+        if (tbody) tbody.innerHTML = _renderSmbCfgRows(cfg);
+        if (loading) loading.style.display = 'none';
+        if (table)   table.style.display   = 'table';
+    } catch (e) {
+        if (errDiv) { errDiv.textContent = 'Error de comunicación.'; errDiv.style.display = 'block'; }
+        if (loading) loading.style.display = 'none';
+    }
+}
+
+function _renderSmbCfgRows(cfg) {
+    const rows = [
+        { key: 'RequireSecuritySignature', desc: 'Si True: solo se permite acceso a servidores con firma SMB obligatoria. CAUSA PRINCIPAL del incidente confirmado.', warnTrue: true },
+        { key: 'EnableSecuritySignature',  desc: 'Firma SMB soportada (se negocia cuando el servidor la requiere). Debe permanecer True.', warnFalse: true },
+        { key: 'EnableInsecureGuestLogons', desc: 'Permite acceso sin autenticación. Riesgo de seguridad si True.', warnTrue: true },
+        { key: 'RequireEncryption',        desc: 'Si True: solo se permiten conexiones SMB cifradas.', warnFalse: false },
+        { key: 'BlockNTLM',                desc: 'Si True: autenticación NTLM bloqueada.', warnFalse: false },
+    ];
+
+    return rows.map(r => {
+        const val = cfg[r.key];
+        let badge;
+        if (val === null || val === undefined) {
+            badge = '<span style="color:#6b7280;">—</span>';
+        } else if (val === true) {
+            const color = r.warnTrue ? '#dc2626' : '#16a34a';
+            badge = `<span style="color:${color};font-weight:600;">True</span>`;
+        } else {
+            const color = r.warnFalse ? '#dc2626' : '#6b7280';
+            badge = `<span style="color:${color};font-weight:600;">False</span>`;
+        }
+        return `<tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:10px 14px;font-family:monospace;font-size:12px;">${escapeHtml(r.key)}</td>
+            <td style="padding:10px 14px;text-align:center;">${badge}</td>
+            <td style="padding:10px 14px;font-size:12px;color:var(--text-muted);">${escapeHtml(r.desc)}</td>
+        </tr>`;
+    }).join('');
+}
+
+// --- UNC access test (from Step 2 button) ---
+async function runUncAccessTest(btn) {
+    const unc = (document.getElementById('unc-input')?.value || '').trim();
+    if (!isValidUnc(unc)) return;
+
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Probando\u2026';
+    const console_ = document.getElementById('wf-console');
+    if (console_) console_.innerHTML = `Probando acceso a "${escapeHtml(unc)}"&hellip;`;
+
+    try {
+        const res  = await fetch('/windows-features/api/smb/test-unc-access', {
+            method: 'POST', headers: getDefaultHeaders(),
+            body: JSON.stringify({ unc_path: unc }),
+        });
+        const data = await res.json();
+
+        if (data.status !== 'success') {
+            if (console_) console_.innerHTML = `Error: ${escapeHtml(data.message || 'desconocido')}`;
+            return;
+        }
+
+        const access = data.access || {};
+        _smbFindings.unc_access = access;
+
+        const cls = _classifyClient();
+        _renderUncAccessResult(access, cls);
+        updateVerdictPanel(cls, _extractHostFromUnc(unc), unc, new Date().toISOString());
+        if (console_) console_.innerHTML = access.accessible
+            ? 'Acceso UNC exitoso.'
+            : `Acceso UNC fallido: ${escapeHtml(access.error_msg || 'sin detalle')}`;
+    } catch (e) {
+        if (console_) console_.innerHTML = `Error de comunicación: ${escapeHtml(e.message)}`;
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+}
+
+function _renderUncAccessResult(access, cls) {
+    const el = document.getElementById('unc-test-result');
+    if (!el) return;
+    const accessible = access.accessible;
+    const err = access.error_msg || '';
+
+    let html;
+    if (accessible === true) {
+        html = `<div style="color:#16a34a;font-weight:600;">&#10003; Accesible` +
+               `${access.item_count != null ? ` (${access.item_count} elemento(s))` : ''}</div>`;
+    } else if (accessible === false) {
+        const causeLabel = cls?.label || 'error de acceso';
+        html = `<div style="color:#dc2626;font-weight:600;">&#10007; No accesible — ${escapeHtml(causeLabel)}</div>
+            <div style="margin-top:4px;font-size:12px;font-family:monospace;
+                        color:var(--text-muted);word-break:break-word;">${escapeHtml(err)}</div>`;
+    } else {
+        html = '<div style="color:#6b7280;">Sin resultado</div>';
+    }
+    el.innerHTML = html;
+    el.style.display = 'block';
+}
+
+// --- Client-side classification (mirrors Python classify_smb_issue) ---
+function _classifyClient() {
+    const cfg      = _smbFindings.client_config || {};
+    const reach    = _smbFindings.reachability  || {};
+    const access   = _smbFindings.unc_access    || {};
+    const services = _smbFindings.services      || {};
+
+    const err = (access.error_msg || '').toLowerCase();
+
+    const lmw = services.lanman_workstation;
+    if (lmw && lmw.status !== 'Running') {
+        return { cause: 'smb_services_down', label: 'Servicio SMB cliente detenido',
+                 confidence: 'high', recommended_action: 'smb.restart_lanman',
+                 risk_level: 'RISKY',
+                 details: [`LanmanWorkstation: ${lmw.status}`] };
+    }
+
+    if (access.accessible === true) {
+        return { cause: 'accessible', label: 'Acceso exitoso', confidence: 'high',
+                 recommended_action: null, risk_level: 'INFO', details: [] };
+    }
+
+    if (access.accessible === false) {
+        const signingPhrases = ['smb signing','security signature','signing is required',
+                                'firma smb','require smb signing'];
+        const hasSign = signingPhrases.some(p => err.includes(p));
+
+        if (cfg.RequireSecuritySignature === true || hasSign) {
+            return {
+                cause: 'smb_signing_mismatch',
+                label: 'Incompatibilidad de firma SMB',
+                confidence: hasSign ? 'high' : 'medium',
+                recommended_action: 'smb.disable_require_signing',
+                risk_level: 'RISKY',
+                details: [
+                    'RequireSecuritySignature = True',
+                    err ? `Error: ${err.slice(0, 200)}` : '',
+                ].filter(Boolean),
+            };
+        }
+        if (reach.ping === false && reach.tcp445 === false) {
+            return { cause: 'host_unreachable', label: 'Servidor no alcanzable',
+                     confidence: 'high', recommended_action: null, risk_level: 'INFO',
+                     details: ['Ping y TCP 445 fallaron.'] };
+        }
+        if (reach.tcp445 === false) {
+            return { cause: 'tcp_445_blocked', label: 'Puerto TCP 445 bloqueado',
+                     confidence: 'high', recommended_action: null, risk_level: 'INFO',
+                     details: ['Ping OK, TCP 445 no alcanzable.'] };
+        }
+        if (['guest','invitado','insecure guest'].some(p => err.includes(p))) {
+            return { cause: 'guest_access_blocked', label: 'Acceso de invitado bloqueado',
+                     confidence: 'high', recommended_action: 'smb.allow_insecure_guest',
+                     risk_level: 'DESTRUCTIVE', details: [`Error: ${err.slice(0,200)}`] };
+        }
+        if (['access denied','denegado','logon failure'].some(p => err.includes(p))) {
+            return { cause: 'access_denied_credentials', label: 'Acceso denegado / credenciales',
+                     confidence: 'high', recommended_action: null, risk_level: 'INFO',
+                     details: ['Verifique credenciales y permisos NTFS.'] };
+        }
+        if (['path not found','network path','no se encontro'].some(p => err.includes(p))) {
+            return { cause: 'share_not_found', label: 'Recurso compartido no encontrado',
+                     confidence: 'high', recommended_action: null, risk_level: 'INFO',
+                     details: ['Verifique que el recurso compartido exista en el servidor.'] };
+        }
+    }
+    return { cause: 'unknown', label: 'Causa desconocida', confidence: 'low',
+             recommended_action: null, risk_level: 'INFO', details: [] };
+}
+
+// --- Mapped drives card ---
+async function runMappedDrives() {
+    const container = document.getElementById('drives-table-container');
+    const loading   = document.getElementById('drives-loading');
+    if (loading)   loading.style.display   = 'block';
+    if (container) container.style.display = 'none';
+
+    try {
+        const res  = await fetch('/windows-features/api/smb/mapped-drives');
+        const data = await res.json();
+        if (loading) loading.style.display = 'none';
+        if (data.status !== 'success' || !container) return;
+
+        const drives = data.drives || [];
+        container.style.display = 'block';
+
+        if (!drives.length) {
+            container.innerHTML =
+                '<span style="color:var(--text-muted);font-size:13px;">Sin unidades de red mapeadas.</span>';
+        } else {
+            container.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <tr style="background:var(--bg-secondary);">
+                    <th style="padding:6px 10px;text-align:left;">Unidad</th>
+                    <th style="padding:6px 10px;text-align:left;">Ruta de red</th>
+                </tr>
+                ${drives.map(d => `<tr style="border-bottom:1px solid var(--border);">
+                    <td style="padding:6px 10px;font-family:monospace;">
+                        ${escapeHtml(d.Name || '')}:\\
+                    </td>
+                    <td style="padding:6px 10px;font-family:monospace;">
+                        ${escapeHtml(d.DisplayRoot || '')}
+                    </td>
+                </tr>`).join('')}
+            </table>`;
+        }
+        _populateDriveLetterSelect(drives.map(d => d.Name || ''));
+    } catch (e) {
+        if (loading) loading.style.display = 'none';
+    }
+}
+
+function _populateDriveLetterSelect(usedLetters) {
+    const sel = document.getElementById('drive-letter-select');
+    if (!sel) return;
+    const used = new Set((usedLetters || []).map(l => l.toUpperCase()));
+    const avail = 'DEFGHIJKLMNOPQRSTUVWXYZ'.split('').filter(l => !used.has(l));
+    sel.innerHTML = avail.map(l => `<option value="${l}">${l}:</option>`).join('');
+}
+
+async function runMapDrive(btn) {
+    const letter = document.getElementById('drive-letter-select')?.value || '';
+    const unc    = (document.getElementById('map-unc-input')?.value || '').trim();
+    if (!letter || !unc) {
+        if (typeof showToast === 'function') showToast('Seleccione una letra y una ruta UNC válida.', 'warning');
+        return;
+    }
+    await _doSmbGoverned('smb.map_drive', '/windows-features/api/smb/map-drive',
+        { drive_letter: letter, unc_path: unc }, btn, null,
+        () => runMappedDrives());
+}
+
+async function runClearSessions(btn) {
+    await _doSmbGoverned('smb.clear_sessions', '/windows-features/api/smb/clear-sessions',
+        {}, btn, null,
+        () => runMappedDrives());
+}
+
+// --- Remediations ---
+async function runDisableRequireSigning(btn) {
+    await _doSmbGoverned('smb.disable_require_signing',
+        '/windows-features/api/smb/disable-require-signing',
+        {}, btn, null,
+        () => runSmbClientConfig());
+}
+
+async function runRestartLanman(btn) {
+    await _doSmbGoverned('smb.restart_lanman',
+        '/windows-features/api/smb/restart-lanman',
+        {}, btn, null, null);
+}
+
+async function runAllowInsecureGuest(btn) {
+    await _doSmbGoverned('smb.allow_insecure_guest',
+        '/windows-features/api/smb/allow-insecure-guest',
+        {}, btn, null,
+        () => runSmbClientConfig());
+}
+
+// --- Generic governed action handler (same two-step pattern as _doAdapterChange) ---
+async function _doSmbGoverned(actionId, endpoint, body, btn, confirmationToken, afterFn) {
+    const originalText = btn.textContent;
+    btn.disabled    = true;
+    btn.textContent = 'Procesando\u2026';
+
+    const console_ = document.getElementById('wf-console');
+    const fullBody = Object.assign({}, body);
+    if (confirmationToken) fullBody.confirmation_token = confirmationToken;
+
+    try {
+        const res  = await fetch(endpoint, {
+            method: 'POST', headers: getDefaultHeaders(), body: JSON.stringify(fullBody),
+        });
+        const data = await res.json();
+
+        if (data.status === 'needs_confirmation') {
+            btn.disabled    = false;
+            btn.textContent = originalText;
+
+            const confirmed = await showConfirm(
+                data.action_id || actionId,
+                data.confirm_message || '¿Confirmar acción?',
+                data.risk_class === 'destructive' ? 'danger' : 'warning'
+            );
+            if (!confirmed) return;
+
+            await fetch('/api/policy/confirm', {
+                method: 'POST', headers: getDefaultHeaders(),
+                body: JSON.stringify({ token: data.action_id }),
+            });
+            await _doSmbGoverned(actionId, endpoint, body, btn, data.action_id, afterFn);
+            return;
+        }
+
+        const isOk = data.status === 'success' || data.status === 'completed';
+        const raw  = data.output || data.error || '';
+        const msg  = isOk
+            ? (raw || `Acción completada: ${actionId}`)
+            : (raw || `Error en acción: ${actionId}`);
+
+        if (console_) console_.innerHTML = msg.replace(/\n/g, '<br>');
+        if (typeof showToast === 'function') showToast(isOk ? 'Operación exitosa.' : msg, isOk ? 'success' : 'error');
+        if (isOk && typeof afterFn === 'function') await afterFn();
+    } catch (e) {
+        btn.disabled    = false;
+        btn.textContent = originalText;
+        const errMsg = `Error de comunicación: ${escapeHtml(e.message)}`;
+        if (console_) console_.innerHTML = errMsg;
+        if (typeof showToast === 'function') showToast(errMsg, 'error');
+    }
+}
+
+// --- Utility ---
+function _extractHostFromUnc(unc) {
+    if (!unc || !unc.startsWith('\\\\')) return '';
+    return unc.slice(2).split('\\')[0] || '';
+}
+
 // ── Optional features (.NET 3.5, .NET 4.8 Adv, SMB1 status) ──────────────
 
 async function loadOptionalFeatures() {
@@ -696,6 +1409,8 @@ async function doEnableSMB1(btn) {
 document.addEventListener('DOMContentLoaded', () => {
     loadSharedFolderDiag();
     loadOptionalFeatures();
+    runSmbClientConfig();
+    runMappedDrives();
 });
 </script>
 {% endblock %}

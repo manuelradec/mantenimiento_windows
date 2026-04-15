@@ -594,6 +594,64 @@ ROLLBACK_STRATEGIES = {
         'needs_reboot': False,
         'restore_point_recommended': False,
     },
+    # smb repair workflow — modular remediations
+    'smb.map_drive': {
+        'classification': 'manually_reversible',
+        'reversible': 'manual',
+        'instructions': (
+            'Desconectar la unidad via la UI de Unidades de red, '
+            'o ejecutar: net use X: /delete'
+        ),
+        'needs_reboot': False,
+        'restore_point_recommended': False,
+    },
+    'smb.clear_sessions': {
+        'classification': 'manually_reversible',
+        'reversible': 'manual',
+        'instructions': 'Volver a mapear las unidades necesarias manualmente.',
+        'needs_reboot': False,
+        'restore_point_recommended': False,
+    },
+    'smb.disable_require_signing': {
+        'classification': 'manually_reversible',
+        'reversible': 'manual',
+        'instructions': (
+            'Revertir: '
+            'Set-SmbClientConfiguration -RequireSecuritySignature $true -Force'
+        ),
+        'rollback_command': (
+            'Set-SmbClientConfiguration -RequireSecuritySignature $true -Force'
+        ),
+        'needs_reboot': False,
+        'restore_point_recommended': False,
+    },
+    'smb.restart_lanman': {
+        'classification': 'auto_reversible',
+        'reversible': 'auto',
+        'instructions': (
+            'El servicio se reinicia automáticamente. '
+            'Las sesiones SMB se restablecen al reconectarse.'
+        ),
+        'needs_reboot': False,
+        'restore_point_recommended': False,
+    },
+    'smb.allow_insecure_guest': {
+        'classification': 'manually_reversible',
+        'reversible': 'manual',
+        'instructions': (
+            'Revertir: eliminar el valor AllowInsecureGuestAuth del registro o establecerlo a 0, '
+            'luego reiniciar LanmanWorkstation. '
+            'Clave: HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\LanmanWorkstation'
+        ),
+        'rollback_command': (
+            'Set-ItemProperty '
+            "'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\LanmanWorkstation' "
+            'AllowInsecureGuestAuth 0 -Type DWORD -Force; '
+            'Restart-Service LanmanWorkstation -Force'
+        ),
+        'needs_reboot': False,
+        'restore_point_recommended': True,
+    },
     # windows_features Phase 5 — optional feature enablement
     'windows_features.enable_dotnet35': {
         'classification': 'manually_reversible',

@@ -50,17 +50,20 @@ def _get_username() -> str:
         return 'unknown'
 
 
-def open_browser(port: int, delay: float = 1.5):
+def open_browser(host: str, port: int, delay: float = 1.5):
     """Open the default browser after a short delay."""
+    # Always open via loopback in the browser even when server binds 0.0.0.0
+    browse_host = '127.0.0.1' if host in ('0.0.0.0', '') else host
+
     def _open():
         import time
         time.sleep(delay)
-        webbrowser.open(f'http://127.0.0.1:{port}')
+        webbrowser.open(f'http://{browse_host}:{port}')
     thread = threading.Thread(target=_open, daemon=True)
     thread.start()
 
 
-def run_production(app, port: int):
+def run_production(app, host: str, port: int):
     """Run the application using Waitress (production WSGI server)."""
     try:
         from waitress import serve
@@ -68,43 +71,43 @@ def run_production(app, port: int):
         logging.getLogger('cleancpu.server').error(
             "Waitress is not installed. Falling back to Flask dev server."
         )
-        run_development(app, port)
+        run_development(app, host, port)
         return
 
+    threads = Config.THREADED if (isinstance(Config.THREADED, int) and not isinstance(Config.THREADED, bool)) else 6
     logger = logging.getLogger('cleancpu.server')
     logger.info(f"CleanCPU v{Config.APP_VERSION} - Production Mode")
-    logger.info(f"URL: http://127.0.0.1:{port}")
+    logger.info(f"Listening: http://{host}:{port}  (threads={threads})")
     logger.info(f"Admin: {get_elevation_info()['is_admin']}")
     logger.info(f"Logs: {Config.LOG_DIR}")
 
-    open_browser(port)
+    open_browser(host, port)
 
     serve(
         app,
-        host='127.0.0.1',
+        host=host,
         port=port,
-        threads=6,
+        threads=threads,
         channel_timeout=120,
         cleanup_interval=30,
         url_scheme='http',
         ident='CleanCPU',
-        # Only listen on localhost
         _quiet=False,
     )
 
 
-def run_development(app, port: int):
+def run_development(app, host: str, port: int):
     """Run the application using Flask's development server."""
     logger = logging.getLogger('cleancpu.server')
     logger.info(f"CleanCPU v{Config.APP_VERSION} - Development Mode")
-    logger.info(f"URL: http://127.0.0.1:{port}")
+    logger.info(f"Listening: http://{host}:{port}")
     logger.info(f"Admin: {get_elevation_info()['is_admin']}")
     logger.info(f"Logs: {Config.LOG_DIR}")
 
-    open_browser(port)
+    open_browser(host, port)
 
     app.run(
-        host='127.0.0.1',
+        host=host,
         port=port,
         debug=True,
         threaded=True,
@@ -123,6 +126,7 @@ def main():
                         help='Do not open browser automatically')
     args = parser.parse_args()
 
+    host = Config.HOST
     port = args.port or Config.PORT
 
     # Set up logging
@@ -168,12 +172,14 @@ def main():
     if args.no_browser:
         # Patch out browser opening
         global open_browser
-        open_browser = lambda port, delay=0: None
+
+        def open_browser(host, port, delay=0):  # noqa: F811
+            pass
 
     if args.dev:
-        run_development(app, port)
+        run_development(app, host, port)
     else:
-        run_production(app, port)
+        run_production(app, host, port)
 
 
 if __name__ == '__main__':
