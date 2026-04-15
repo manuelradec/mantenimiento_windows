@@ -45,7 +45,10 @@
       "Bash(python -c \"from core.governance import ROLLBACK_STRATEGIES; print\\(ROLLBACK_STRATEGIES['windows_features.test_unc']['classification']\\); print\\(ROLLBACK_STRATEGIES['windows_features.open_network_path']['classification']\\)\")",
       "Bash(del _test_unc.py)",
       "Bash(python -m flake8 services/windows_features.py routes/windows_features.py core/action_registry.py core/governance.py services/network_tools.py --max-line-length=120)",
-      "Bash(python -m pytest tests/test_governance.py tests/test_hardening.py -v)"
+      "Bash(python -m pytest tests/test_governance.py tests/test_hardening.py -v)",
+      "Bash(python -m flake8 services/smb_repair.py routes/windows_features.py core/action_registry.py core/governance.py --max-line-length=120)",
+      "Bash(python -m flake8 config.py core/security.py server.py --max-line-length=100)",
+      "Bash(python -m pytest tests/ -q --tb=short)"
     ]
   }
 }

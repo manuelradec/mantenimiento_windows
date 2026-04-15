@@ -585,8 +585,103 @@ def _register_windows_features_actions():
     ))
 
 
+def _register_smb_repair_actions():
+    """Register SMB repair workflow actions (modular diagnostic + remediation)."""
+
+    # SAFE_MUTATION — read-only launchers with network I/O or user-provided input
+    for aid, name, desc, timeout in [
+        (
+            'smb.map_drive',
+            'Mapear unidad de red',
+            'Mapear un recurso compartido a una letra de unidad (net use)',
+            30,
+        ),
+        (
+            'smb.clear_sessions',
+            'Limpiar sesiones SMB y unidades mapeadas',
+            'Eliminar todas las unidades mapeadas y sesiones SMB (net use * /delete)',
+            30,
+        ),
+    ]:
+        registry.register(ActionDef(
+            action_id=aid,
+            name=name,
+            module='smb',
+            risk_class=RiskClass.DISRUPTIVE,
+            requires_admin=False,
+            requires_confirmation=True,
+            confirm_message=(
+                'Esto desconectará todas las unidades de red mapeadas. ¿Continuar?'
+                if aid == 'smb.clear_sessions'
+                else 'Esto mapeará una unidad de red. ¿Continuar?'
+            ),
+            default_timeout=timeout,
+            description=desc,
+        ))
+
+    # RISKY — primary remediations (confirmed production fix)
+    for aid, name, desc, timeout, confirm_msg in [
+        (
+            'smb.disable_require_signing',
+            'Deshabilitar RequireSecuritySignature (corrección firma SMB)',
+            'Set-SmbClientConfiguration -RequireSecuritySignature $false -Force. '
+            'Corrección principal para incompatibilidad de firma SMB. '
+            'Preserva EnableSecuritySignature = True.',
+            30,
+            'Esto deshabilita el requisito obligatorio de firma SMB en este cliente. '
+            'La firma SMB sigue siendo ofrecida cuando el servidor la soporta. '
+            'Recomendado cuando el diagnóstico confirma incompatibilidad de firma. ¿Continuar?',
+        ),
+        (
+            'smb.restart_lanman',
+            'Reiniciar servicio LanmanWorkstation',
+            'Restart-Service LanmanWorkstation -Force. '
+            'Necesario para que los cambios de configuración SMB surtan efecto en sesiones activas.',
+            30,
+            'Esto reiniciará el servicio SMB cliente. '
+            'Las sesiones SMB activas y unidades mapeadas se desconectarán brevemente. ¿Continuar?',
+        ),
+    ]:
+        registry.register(ActionDef(
+            action_id=aid,
+            name=name,
+            module='smb',
+            risk_class=RiskClass.RISKY,
+            requires_admin=True,
+            requires_confirmation=True,
+            confirm_message=confirm_msg,
+            default_timeout=timeout,
+            description=desc,
+        ))
+
+    # DESTRUCTIVE — legacy compatibility only (NOT the default fix)
+    registry.register(ActionDef(
+        action_id='smb.allow_insecure_guest',
+        name='Habilitar acceso de invitado inseguro (solo compatibilidad legada)',
+        module='smb',
+        risk_class=RiskClass.DESTRUCTIVE,
+        requires_admin=True,
+        requires_confirmation=True,
+        confirm_message=(
+            'ADVERTENCIA DE SEGURIDAD: Esta acción habilita el acceso de invitado inseguro. '
+            'NO es la corrección principal para incompatibilidad de firma SMB. '
+            'Úsela SOLO si el diagnóstico confirma que el servidor requiere acceso de invitado '
+            'y no existe alternativa viable. '
+            'Esto modifica el registro del sistema y reinicia LanmanWorkstation. '
+            '¿Desea continuar?'
+        ),
+        default_timeout=30,
+        needs_restore_point=True,
+        description=(
+            'Establece AllowInsecureGuestAuth=1 en el registro y reinicia LanmanWorkstation. '
+            'Solo para compatibilidad con recursos de red legados sin autenticación.'
+        ),
+    ))
+
+
 _register_all_actions()
 _register_office_actions()
 _register_startup_actions()
 _register_sharing_actions()
 _register_windows_features_actions()
+_register_smb_repair_actions()
