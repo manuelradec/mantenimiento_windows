@@ -314,30 +314,22 @@ async function saveTask() {
     btn.disabled    = true;
     btn.textContent = 'Guardando…';
 
-    try {
-        const res  = await fetch('/scheduled-restart/api/create', {
-            method:  'POST',
-            headers: {'Content-Type': 'application/json'},
-            body:    JSON.stringify({ date, time, recurrence, grace_period: grace, force: false }),
-        });
-        const data = await res.json();
-
-        const console_ = document.getElementById('output-console');
-        if (data.status === 'success') {
-            if (console_) console_.textContent = data.message;
-            if (typeof showToast === 'function') showToast(data.message, 'success');
-            checkStatus();
-        } else {
-            if (console_) console_.textContent = 'Error: ' + (data.error || 'desconocido');
-            if (typeof showToast === 'function') showToast(data.error || 'Error al programar', 'error');
-        }
-    } catch (e) {
-        document.getElementById('output-console').textContent = 'Error: ' + e.message;
-        if (typeof showToast === 'function') showToast('Error de comunicación', 'error');
-    } finally {
-        btn.disabled    = false;
-        btn.textContent = 'Programar reinicio con aviso';
+    const data = await apiPost('/scheduled-restart/api/create', {
+        date, time, recurrence, grace_period: grace, force: false,
+    });
+    const console_ = document.getElementById('output-console');
+    if (data.status === 'success') {
+        if (console_) console_.textContent = data.message;
+        if (typeof showToast === 'function') showToast(data.message, 'success');
+        checkStatus();
+    } else {
+        const msg = data.error || 'Error al programar';
+        if (console_) console_.textContent = 'Error: ' + msg;
+        if (typeof showToast === 'function') showToast(msg, 'error');
     }
+
+    btn.disabled    = false;
+    btn.textContent = 'Programar reinicio con aviso';
 }
 
 // ── Forced restart ─────────────────────────────────────────────────────────
@@ -377,36 +369,25 @@ async function saveForceTask() {
     btn.disabled    = true;
     btn.textContent = 'Programando reinicio forzado…';
 
-    try {
-        const res  = await fetch('/scheduled-restart/api/create', {
-            method:  'POST',
-            headers: {'Content-Type': 'application/json'},
-            body:    JSON.stringify({
-                date, time, recurrence,
-                force: true, force_confirmed: true,
-            }),
-        });
-        const data = await res.json();
-
-        const console_ = document.getElementById('output-console');
-        if (data.status === 'success') {
-            if (console_) console_.textContent = data.message;
-            if (typeof showToast === 'function') showToast(data.message, 'warning');
-            // Uncheck the lock after scheduling so the technician must re-confirm next time
-            check.checked = false;
-            toggleForceBtn();
-            checkStatus();
-        } else {
-            if (console_) console_.textContent = 'Error: ' + (data.error || 'desconocido');
-            if (typeof showToast === 'function') showToast(data.error || 'Error al programar', 'error');
-        }
-    } catch (e) {
-        document.getElementById('output-console').textContent = 'Error: ' + e.message;
-        if (typeof showToast === 'function') showToast('Error de comunicación', 'error');
-    } finally {
-        btn.disabled    = false;
-        btn.textContent = 'Programar reinicio FORZADO';
+    const data = await apiPost('/scheduled-restart/api/create', {
+        date, time, recurrence, force: true, force_confirmed: true,
+    });
+    const console_ = document.getElementById('output-console');
+    if (data.status === 'success') {
+        if (console_) console_.textContent = data.message;
+        if (typeof showToast === 'function') showToast(data.message, 'warning');
+        // Uncheck the lock after scheduling so the technician must re-confirm next time
+        check.checked = false;
+        toggleForceBtn();
+        checkStatus();
+    } else {
+        const msg = data.error || 'Error al programar';
+        if (console_) console_.textContent = 'Error: ' + msg;
+        if (typeof showToast === 'function') showToast(msg, 'error');
     }
+
+    btn.disabled    = false;
+    btn.textContent = 'Programar reinicio FORZADO';
 }
 
 // ── Delete ─────────────────────────────────────────────────────────────────
@@ -415,25 +396,16 @@ async function deleteTask() {
     const confirmed = confirm('¿Eliminar la tarea de reinicio programado?');
     if (!confirmed) return;
 
-    try {
-        const res  = await fetch('/scheduled-restart/api/delete', {
-            method:  'POST',
-            headers: {'Content-Type': 'application/json'},
-        });
-        const data = await res.json();
-
-        const console_ = document.getElementById('output-console');
-        if (data.status === 'success') {
-            if (console_) console_.textContent = data.message;
-            if (typeof showToast === 'function') showToast(data.message, 'success');
-            checkStatus();
-        } else {
-            if (console_) console_.textContent = 'Error: ' + (data.error || 'desconocido');
-            if (typeof showToast === 'function') showToast(data.error || 'Error al eliminar', 'error');
-        }
-    } catch (e) {
-        document.getElementById('output-console').textContent = 'Error: ' + e.message;
-        if (typeof showToast === 'function') showToast('Error de comunicación', 'error');
+    const data = await apiPost('/scheduled-restart/api/delete');
+    const console_ = document.getElementById('output-console');
+    if (data.status === 'success') {
+        if (console_) console_.textContent = data.message;
+        if (typeof showToast === 'function') showToast(data.message, 'success');
+        checkStatus();
+    } else {
+        const msg = data.error || 'Error al eliminar';
+        if (console_) console_.textContent = 'Error: ' + msg;
+        if (typeof showToast === 'function') showToast(msg, 'error');
     }
 }
 

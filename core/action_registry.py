@@ -342,7 +342,7 @@ def _register_all_actions():
          'WARNING: This resets the Winsock catalog. A reboot is REQUIRED afterward. '
          'Continue?', True),
         ('repair.chkdsk_schedule', 'Schedule Full CHKDSK', 'repair',
-         'Schedule full disk check on next reboot', 30,
+         'Schedule full disk check on next reboot', 600,
          'This schedules a full CHKDSK on next reboot (1-3 hours). Continue?', True),
         ('repair.memory_diagnostic', 'Memory Diagnostic', 'repair',
          'Schedule memory diagnostic test on next reboot', 10,

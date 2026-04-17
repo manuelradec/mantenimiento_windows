@@ -530,35 +530,29 @@ async function changeServiceStartup(serviceName, startupType, displayName, btn) 
     const console_ = document.getElementById('output-console');
     if (console_) console_.innerHTML = `Cambiando tipo de inicio de ${displayName} a ${startupLabel}…`;
 
-    try {
-        const res = await fetch('/network/api/set-service-startup', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ service_name: serviceName, startup_type: startupType }),
-        });
-        const data = await res.json();
+    const data = await apiPost('/network/api/set-service-startup', {
+        service_name: serviceName,
+        startup_type: startupType,
+    });
 
-        // Set-Service produces no stdout on success; build a meaningful message
-        // instead of falling back to '(sin salida)' for the normal success path.
-        const isOk = data.status === 'success' || data.status === 'completed';
-        const consoleMsg = isOk
-            ? `Tipo de inicio de "${displayName}" cambiado a ${startupLabel} correctamente.`
-            : `Error al cambiar "${displayName}": ${data.error || data.output || 'desconocido'}`;
-        if (console_) console_.innerHTML = consoleMsg;
+    const isOk = data.status === 'success' || data.status === 'completed';
+    const consoleMsg = isOk
+        ? `Tipo de inicio de "${displayName}" cambiado a ${startupLabel} correctamente.`
+        : `Error al cambiar "${displayName}": ${data.error || data.output || 'desconocido'}`;
+    if (console_) console_.innerHTML = consoleMsg;
 
-        const msg = isOk
-            ? `${displayName}: inicio cambiado a ${startupLabel}`
-            : `Error al cambiar ${displayName}: ${data.error || data.message || 'desconocido'}`;
+    const msg = isOk
+        ? `${displayName}: inicio cambiado a ${startupLabel}`
+        : `Error al cambiar ${displayName}: ${data.error || data.message || 'desconocido'}`;
+    if (typeof showToast === 'function') showToast(msg, isOk ? 'success' : 'error');
 
-        if (typeof showToast === 'function') showToast(msg, isOk ? 'success' : 'error');
-
-        // Reload the table to reflect new state
-        await loadManagedServices();
-    } catch (e) {
+    if (!isOk) {
         btn.disabled = false;
         btn.textContent = startupType === 'Automatic' ? '→ Automático' : '→ Manual';
-        if (typeof showToast === 'function') showToast(`Error de comunicación: ${e.message}`, 'error');
+        return;
     }
+
+    await loadManagedServices();
 }
 
 // ── RADEC Catalog ──────────────────────────────────────────────────────────
@@ -677,12 +671,7 @@ async function runCatalogTest(btn) {
     if (console_) console_.innerHTML = `Ejecutando Test-NetConnection hacia ${host}${portLabel}…`;
 
     try {
-        const res = await fetch('/network/api/test-catalog', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ host, label, port }),
-        });
-        const data = await res.json();
+        const data = await apiPost('/network/api/test-catalog', { host, label, port });
 
         // Render raw output to console
         const rawText = data.output || data.error || '(sin salida)';

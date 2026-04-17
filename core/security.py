@@ -21,7 +21,7 @@ request.is_secure work correctly behind a load balancer.
 import secrets
 import logging
 
-from flask import request, abort, g, session
+from flask import request, abort, g, session, jsonify
 
 logger = logging.getLogger('cleancpu.security')
 
@@ -223,6 +223,59 @@ def init_security(app):
     def _inject_csrf():
         """Make CSRF token available to all templates."""
         return {'csrf_token': session.get('csrf_token', '')}
+
+    @app.errorhandler(403)
+    def _handle_forbidden(err):
+        """
+        Return JSON for XHR/fetch clients instead of an HTML error page.
+
+        This prevents the frontend from seeing 'Unexpected token <' when it
+        tries to JSON.parse an error response from a failed CSRF / Origin /
+        Host check.
+        """
+        description = getattr(err, 'description', 'Forbidden')
+        if _wants_json_response():
+            return jsonify({
+                'status': 'error',
+                'error': description,
+                'code': 403,
+            }), 403
+        # Fall back to default HTML rendering for browser navigations.
+        return description, 403
+
+    @app.errorhandler(400)
+    def _handle_bad_request(err):
+        description = getattr(err, 'description', 'Bad Request')
+        if _wants_json_response():
+            return jsonify({
+                'status': 'error',
+                'error': description,
+                'code': 400,
+            }), 400
+        return description, 400
+
+
+def _wants_json_response() -> bool:
+    """
+    Decide whether the current request expects a JSON error response.
+
+    True when the request was sent as JSON, was an XHR/fetch (declared via
+    X-Requested-With), targets an /api/ path, or explicitly accepts JSON
+    over HTML in the Accept header.
+    """
+    if request.is_json:
+        return True
+    if request.headers.get('X-Requested-With', '').lower() == 'xmlhttprequest':
+        return True
+    if request.headers.get('X-CSRF-Token'):
+        # Frontend fetch helpers always send this — strong JSON signal.
+        return True
+    if '/api/' in request.path:
+        return True
+    accept = request.accept_mimetypes
+    return (
+        accept.best_match(['application/json', 'text/html']) == 'application/json'
+    )
 
 
 def _validate_host(allowed_hosts: set, wildcard_patterns: list):
