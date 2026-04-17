@@ -48,7 +48,17 @@
       "Bash(python -m pytest tests/test_governance.py tests/test_hardening.py -v)",
       "Bash(python -m flake8 services/smb_repair.py routes/windows_features.py core/action_registry.py core/governance.py --max-line-length=120)",
       "Bash(python -m flake8 config.py core/security.py server.py --max-line-length=100)",
-      "Bash(python -m pytest tests/ -q --tb=short)"
+      "Bash(python -m pytest tests/ -q --tb=short)",
+      "Bash(python -m flake8 core/security.py core/policy_engine.py core/job_runner.py services/command_runner.py --max-line-length=120 --count)",
+      "Bash(python -m pytest tests/test_policy_engine.py tests/test_governance.py tests/test_hardening.py -x -q)",
+      "Bash(python -m pytest -x -q)",
+      "Bash(python -m pytest -x -q --tb=short)",
+      "Bash(python -m pytest -x -q --tb=line)",
+      "Read(//tmp/**)",
+      "Bash(python -m pytest -x --tb=line)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(python -m flake8 services/repair.py core/action_registry.py static/js/app.js --max-line-length=120 --count)",
+      "Bash(python -m flake8 services/repair.py core/action_registry.py --max-line-length=120 --count)"
     ]
   }
 }

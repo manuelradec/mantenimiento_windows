@@ -6,7 +6,8 @@ CHKDSK, WinSAT, memory diagnostics.
 """
 import logging
 
-from services.command_runner import run_cmd, CommandStatus
+from config import Config
+from services.command_runner import run_cmd, run_powershell, CommandStatus
 
 logger = logging.getLogger('maintenance.repair')
 
@@ -89,13 +90,21 @@ def chkdsk_scan_online():
 def chkdsk_schedule_full():
     """
     Schedule a full CHKDSK on next reboot.
-    WARNING: Requires reboot, can take a long time.
-    Does NOT force reboot - just schedules the check.
+
+    Implementation notes:
+    - chkdsk C: /f /r /x cannot lock the system volume while it is mounted,
+      so Windows prompts "schedule for next reboot? (Y/N)" and waits for
+      input. We auto-answer via PowerShell's pipeline so the command
+      completes without human interaction.
+    - COMMAND_TIMEOUT_LONG is used because the prompt path can be delayed
+      by pending I/O on the volume; 30s was too tight and produced
+      spurious timeouts in production.
+    - Does NOT force a reboot — it only marks the volume for autochk.
     """
-    return run_cmd(
-        'chkdsk C: /f /r /x',
+    return run_powershell(
+        "'Y' | chkdsk C: /f /r /x",
         requires_admin=True,
-        timeout=30,
+        timeout=Config.COMMAND_TIMEOUT_LONG,
         description='Schedule full CHKDSK (next reboot)',
     )
 

@@ -18,6 +18,7 @@ import time
 import re
 import sys
 import os
+import shlex
 import uuid
 from datetime import datetime
 from enum import Enum
@@ -280,6 +281,13 @@ def _redact_command_for_log(cmd_display: str) -> str:
     return redacted
 
 
+def _strip_outer_quotes(token: str) -> str:
+    """Remove a single pair of matching outer quotes from a shlex token."""
+    if len(token) >= 2 and token[0] == token[-1] and token[0] in ('"', "'"):
+        return token[1:-1]
+    return token
+
+
 def _prepare_command(command, powershell: bool, shell: bool):
     """
     Resolve the actual subprocess command, shell flag, and allowlist-validation parts.
@@ -302,7 +310,17 @@ def _prepare_command(command, powershell: bool, shell: bool):
         return command, shell, command
 
     if isinstance(command, str):
-        return command, True, command.split()  # shell required for string commands
+        # Use shlex with posix=False so Windows paths like
+        # "C:\Program Files\Windows Defender\MpCmdRun.exe" -SignatureUpdate
+        # tokenize as a single argv[0] instead of being split on spaces.
+        # posix=False preserves the surrounding quotes in each token; strip
+        # them so _validate_command sees the bare executable path.
+        try:
+            raw_parts = shlex.split(command, posix=False)
+        except ValueError:
+            raw_parts = command.split()
+        parts = [_strip_outer_quotes(p) for p in raw_parts]
+        return command, True, parts  # shell required for string commands
 
     return command, shell, None  # Unknown type — pass through without validation
 

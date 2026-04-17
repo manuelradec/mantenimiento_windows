@@ -23,6 +23,67 @@ function getDefaultHeaders() {
     };
 }
 
+/**
+ * Centralised POST helper for all state-changing requests.
+ *
+ * Guarantees:
+ *   - CSRF + Content-Type headers via getDefaultHeaders()
+ *   - JSON body serialisation when provided
+ *   - JSON response parsing with a graceful fallback when the server
+ *     returns a non-JSON body (e.g. during a transient proxy error).
+ *
+ * The helper normalises network/parsing failures into an object shaped
+ * like a governance error response so callers can treat all failure
+ * modes uniformly:
+ *
+ *   { status: 'error', error: '<message>', httpStatus?: <code> }
+ */
+async function apiPost(url, body = null, extraOptions = {}) {
+    const options = {
+        method: 'POST',
+        headers: getDefaultHeaders(),
+        ...extraOptions,
+    };
+    if (body !== null && body !== undefined) {
+        options.body = JSON.stringify(body);
+    }
+
+    let response;
+    try {
+        response = await fetch(url, options);
+    } catch (err) {
+        return { status: 'error', error: `Error de red: ${err.message}` };
+    }
+
+    const text = await response.text();
+    let data = null;
+    if (text) {
+        try {
+            data = JSON.parse(text);
+        } catch (_) {
+            data = null;
+        }
+    }
+
+    if (!response.ok) {
+        const message = (data && (data.error || data.description))
+            || text
+            || `HTTP ${response.status}`;
+        return { status: 'error', error: message, httpStatus: response.status };
+    }
+
+    return data !== null
+        ? data
+        : { status: 'error', error: 'Respuesta vacía del servidor' };
+}
+
+// Expose on window for legacy inline scripts in templates.
+if (typeof window !== 'undefined') {
+    window.apiPost = apiPost;
+    window.getDefaultHeaders = getDefaultHeaders;
+    window.getCsrfToken = getCsrfToken;
+}
+
 // ============================================================
 // Action Execution (with Governance, CSRF, Job Support)
 // ============================================================

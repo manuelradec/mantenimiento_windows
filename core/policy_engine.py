@@ -10,6 +10,7 @@ Validates every action request against:
 """
 import logging
 import threading
+import time
 from typing import Optional
 
 from core.action_registry import (
@@ -36,7 +37,8 @@ class PolicyEngine:
     def __init__(self):
         self._mode = OperationMode.SAFE_MAINTENANCE  # Default: safe maintenance
         self._lock = threading.Lock()
-        self._active_locks: dict[str, str] = {}  # module -> job_id
+        # module -> {'job_id': str, 'acquired_at': float (unix ts)}
+        self._active_locks: dict[str, dict] = {}
         self._confirmed_tokens: set[str] = set()  # Set of confirmed action tokens
 
     @property
@@ -89,7 +91,7 @@ class PolicyEngine:
         # 3. Check mutual exclusion
         with self._lock:
             if action.module in self._active_locks:
-                active_job = self._active_locks[action.module]
+                active_job = self._active_locks[action.module].get('job_id', '?')
                 return {
                     'allowed': False,
                     'reason': (
@@ -133,22 +135,61 @@ class PolicyEngine:
         with self._lock:
             if module in self._active_locks:
                 return False
-            self._active_locks[module] = job_id
+            self._active_locks[module] = {
+                'job_id': job_id,
+                'acquired_at': time.time(),
+            }
+            logger.debug(f"Lock acquired: module={module!r} job={job_id}")
             return True
 
-    def release_lock(self, module: str):
-        """Release an execution lock for a module."""
+    def release_lock(self, module: str) -> bool:
+        """Release an execution lock for a module. Returns True if a lock was released."""
         with self._lock:
-            self._active_locks.pop(module, None)
+            entry = self._active_locks.pop(module, None)
+            if entry is not None:
+                logger.debug(
+                    f"Lock released: module={module!r} job={entry.get('job_id')}"
+                )
+                return True
+            return False
+
+    def force_release_lock(self, module: str) -> Optional[dict]:
+        """
+        Administratively release a stuck lock.
+
+        Returns the previous lock entry (job_id + acquired_at) or None if no
+        lock was held. Callers should log the forced release for audit.
+        """
+        with self._lock:
+            entry = self._active_locks.pop(module, None)
+            if entry is not None:
+                logger.warning(
+                    f"Lock force-released: module={module!r} "
+                    f"job={entry.get('job_id')} "
+                    f"held_for={time.time() - entry.get('acquired_at', time.time()):.1f}s"
+                )
+            return entry
+
+    def get_active_locks(self) -> dict[str, dict]:
+        """Return a snapshot of active locks with age in seconds."""
+        now = time.time()
+        with self._lock:
+            return {
+                module: {
+                    'job_id': info.get('job_id', ''),
+                    'acquired_at': info.get('acquired_at', now),
+                    'age_seconds': round(now - info.get('acquired_at', now), 1),
+                }
+                for module, info in self._active_locks.items()
+            }
 
     def get_status(self) -> dict:
         """Get current policy engine status."""
-        with self._lock:
-            return {
-                'mode': self._mode.value,
-                'active_locks': dict(self._active_locks),
-                'allowed_risk_classes': [r.value for r in MODE_ALLOWED_RISKS[self._mode]],
-            }
+        return {
+            'mode': self._mode.value,
+            'active_locks': self.get_active_locks(),
+            'allowed_risk_classes': [r.value for r in MODE_ALLOWED_RISKS[self._mode]],
+        }
 
 
 # Global policy engine instance

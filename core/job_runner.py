@@ -237,6 +237,8 @@ class JobRunner:
             )
             return
 
+        # Lock is held — from this point on the finally MUST release it,
+        # even if BaseException (SystemExit, KeyboardInterrupt) propagates.
         start_time = time.time()
         try:
             # Mark as running
@@ -305,7 +307,16 @@ class JobRunner:
             logger.error(f"Job {job.job_id} failed: {e}")
 
         finally:
-            policy.release_lock(job.module)
+            # Defensive: even if release_lock raises (it shouldn't), swallow
+            # the error so the worker thread exits cleanly instead of dying
+            # with the lock still held.
+            try:
+                policy.release_lock(job.module)
+            except Exception:
+                logger.exception(
+                    f"Unexpected error releasing lock for module {job.module!r} "
+                    f"(job {job.job_id})"
+                )
 
     def get_job(self, job_id: str) -> Optional[dict]:
         """Get job status. Checks in-memory first, falls back to DB."""
