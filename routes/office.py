@@ -28,6 +28,30 @@ def api_info():
         return jsonify({'error': str(e)}), 500
 
 
+@office_bp.route('/api/is-installed')
+def api_is_installed():
+    """
+    Lightweight endpoint the UI calls on page load to decide whether
+    to enable inspect/activate/repair buttons. Returns only
+    ``{installed, reason}`` so the client can short-circuit without
+    pulling the full registry payload.
+    """
+    from services.office_tools import get_installation_info
+    try:
+        info = get_installation_info()
+        installed = bool(info.get('installed'))
+        if installed:
+            reason = info.get('product_name') or 'Office detectado.'
+        elif info.get('ospp_path'):
+            reason = 'Office detectado por ospp.vbs sin producto en registro.'
+        else:
+            reason = 'Office no se detecto en este equipo.'
+        return jsonify({'installed': installed, 'reason': reason})
+    except Exception as e:
+        logger.error(f"Office is-installed error: {e}")
+        return jsonify({'installed': False, 'reason': f'Error: {e}'}), 500
+
+
 @office_bp.route('/api/inspect', methods=['POST'])
 def api_inspect():
     """Run ospp.vbs /dstatus to get full license status. Requires admin."""

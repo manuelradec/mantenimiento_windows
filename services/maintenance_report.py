@@ -251,6 +251,27 @@ def save_report_locally(html_content, system_info):
         return None
 
 
+# Windows OSError winerror codes that indicate the share simply needs
+# credentials. We convert these into a ``skipped`` result with a clear hint
+# instead of crashing the report flow.
+#   1326 = ERROR_LOGON_FAILURE      ("user name or password is incorrect")
+#   1327 = ERROR_ACCOUNT_RESTRICTION
+#   5    = ERROR_ACCESS_DENIED      (often surfaces for cached bad credentials)
+_AUTH_WINERRORS = {1326, 1327, 5}
+
+
+def _is_auth_error(exc: OSError) -> bool:
+    """Return True when an OSError was caused by missing/bad share credentials."""
+    return getattr(exc, 'winerror', None) in _AUTH_WINERRORS
+
+
+_SHARE_AUTH_HINT = (
+    'Faltan credenciales para la carpeta de red. Guarda usuario/contrasena '
+    'en Red > Credenciales de carpeta de red y reintenta. '
+    'El reporte se guardo localmente.'
+)
+
+
 def save_to_network_share(html_content, system_info):
     """Save the report to the network share."""
     if sys.platform != 'win32':
@@ -270,12 +291,23 @@ def save_to_network_share(html_content, system_info):
             f.write(html_content)
         logger.info(f"Report saved to network share: {target_path}")
         return {'status': 'success', 'path': target_path}
-    except (PermissionError, OSError) as e:
+    except OSError as e:
+        if _is_auth_error(e):
+            logger.warning(
+                "Network share requires credentials (winerror=%s): %s",
+                getattr(e, 'winerror', None), target_dir,
+            )
+            return {
+                'status': 'skipped',
+                'reason': 'auth_required',
+                'error': _SHARE_AUTH_HINT,
+                'winerror': getattr(e, 'winerror', None),
+            }
         logger.error(f"Failed to save to network share: {e}")
         return {
             'status': 'error',
             'error': f'No se pudo guardar en la carpeta de red: {e}. '
-                     'El reporte se guardó localmente.',
+                     'El reporte se guardo localmente.',
         }
 
 
@@ -385,9 +417,21 @@ def generate_radec_excel(system_info, steps):
             shutil.copy2(local_path, net_path)
             network_result = {'status': 'success', 'path': net_path}
             logger.info(f"Excel form copied to network: {net_path}")
-        except (PermissionError, OSError) as e:
-            network_result = {'status': 'error', 'error': str(e)}
-            logger.warning(f"Failed to copy Excel to network: {e}")
+        except OSError as e:
+            if _is_auth_error(e):
+                logger.warning(
+                    "Excel copy: share requires credentials (winerror=%s)",
+                    getattr(e, 'winerror', None),
+                )
+                network_result = {
+                    'status': 'skipped',
+                    'reason': 'auth_required',
+                    'error': _SHARE_AUTH_HINT,
+                    'winerror': getattr(e, 'winerror', None),
+                }
+            else:
+                network_result = {'status': 'error', 'error': str(e)}
+                logger.warning(f"Failed to copy Excel to network: {e}")
 
     return {
         'status': 'success',
