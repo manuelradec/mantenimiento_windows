@@ -17,6 +17,7 @@ import logging
 import time
 import re
 import sys
+import ntpath
 import os
 import shlex
 import uuid
@@ -203,7 +204,11 @@ def _validate_command(cmd_parts: list) -> bool:
     if not cmd_parts:
         return False
 
-    base_cmd = os.path.basename(cmd_parts[0]).lower().replace('.exe', '')
+    # Always use ntpath.basename so the allowlist resolves correctly on
+    # non-Windows CI runners — ``os.path.basename`` on Linux does not split
+    # on '\\', so 'C:\\Program Files\\Lenovo\\...\\tvsu.exe' would stay as
+    # the whole string and miss the 'tvsu' allowlist key.
+    base_cmd = ntpath.basename(cmd_parts[0]).lower().replace('.exe', '')
     entry = _NORMALIZED_ALLOWLIST.get(base_cmd)
 
     if entry is None:
