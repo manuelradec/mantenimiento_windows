@@ -17,6 +17,7 @@ import logging
 import time
 import re
 import sys
+import ntpath
 import os
 import shlex
 import uuid
@@ -108,6 +109,12 @@ ALLOWED_COMMANDS = {
     'taskkill': {'subcommands': ['/f', '/im', '/F', '/T', '/PID'],
                  'denied_args': ['/fi']},
     'start': {'allowed_patterns': [r'^(explorer\.exe|ms-settings:.*)$']},
+
+    # Lenovo Update launchers — invoked by path from _step_lenovo_update.
+    # They take no arguments so max_args=0 keeps the surface area minimal
+    # while still allowing the existing detection-by-path flow to run.
+    'tvsu.exe': {'max_args': 0},
+    'lenovo.vantage.exe': {'max_args': 0},
     'ren': {'allowed_patterns': [
         r'^.*\\softwaredistribution\s+softwaredistribution\.bak\.',
         r'^.*\\catroot2\s+catroot2\.bak\.',
@@ -128,6 +135,16 @@ ALLOWED_COMMANDS = {
     'fsutil': {'subcommands': ['behavior']},
     'pnputil': {'subcommands': ['/enum-drivers', '/enum-devices'],
                 'denied_args': ['/delete-driver', '/remove']},
+
+    # Network share credential manager — invoked only from
+    # services/network_credentials.py, which builds the argv list itself.
+    # /list is the only read form; /add and /delete always target UNC paths.
+    'cmdkey': {'allowed_patterns': [
+        r'^/list(?::\S+)?$',
+        r'^/delete:\S+$',
+        r'^/add:\S+\s+/user:\S+\s+/pass:.+$',
+        r'^/generic:\S+\s+/user:\S+\s+/pass:.+$',
+    ]},
 
     # PowerShell — allowed only via internal wrappers (run_powershell/
     # run_powershell_json) which build the command list themselves.
@@ -187,7 +204,11 @@ def _validate_command(cmd_parts: list) -> bool:
     if not cmd_parts:
         return False
 
-    base_cmd = os.path.basename(cmd_parts[0]).lower().replace('.exe', '')
+    # Always use ntpath.basename so the allowlist resolves correctly on
+    # non-Windows CI runners — ``os.path.basename`` on Linux does not split
+    # on '\\', so 'C:\\Program Files\\Lenovo\\...\\tvsu.exe' would stay as
+    # the whole string and miss the 'tvsu' allowlist key.
+    base_cmd = ntpath.basename(cmd_parts[0]).lower().replace('.exe', '')
     entry = _NORMALIZED_ALLOWLIST.get(base_cmd)
 
     if entry is None:
@@ -275,8 +296,9 @@ def _kill_process_tree(proc):
 
 def _redact_command_for_log(cmd_display: str) -> str:
     """Redact potentially sensitive parts of a command for logging."""
-    # Redact passwords, keys, tokens in command strings
-    redacted = re.sub(r'(?i)(password|pwd|key|token|secret)\s*[=:]\s*\S+',
+    # Redact passwords, keys, tokens in command strings. Includes cmdkey's
+    # '/pass:' form (the redactor runs on the joined display string).
+    redacted = re.sub(r'(?i)(password|pwd|pass|key|token|secret)\s*[=:]\s*\S+',
                       r'\1=***REDACTED***', cmd_display)
     return redacted
 

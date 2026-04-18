@@ -255,3 +255,35 @@ def api_disable_adapter():
         confirmation_token=data.get('confirmation_token'),
     )
     return jsonify(result)
+
+
+# --- Network share credentials (cmdkey) ---
+
+@network_bp.route('/api/credentials')
+def api_list_credentials():
+    """List stored Windows credential targets (no usernames/passwords exposed)."""
+    from services import network_credentials as creds
+    return jsonify(creds.list_credentials())
+
+
+@network_bp.route('/api/credentials', methods=['POST'])
+def api_save_credential():
+    """
+    Store a credential for a network share.
+    Body: { target: "\\\\host\\share", user: "...", password: "..." }
+    """
+    from services import network_credentials as creds
+    data = request.get_json(silent=True) or {}
+    return jsonify(creds.save_credential(
+        data.get('target', ''),
+        data.get('user', ''),
+        data.get('password', ''),
+    ))
+
+
+@network_bp.route('/api/credentials/delete', methods=['POST'])
+def api_delete_credential():
+    """Delete a stored credential. Body: { target: '\\\\host\\share' }."""
+    from services import network_credentials as creds
+    data = request.get_json(silent=True) or {}
+    return jsonify(creds.delete_credential(data.get('target', '')))

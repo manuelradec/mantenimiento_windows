@@ -795,9 +795,12 @@ def _step_lenovo_update():
     if not exe:
         return {'status': 'skipped', 'message': 'Lenovo Vantage/System Update no está instalado.'}
 
+    # Launch the detected Lenovo binary directly — quoting the path so
+    # shlex keeps it as a single token. Avoiding the 'start "" ...' form
+    # keeps the 'start' allowlist strict (explorer.exe / ms-settings only).
     result = run_cmd(
-        f'start "" "{exe}"',
-        shell=True, timeout=10,
+        f'"{exe}"',
+        timeout=10,
         description='Launch Lenovo Update',
     )
     if result.is_error:

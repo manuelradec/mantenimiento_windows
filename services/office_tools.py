@@ -170,17 +170,116 @@ def get_installation_info() -> dict:
     }
 
 
+# LicenseStatus enum values exposed by SoftwareLicensingProduct (WMI).
+# Reference: learn.microsoft.com/windows/win32/secprov/softwarelicensingproduct
+_WMI_LICENSE_STATUS = {
+    0: 'unlicensed',
+    1: 'licensed',
+    2: 'oob_grace',
+    3: 'oot_grace',
+    4: 'non_genuine_grace',
+    5: 'notification',
+    6: 'extended_grace',
+}
+
+
+def _inspect_license_via_wmi() -> dict:
+    """
+    Fallback inspection when ospp.vbs is unavailable: query
+    SoftwareLicensingProduct (SLP) via CIM. SLP is always present on
+    supported Windows versions, doesn't need Office, and doesn't require
+    admin — so it works where ospp.vbs silently fails.
+    """
+    ps = (
+        "Get-CimInstance -ClassName SoftwareLicensingProduct "
+        "-Filter \"PartialProductKey IS NOT NULL AND Name LIKE 'Office%'\" "
+        "| Select-Object Name,Description,PartialProductKey,LicenseStatus "
+        "| ConvertTo-Json -Compress"
+    )
+    result = run_powershell_json(
+        ps, timeout=30, description='Inspect Office license via SLP',
+    )
+    if result.is_error:
+        return {
+            'status': 'error',
+            'message': (
+                f'No se pudo consultar SoftwareLicensingProduct: '
+                f'{result.error or "error desconocido"}'
+            ),
+            'raw_output': result.output or '',
+            'parsed': {},
+        }
+
+    items = result.details.get('data')
+    if items is None:
+        # No Office license entries returned — Office is likely not installed,
+        # or installed without a product key registered in SLP.
+        return {
+            'status': 'office_not_found',
+            'message': (
+                'No se encontro ninguna licencia de Office en '
+                'SoftwareLicensingProduct. Office puede no estar instalado.'
+            ),
+            'raw_output': result.output or '',
+            'parsed': {},
+        }
+
+    # ConvertTo-Json returns a single object when there is one match and a
+    # list otherwise. Normalize to list.
+    if isinstance(items, dict):
+        items = [items]
+    if not isinstance(items, list) or not items:
+        return {
+            'status': 'office_not_found',
+            'message': 'Sin licencias de Office registradas en SLP.',
+            'raw_output': result.output or '',
+            'parsed': {},
+        }
+
+    first = items[0] if isinstance(items[0], dict) else {}
+    status_code = first.get('LicenseStatus')
+    status_label = _WMI_LICENSE_STATUS.get(status_code, f'unknown({status_code})')
+    name = first.get('Name', 'Microsoft Office')
+    partial = first.get('PartialProductKey', '')
+
+    if status_label == 'licensed':
+        msg = f'Office activado (SLP): {name}'
+    elif status_label == 'notification':
+        msg = f'Office requiere activacion (SLP): {name}'
+    elif status_label in ('oob_grace', 'oot_grace', 'extended_grace'):
+        msg = f'Office en periodo de gracia (SLP): {name}'
+    elif status_label == 'unlicensed':
+        msg = f'Office NO esta activado (SLP): {name}'
+    else:
+        msg = f'Estado de licencia (SLP): {status_label}'
+
+    return {
+        'status': 'success',
+        'message': msg,
+        'raw_output': result.output or '',
+        'parsed': {
+            'product_name': name,
+            'license_status': status_label,
+            'partial_key': partial,
+            'source': 'slp_wmi',
+        },
+    }
+
+
 def inspect_license() -> dict:
     """
-    Run ospp.vbs /dstatus to get the current Office license/activation status.
-    Requires admin for ospp.vbs to run; returns REQUIRES_ADMIN status if absent.
+    Inspect Office license/activation. Preferred path is ospp.vbs /dstatus
+    (full detail, requires admin). When ospp.vbs is missing — common on
+    Click-to-Run installs where the VBS has been dropped — we fall back
+    to SoftwareLicensingProduct via WMI, which is less detailed but works
+    without admin and always available on Windows.
 
     Returns dict with:
         status: 'success' | 'requires_admin' | 'office_not_found' |
-                        'ospp_not_found' | 'error'
+                        'error' | 'not_applicable'
         message: human-readable summary
-        raw_output: full ospp.vbs /dstatus output (for technician)
-        parsed: structured fields from _parse_dstatus()
+        raw_output: full ospp.vbs /dstatus (or SLP JSON) output
+        parsed: structured fields
     """
     if sys.platform != 'win32':
         return {
@@ -192,15 +291,10 @@ def inspect_license() -> dict:
 
     ospp_path = _find_ospp()
     if not ospp_path:
-        return {
-            'status': 'ospp_not_found',
-            'message': (
-                'No se encontro ospp.vbs. Office puede no estar instalado '
-                'o estar en una ruta no estandar.'
-            ),
-            'raw_output': '',
-            'parsed': {},
-        }
+        # Clean fallback: SLP/WMI tells us whether Office is licensed even
+        # when ospp.vbs is missing. Keeps the page useful instead of
+        # blocking with ospp_not_found.
+        return _inspect_license_via_wmi()
 
     result = _run_ospp(ospp_path, '/dstatus', timeout=60)
 

@@ -171,7 +171,7 @@ class PolicyEngine:
             return entry
 
     def get_active_locks(self) -> dict[str, dict]:
-        """Return a snapshot of active locks with age in seconds."""
+        """Return a detailed snapshot of active locks with age in seconds."""
         now = time.time()
         with self._lock:
             return {
@@ -184,10 +184,25 @@ class PolicyEngine:
             }
 
     def get_status(self) -> dict:
-        """Get current policy engine status."""
+        """
+        Get current policy engine status.
+
+        The ``active_locks`` field preserves its legacy contract
+        ({module: job_id_str}) so existing clients keep working. Detailed
+        lock metadata (timestamp / age) is exposed separately under
+        ``active_locks_detailed`` — new consumers should prefer that key,
+        or call ``get_active_locks()`` directly.
+        """
+        with self._lock:
+            # Legacy shape preserved for backward compatibility.
+            legacy_locks = {
+                module: info.get('job_id', '')
+                for module, info in self._active_locks.items()
+            }
         return {
             'mode': self._mode.value,
-            'active_locks': self.get_active_locks(),
+            'active_locks': legacy_locks,
+            'active_locks_detailed': self.get_active_locks(),
             'allowed_risk_classes': [r.value for r in MODE_ALLOWED_RISKS[self._mode]],
         }
 

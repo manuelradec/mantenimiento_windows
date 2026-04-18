@@ -55,12 +55,37 @@ def set_balanced():
     )
 
 
+def _has_battery() -> bool:
+    """
+    Detect battery presence via WMI so ``powercfg /batteryreport`` is never
+    invoked on desktops. Returns True only when a Win32_Battery instance
+    is exposed by CIM; on error falls back to False so we skip cleanly
+    rather than letting powercfg emit its confusing desktop error.
+    """
+    probe = run_powershell(
+        "$b = Get-CimInstance -ClassName Win32_Battery -ErrorAction SilentlyContinue; "
+        "if ($b) { 'yes' } else { 'no' }",
+        timeout=10,
+        description='Detect battery presence',
+    )
+    if not probe.is_success:
+        return False
+    return (probe.output or '').strip().lower().startswith('yes')
+
+
 def get_battery_report():
     """Generate a battery report (laptops only)."""
     import os
     import sys
     if sys.platform != 'win32':
         return CommandResult(status=CommandStatus.NOT_APPLICABLE, output='Not on Windows.')
+
+    if not _has_battery():
+        return CommandResult(
+            status=CommandStatus.NOT_APPLICABLE,
+            output='Este equipo no tiene bateria (probablemente un desktop). '
+                   'Se omite el reporte de bateria.',
+        )
 
     report_path = os.path.join(
         os.environ.get('PROGRAMDATA', 'C:\\ProgramData'),

@@ -58,7 +58,18 @@
       "Bash(python -m pytest -x --tb=line)",
       "Bash(echo \"EXIT=$?\")",
       "Bash(python -m flake8 services/repair.py core/action_registry.py static/js/app.js --max-line-length=120 --count)",
-      "Bash(python -m flake8 services/repair.py core/action_registry.py --max-line-length=120 --count)"
+      "Bash(python -m flake8 services/repair.py core/action_registry.py --max-line-length=120 --count)",
+      "Bash(python -m pytest tests/test_policy_engine.py tests/test_governance.py tests/test_hardening.py tests/test_routes.py -q)",
+      "Bash(python -m pytest -q)",
+      "Bash(python -m flake8 core services routes tests)",
+      "Bash(echo \"exit=$?\")",
+      "Read(//c/Users/Infraestructura/.claude/projects/d--MANUEL-SEDANO-LUNA-Desarrollos-MANTENIMIENTO-mantenimiento-windows/memory/**)",
+      "Read(//c/Users/Infraestructura/.claude/projects/d--MANUEL-SEDANO-LUNA-Desarrollos-MANTENIMIENTO-mantenimiento-windows/**)",
+      "Bash(python -c ' *)",
+      "Bash(python -m pytest tests/test_ola3_regressions.py -q)",
+      "Bash(python -m pytest tests/test_ola1_ola2_regressions.py tests/test_ola3_regressions.py -q)",
+      "Bash(python -c \"import ntpath; print\\(repr\\(ntpath.basename\\(r'C:\\\\Program Files \\(x86\\)\\\\Lenovo\\\\System Update\\\\tvsu.exe'\\)\\)\\)\")",
+      "Bash(rm -f _v.txt _v2.txt)"
     ]
   }
 }
