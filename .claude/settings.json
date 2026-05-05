@@ -69,7 +69,78 @@
       "Bash(python -m pytest tests/test_ola3_regressions.py -q)",
       "Bash(python -m pytest tests/test_ola1_ola2_regressions.py tests/test_ola3_regressions.py -q)",
       "Bash(python -c \"import ntpath; print\\(repr\\(ntpath.basename\\(r'C:\\\\Program Files \\(x86\\)\\\\Lenovo\\\\System Update\\\\tvsu.exe'\\)\\)\\)\")",
-      "Bash(rm -f _v.txt _v2.txt)"
+      "Bash(rm -f _v.txt _v2.txt)",
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "Bash(black --version)",
+      "Bash(ruff --version)",
+      "Bash(python -m black --version)",
+      "Bash(python -m ruff --version)",
+      "Bash(python:*)",
+      "Bash(python -m pytest:*)",
+      "Bash(python -m flake8:*)",
+      "Bash(python -m black:*)",
+      "Bash(python -m ruff:*)",
+      "Bash(pytest:*)",
+      "Bash(pyinstaller:*)",
+      "Bash(ruff:*)",
+      "Bash(black:*)",
+      "Bash(pip install:*)",
+      "Bash(git status)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Read(./**)",
+      "Edit(./**)",
+      "Write(./**)",
+      "Edit(/.claude/skills/build-exe/**)",
+      "Edit(/.claude/skills/catchup/**)",
+      "Edit(/.claude/skills/release/**)",
+      "Bash(./venv/Scripts/black.exe --version)",
+      "Bash(./venv/Scripts/ruff.exe --version)",
+      "Bash(./venv/Scripts/python.exe -c \"import pyflakes; print\\(pyflakes.__version__\\)\")",
+      "Bash(./venv/Scripts/python.exe -m pyflakes app.py)",
+      "Bash(./venv/Scripts/python.exe -m pyflakes .)",
+      "Bash(findstr /V \"venv\\\\\\\\\")",
+      "Bash(findstr /V \"build\\\\\\\\\")",
+      "Bash(findstr /V \"dist\\\\\\\\\")",
+      "Bash(./venv/Scripts/python.exe -m pyflakes app.py config.py server.py legacy_tkinter_main.py core/ routes/ services/ tests/)",
+      "Bash(./venv/Scripts/python.exe -m pyflakes app.py config.py server.py core/ routes/ services/ tests/)",
+      "Bash(./venv/Scripts/python.exe -m pytest tests/ -x --tb=short)",
+      "Bash(git stash *)",
+      "Bash(./venv/Scripts/python.exe -m pytest tests/test_governance.py::TestPersistenceExtended::test_snapshot_persistence -v)",
+      "Bash(./venv/Scripts/python.exe -m pytest tests/ --tb=line)",
+      "Bash(./venv/Scripts/python.exe -m pyflakes legacy_tkinter_main.py)",
+      "Bash(./venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('legacy_tkinter_main.py', encoding='utf-8'\\).read\\(\\)\\); print\\('SYNTAX OK'\\)\")"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(rm -rf /:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git reset --hard:*)",
+      "Edit(C:\\ProgramData\\**)",
+      "Edit(/c/ProgramData/**)",
+      "Write(C:\\ProgramData\\**)",
+      "Write(/c/ProgramData/**)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$j=[Console]::In.ReadToEnd()|ConvertFrom-Json;$f=$j.tool_input.file_path;if($f -and ($f -like '*.py') -and (Test-Path $f)){& \"venv\\Scripts\\black.exe\" $f 2>$null;& \"venv\\Scripts\\ruff.exe\" check --fix $f 2>$null}",
+            "shell": "powershell",
+            "timeout": 30,
+            "statusMessage": "Formateando con black + ruff"
+          }
+        ]
+      }
     ]
   }
 }
