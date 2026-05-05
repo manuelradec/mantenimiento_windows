@@ -19,7 +19,7 @@ def app(tmp_path):
     os.makedirs(cfg.Config.REPORT_DIR, exist_ok=True)
 
     from app import create_app
-    from core.persistence import init_db
+    from core.persistence import init_db, SessionStore
 
     app = create_app()
     app.config["TESTING"] = True
@@ -27,6 +27,15 @@ def app(tmp_path):
     app.config["HOSTNAME"] = "testhost"
     app.config["USERNAME"] = "testuser"
     init_db()
+    # FK constraint: jobs.session_id REFERENCES sessions.session_id.
+    # Sin este insert, cualquier ruta gobernada que cree un job falla con
+    # IntegrityError: FOREIGN KEY constraint failed.
+    SessionStore.create(
+        session_id="test-session",
+        hostname="testhost",
+        username="testuser",
+        is_admin=False,
+    )
     return app
 
 
