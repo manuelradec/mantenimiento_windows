@@ -2,7 +2,7 @@
 
 > Última actualización: 2026-05-05
 > Versión actual: 3.0.0
-> Estado general: T-01 cerrada. Listo para próxima tarea del backlog.
+> Estado general: T-01 cerrada. T-05 sub-objetivo (14 fallos readonly DB) cerrado. T-05 amplio (smoke tests por blueprint) en curso.
 
 ---
 
@@ -19,7 +19,9 @@ Las **reglas duras del stack** NO van aquí, van en `CLAUDE.md`.
 
 ## 1. Tareas activas (en progreso)
 
-_Vacío. T-01 cerrada en 2026-05-05. Próximo: ver sección 5._
+### T-05 — Tests automatizados base (en curso, 2026-05-05)
+- **Sub-objetivo cerrado**: 14 fallos `OperationalError: readonly database` resueltos en commit `65cbb17`. La suite va de 219 pass / 14 fail → **233 pass / 0 fail**. Ver sección 4 para detalle del fix (conftest.py + SessionStore.create en fixtures).
+- **Sub-objetivo abierto**: smoke tests de cada blueprint (criterio de aceptación del backlog). Hay que inventariar `routes/*.py` vs cobertura actual e escribir tests faltantes.
 
 ---
 
@@ -87,8 +89,10 @@ Audit higiene (2026-05-04) — RESUELTOS:
 
 Pendientes (no bloqueantes):
 
-**14 tests con `OperationalError: readonly database` (deuda de testabilidad):**
-- Confirmado pre-existente (falla también con `git stash`). Causa probable: `C:\ProgramData\CleanCPU\cleancpu.db` quedó con permisos de admin tras una corrida elevada y el test runner no-admin no puede escribir. Tests afectados: `test_governance::TestPersistenceExtended::*`, `test_hardening::TestSnapshotPersistence::*`, `test_policy_engine::TestPersistence::*`, varios de `test_routes` y `test_smart_app_control`. Candidato natural para T-05 (tests automatizados base).
+~~**14 tests con `OperationalError: readonly database` (deuda de testabilidad)**~~ — RESUELTO 2026-05-05 (commit `65cbb17`):
+- `tests/conftest.py` (nuevo): autouse fixture `_isolate_db` redirige `Config.LOG_DIR`/`Config.REPORT_DIR` a `tmp_path` por test vía monkeypatch, y resetea `core.persistence._local.conn` antes/después. Resuelve 8 fallos.
+- `tests/test_routes.py` y `tests/test_smart_app_control.py`: el fixture `app` ahora llama `SessionStore.create('test-session', ...)` después de `init_db()`. Resuelve 6 FK constraint failures que estaban enmascarados por el readonly DB. Sin esta sesión, cualquier endpoint gobernado fallaba con `IntegrityError: FOREIGN KEY constraint failed` porque `jobs.session_id REFERENCES sessions.session_id`.
+- Resultado: 219 pass / 14 fail → **233 pass / 0 fail**.
 
 **Estilo `pathlib` (NO tocar):**
 - ~10 lugares (`config.py:50,61`, `services/cleanup.py:40,52,69,354`, `services/power_tools.py:91`, `core/snapshots.py:86,165,198,312`, `services/system_info.py:42`, `routes/maintenance.py:371`) usan `os.path.join` + literal `'C:\\Windows'` en vez de `pathlib.Path`. Funciona, refactor amplio fuera de scope.
@@ -104,17 +108,17 @@ Pendientes (no bloqueantes):
 
 ## 5. Próximo paso concreto
 
-**Commits primero** (todo el trabajo de T-01 y audit sigue uncommitted desde `9a199b5`). Plan propuesto: 5 commits por tema (ver chat de la sesión 2026-05-05 con detalle).
+**Continuar T-05 amplio**: smoke tests de cada blueprint. Hay que listar `routes/*.py`, cruzar con tests existentes (`test_routes.py`, `test_smart_app_control.py`, etc.) y escribir smoke tests para los blueprints sin cobertura. Cada test mínimo: `client.get('/<blueprint-prefix>/')` → 200 + verificar template renderiza.
 
-**Después de commits**, opciones del backlog:
-- **T-05** (recomendado siguiente): tests automatizados base. Resuelve los 14 fallos pre-existentes de `readonly database` mockeando `Config.LOG_DIR` o usando `tmp_path` por test. Pavimenta el camino para T-02 y T-03.
-- **T-02**: scheduled restart manager. Requiere persistencia nueva, mejor con T-05 antes.
+Después de T-05 amplio cerrado:
+- **T-02**: scheduled restart manager. Requiere persistencia nueva (con T-05 cerrado, agregar tests es directo).
 - **T-03**: dashboard 9 pasos lógicos. Bloque grande de UI; ya existe `routes/maintenance.py` con la lógica, falta la vista unificada.
 
 ---
 
 ## 6. Histórico (resumen, no detalle)
 
+- **2026-05-05 (cont.)**: T-05 sub-objetivo cerrado. Suite limpia: 233 pass / 0 fail. Fix vía `tests/conftest.py` (autouse fixture aislando DB en tmp_path + reset de thread-local conn) + `SessionStore.create` en fixtures de `test_routes.py` y `test_smart_app_control.py` para satisfacer FK constraint en `jobs.session_id`. Commit `65cbb17`.
 - **2026-05-05**: T-01 cerrada. Build .exe ejecutado (12.13 MB), reproducción guiada del bug, traceback capturado (`TemplateNotFound: diagnostics.html`), root cause identificado (cleanup borraba `_MEIxxxxxx\`). Fix aplicado en `services/cleanup.py` (skip de `_MEI*` en %TEMP%) + fix complementario en `server.py` (quitar `logging.basicConfig` que bloqueaba el RotatingFileHandler). Smoke test post-fix: mantenimiento → click módulos → cerrar → relanzar → click módulos. Todo 200 OK. Bug primario y secundario resueltos.
 - **2026-05-04**: Audit higiene previo a T-01 + fixes Dudas 1/2/3/4/5 cerradas. SQL de `governance.py` migrado a `SnapshotStore.save()`. `app.py` banner: print (UX) + `app.logger.info` (cumple §5). Tests: 8 imports + 1 variable no usados eliminados. `legacy_tkinter_main.py` (Opción A): docstring de rol + try/except en subprocess + variable no usada removida. Pyflakes limpio en todo el árbol. Descubiertos 14 fallos pre-existentes de tests por `OperationalError readonly db` (deuda de testabilidad, no bloqueante).
 - **2026-03-19**: Sesión inicial de migración a v3.0.0. Bugs críticos identificados y arreglados (TemplateNotFound, UnicodeDecodeError, timeouts de NetAdapter, error JS de className).
