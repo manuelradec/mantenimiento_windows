@@ -8,6 +8,7 @@ Store cache reset, prefetch cleanup.
 Safety: No service-disabling operations. All cleanup targets are safe
 directories that Windows rebuilds automatically.
 """
+
 import os
 import shutil
 import hashlib
@@ -15,60 +16,94 @@ import logging
 import sys
 from collections import defaultdict
 
-from services.command_runner import run_cmd, run_powershell, CommandStatus, CommandResult
+from services.command_runner import (
+    run_cmd,
+    run_powershell,
+    CommandStatus,
+    CommandResult,
+)
 
-logger = logging.getLogger('cleancpu.cleanup')
+logger = logging.getLogger("cleancpu.cleanup")
 
 
 def clean_user_temp():
     """Clean user temporary files."""
-    if sys.platform != 'win32':
-        return CommandResult(status=CommandStatus.NOT_APPLICABLE, output='Not on Windows.')
+    if sys.platform != "win32":
+        return CommandResult(
+            status=CommandStatus.NOT_APPLICABLE, output="Not on Windows."
+        )
 
-    temp_path = os.environ.get('TEMP', '')
+    temp_path = os.environ.get("TEMP", "")
     if not temp_path or not os.path.exists(temp_path):
-        return CommandResult(status=CommandStatus.NOT_APPLICABLE, output='TEMP path not found.')
+        return CommandResult(
+            status=CommandStatus.NOT_APPLICABLE, output="TEMP path not found."
+        )
 
-    return _clean_directory(temp_path, 'User TEMP')
+    return _clean_directory(temp_path, "User TEMP")
 
 
 def clean_windows_temp():
     """Clean Windows system temporary files."""
-    if sys.platform != 'win32':
-        return CommandResult(status=CommandStatus.NOT_APPLICABLE, output='Not on Windows.')
+    if sys.platform != "win32":
+        return CommandResult(
+            status=CommandStatus.NOT_APPLICABLE, output="Not on Windows."
+        )
 
-    temp_path = os.path.join(os.environ.get('SystemRoot', 'C:\\Windows'), 'Temp')
+    temp_path = os.path.join(os.environ.get("SystemRoot", "C:\\Windows"), "Temp")
     if not os.path.exists(temp_path):
-        return CommandResult(status=CommandStatus.NOT_APPLICABLE, output='Windows Temp not found.')
+        return CommandResult(
+            status=CommandStatus.NOT_APPLICABLE, output="Windows Temp not found."
+        )
 
-    return _clean_directory(temp_path, 'Windows Temp')
+    return _clean_directory(temp_path, "Windows Temp")
 
 
 def clean_software_distribution():
     """Clean Windows Update download cache."""
-    if sys.platform != 'win32':
-        return CommandResult(status=CommandStatus.NOT_APPLICABLE, output='Not on Windows.')
+    if sys.platform != "win32":
+        return CommandResult(
+            status=CommandStatus.NOT_APPLICABLE, output="Not on Windows."
+        )
 
-    path = os.path.join(os.environ.get('SystemRoot', 'C:\\Windows'),
-                        'SoftwareDistribution', 'Download')
+    path = os.path.join(
+        os.environ.get("SystemRoot", "C:\\Windows"), "SoftwareDistribution", "Download"
+    )
     if not os.path.exists(path):
-        return CommandResult(status=CommandStatus.NOT_APPLICABLE,
-                             output='SoftwareDistribution\\Download not found.')
+        return CommandResult(
+            status=CommandStatus.NOT_APPLICABLE,
+            output="SoftwareDistribution\\Download not found.",
+        )
 
-    return _clean_directory(path, 'SoftwareDistribution Download')
+    return _clean_directory(path, "SoftwareDistribution Download")
 
 
 def clean_inet_cache():
     """Clean Internet cache files."""
-    if sys.platform != 'win32':
-        return CommandResult(status=CommandStatus.NOT_APPLICABLE, output='Not on Windows.')
+    if sys.platform != "win32":
+        return CommandResult(
+            status=CommandStatus.NOT_APPLICABLE, output="Not on Windows."
+        )
 
     paths = [
-        os.path.join(os.environ.get('USERPROFILE', ''),
-                     'AppData', 'Local', 'Microsoft', 'Windows', 'INetCache'),
-        os.path.join(os.environ.get('SystemRoot', 'C:\\Windows'),
-                     'System32', 'config', 'systemprofile',
-                     'AppData', 'Local', 'Microsoft', 'Windows', 'INetCache'),
+        os.path.join(
+            os.environ.get("USERPROFILE", ""),
+            "AppData",
+            "Local",
+            "Microsoft",
+            "Windows",
+            "INetCache",
+        ),
+        os.path.join(
+            os.environ.get("SystemRoot", "C:\\Windows"),
+            "System32",
+            "config",
+            "systemprofile",
+            "AppData",
+            "Local",
+            "Microsoft",
+            "Windows",
+            "INetCache",
+        ),
     ]
 
     total_cleaned = 0
@@ -76,42 +111,47 @@ def clean_inet_cache():
     messages = []
     for path in paths:
         if os.path.exists(path):
-            result = _clean_directory(path, f'INetCache ({path})')
-            total_cleaned += result.details.get('files_deleted', 0)
-            total_errors += result.details.get('errors', 0)
+            result = _clean_directory(path, f"INetCache ({path})")
+            total_cleaned += result.details.get("files_deleted", 0)
+            total_errors += result.details.get("errors", 0)
             messages.append(result.output)
 
     return CommandResult(
         status=CommandStatus.SUCCESS,
-        output='\n'.join(messages) if messages else 'No INetCache directories found.',
-        details={'files_deleted': total_cleaned, 'errors': total_errors},
+        output="\n".join(messages) if messages else "No INetCache directories found.",
+        details={"files_deleted": total_cleaned, "errors": total_errors},
     )
 
 
 def empty_recycle_bin():
     """Empty the Windows Recycle Bin."""
     result = run_powershell(
-        'Clear-RecycleBin -Confirm:$false -ErrorAction SilentlyContinue',
-        description='Empty Recycle Bin',
+        "Clear-RecycleBin -Confirm:$false -ErrorAction SilentlyContinue",
+        description="Empty Recycle Bin",
     )
-    if result.status == CommandStatus.ERROR and result.error and 'not find' in result.error.lower():
-        return CommandResult(status=CommandStatus.SUCCESS,
-                             output='Recycle Bin is already empty.')
+    if (
+        result.status == CommandStatus.ERROR
+        and result.error
+        and "not find" in result.error.lower()
+    ):
+        return CommandResult(
+            status=CommandStatus.SUCCESS, output="Recycle Bin is already empty."
+        )
     return result
 
 
 def flush_dns_cache():
     """Clear the DNS resolver cache."""
-    return run_cmd('ipconfig /flushdns', description='Flush DNS cache')
+    return run_cmd("ipconfig /flushdns", description="Flush DNS cache")
 
 
 def run_cleanmgr():
     """Run Windows Disk Cleanup utility."""
     result = run_cmd(
-        'cleanmgr /sagerun:1',
+        "cleanmgr /sagerun:1",
         requires_admin=True,
         timeout=300,
-        description='Run Disk Cleanup (cleanmgr)',
+        description="Run Disk Cleanup (cleanmgr)",
     )
     return result
 
@@ -119,10 +159,10 @@ def run_cleanmgr():
 def dism_component_cleanup():
     """Run DISM StartComponentCleanup to remove superseded components."""
     result = run_cmd(
-        'DISM /Online /Cleanup-Image /StartComponentCleanup',
+        "DISM /Online /Cleanup-Image /StartComponentCleanup",
         requires_admin=True,
         timeout=600,
-        description='DISM StartComponentCleanup',
+        description="DISM StartComponentCleanup",
     )
     return result
 
@@ -134,26 +174,26 @@ def restart_explorer():
     Reports accurate status: only SUCCESS if both stop and start succeed.
     """
     stop_result = run_cmd(
-        'taskkill /f /im explorer.exe',
-        description='Stop Explorer',
+        "taskkill /f /im explorer.exe",
+        description="Stop Explorer",
     )
 
     start_result = run_cmd(
-        'start explorer.exe',
+        "start explorer.exe",
         shell=True,
-        description='Start Explorer',
+        description="Start Explorer",
     )
 
     # Determine overall status based on sub-steps
     sub_results = {
-        'stop': stop_result.to_dict(),
-        'start': start_result.to_dict(),
+        "stop": stop_result.to_dict(),
+        "start": start_result.to_dict(),
     }
 
     if stop_result.is_error:
         return CommandResult(
             status=CommandStatus.ERROR,
-            output='Failed to stop Explorer.',
+            output="Failed to stop Explorer.",
             error=stop_result.error,
             details=sub_results,
         )
@@ -161,14 +201,14 @@ def restart_explorer():
     if start_result.is_error:
         return CommandResult(
             status=CommandStatus.WARNING,
-            output='Explorer stopped but may not have restarted properly.',
+            output="Explorer stopped but may not have restarted properly.",
             error=start_result.error,
             details=sub_results,
         )
 
     return CommandResult(
         status=CommandStatus.SUCCESS,
-        output='Explorer restarted successfully.',
+        output="Explorer restarted successfully.",
         details=sub_results,
     )
 
@@ -178,19 +218,19 @@ def retrim_ssd():
     check = run_powershell(
         "Get-PhysicalDisk | Where-Object MediaType -eq 'SSD' | "
         "Select-Object FriendlyName",
-        description='Check for SSD presence',
+        description="Check for SSD presence",
     )
     if check.status != CommandStatus.SUCCESS or not check.output.strip():
         return CommandResult(
             status=CommandStatus.NOT_APPLICABLE,
-            output='No SSD detected. ReTrim not applicable.',
+            output="No SSD detected. ReTrim not applicable.",
         )
 
     result = run_powershell(
-        'Optimize-Volume -DriveLetter C -ReTrim -Verbose',
+        "Optimize-Volume -DriveLetter C -ReTrim -Verbose",
         requires_admin=True,
         timeout=120,
-        description='ReTrim SSD',
+        description="ReTrim SSD",
     )
     return result
 
@@ -199,20 +239,20 @@ def defrag_hdd():
     """Defragment HDD (only if HDD is detected, never SSD)."""
     hdd_check = run_powershell(
         "(Get-PhysicalDisk | Where-Object MediaType -eq 'HDD').Count",
-        description='Count HDDs',
+        description="Count HDDs",
     )
 
-    if hdd_check.output.strip() == '0' or not hdd_check.output.strip():
+    if hdd_check.output.strip() == "0" or not hdd_check.output.strip():
         return CommandResult(
             status=CommandStatus.NOT_APPLICABLE,
-            output='No HDD detected. Defragmentation skipped (SSD does not need defrag).',
+            output="No HDD detected. Defragmentation skipped (SSD does not need defrag).",
         )
 
     result = run_cmd(
-        'defrag C: /O /U /V',
+        "defrag C: /O /U /V",
         requires_admin=True,
         timeout=600,
-        description='Defragment HDD',
+        description="Defragment HDD",
     )
     return result
 
@@ -220,10 +260,10 @@ def defrag_hdd():
 def analyze_fragmentation():
     """Analyze disk fragmentation without performing defrag."""
     return run_cmd(
-        'defrag C: /A',
+        "defrag C: /A",
         requires_admin=True,
         timeout=60,
-        description='Analyze disk fragmentation',
+        description="Analyze disk fragmentation",
     )
 
 
@@ -237,17 +277,17 @@ def scan_duplicate_files(directory=None):
 
     Returns duplicates grouped by hash. Does NOT delete anything.
     """
-    if sys.platform != 'win32':
-        target = directory or os.path.expanduser('~/Downloads')
+    if sys.platform != "win32":
+        target = directory or os.path.expanduser("~/Downloads")
     else:
         target = directory or os.path.join(
-            os.environ.get('USERPROFILE', ''), 'Downloads'
+            os.environ.get("USERPROFILE", ""), "Downloads"
         )
 
     if not os.path.exists(target):
         return CommandResult(
             status=CommandStatus.NOT_APPLICABLE,
-            output=f'Directory not found: {target}',
+            output=f"Directory not found: {target}",
         )
 
     # Phase 1: Group by file size
@@ -275,18 +315,20 @@ def scan_duplicate_files(directory=None):
         for filepath in paths:
             try:
                 hasher = hashlib.sha256()
-                with open(filepath, 'rb') as f:
+                with open(filepath, "rb") as f:
                     while True:
                         chunk = f.read(65536)
                         if not chunk:
                             break
                         hasher.update(chunk)
                 file_hash = hasher.hexdigest()
-                hash_map[file_hash].append({
-                    'path': filepath,
-                    'name': os.path.basename(filepath),
-                    'size': file_size,
-                })
+                hash_map[file_hash].append(
+                    {
+                        "path": filepath,
+                        "name": os.path.basename(filepath),
+                        "size": file_size,
+                    }
+                )
             except (PermissionError, OSError):
                 error_count += 1
 
@@ -295,14 +337,14 @@ def scan_duplicate_files(directory=None):
 
     return CommandResult(
         status=CommandStatus.SUCCESS,
-        output=f'Scanned {file_count} files. Found {dup_count} duplicate(s) in {len(duplicates)} group(s).',
+        output=f"Scanned {file_count} files. Found {dup_count} duplicate(s) in {len(duplicates)} group(s).",
         details={
-            'total_files': file_count,
-            'duplicate_groups': len(duplicates),
-            'duplicate_files': dup_count,
-            'errors': error_count,
-            'duplicates': {h: files for h, files in list(duplicates.items())[:50]},
-            'directory': target,
+            "total_files": file_count,
+            "duplicate_groups": len(duplicates),
+            "duplicate_files": dup_count,
+            "errors": error_count,
+            "duplicates": {h: files for h, files in list(duplicates.items())[:50]},
+            "directory": target,
         },
     )
 
@@ -313,12 +355,12 @@ def restart_sysmain():
     Safe operation - does not permanently disable the service.
     """
     result = run_powershell(
-        'Restart-Service SysMain -Force -ErrorAction SilentlyContinue',
+        "Restart-Service SysMain -Force -ErrorAction SilentlyContinue",
         requires_admin=True,
-        description='Restart SysMain service (clear cache)',
+        description="Restart SysMain service (clear cache)",
     )
     if result.status == CommandStatus.SUCCESS:
-        result.output = 'SysMain service restarted. Cache cleared safely.'
+        result.output = "SysMain service restarted. Cache cleared safely."
     return result
 
 
@@ -328,34 +370,74 @@ def restart_windows_search():
     Safe operation - does not permanently disable the service.
     """
     result = run_powershell(
-        'Restart-Service WSearch -Force -ErrorAction SilentlyContinue',
+        "Restart-Service WSearch -Force -ErrorAction SilentlyContinue",
         requires_admin=True,
-        description='Restart Windows Search service (rebuild index)',
+        description="Restart Windows Search service (rebuild index)",
     )
     if result.status == CommandStatus.SUCCESS:
-        result.output = 'Windows Search service restarted. Index will rebuild automatically.'
+        result.output = (
+            "Windows Search service restarted. Index will rebuild automatically."
+        )
     return result
 
 
 def reset_windows_store_cache():
     """Reset Windows Store cache."""
     return run_cmd(
-        'wsreset.exe',
+        "wsreset.exe",
         timeout=60,
-        description='Reset Windows Store cache',
+        description="Reset Windows Store cache",
     )
 
 
 def clean_prefetch():
     """Clean Prefetch folder (optional, minimal benefit)."""
-    if sys.platform != 'win32':
-        return CommandResult(status=CommandStatus.NOT_APPLICABLE, output='Not on Windows.')
+    if sys.platform != "win32":
+        return CommandResult(
+            status=CommandStatus.NOT_APPLICABLE, output="Not on Windows."
+        )
 
-    prefetch_path = os.path.join(os.environ.get('SystemRoot', 'C:\\Windows'), 'Prefetch')
+    prefetch_path = os.path.join(
+        os.environ.get("SystemRoot", "C:\\Windows"), "Prefetch"
+    )
     if not os.path.exists(prefetch_path):
-        return CommandResult(status=CommandStatus.NOT_APPLICABLE, output='Prefetch folder not found.')
+        return CommandResult(
+            status=CommandStatus.NOT_APPLICABLE, output="Prefetch folder not found."
+        )
 
-    return _clean_directory(prefetch_path, 'Prefetch')
+    return _clean_directory(prefetch_path, "Prefetch")
+
+
+def _get_pyinstaller_runtime_root() -> str:
+    """Devuelve el _MEIxxxxxx activo si la app corre desde el .exe empacado
+    con PyInstaller --onefile. Devuelve '' en dev (Python normal)."""
+    if getattr(sys, "frozen", False):
+        return getattr(sys, "_MEIPASS", "") or ""
+    return ""
+
+
+def _should_skip_pyinstaller_runtime(
+    item_path: str, item_name: str, runtime_root: str
+) -> bool:
+    """No borrar el _MEI activo del propio .exe ni leftovers `_MEI*` que
+    podrían pertenecer a otro proceso vivo (PyInstaller bootloader naming).
+
+    Why: cuando el .exe corre con --onefile, PyInstaller extrae templates,
+    static y módulos a %TEMP%\\_MEIxxxxxx\\. Si el flujo de mantenimiento
+    borra ese directorio, la app se autodestruye los recursos en runtime
+    y cualquier render_template posterior falla con TemplateNotFound.
+    """
+    if item_name.lower().startswith("_mei"):
+        return True
+    if runtime_root:
+        try:
+            ip = os.path.realpath(item_path)
+            rr = os.path.realpath(runtime_root)
+            if ip == rr or ip.startswith(rr + os.sep):
+                return True
+        except OSError:
+            pass
+    return False
 
 
 def _clean_directory(path, label):
@@ -366,11 +448,16 @@ def _clean_directory(path, label):
     files_deleted = 0
     dirs_deleted = 0
     errors = 0
+    skipped = 0
     freed_bytes = 0
+    runtime_root = _get_pyinstaller_runtime_root()
 
     try:
         for item in os.listdir(path):
             item_path = os.path.join(path, item)
+            if _should_skip_pyinstaller_runtime(item_path, item, runtime_root):
+                skipped += 1
+                continue
             try:
                 if os.path.isfile(item_path) or os.path.islink(item_path):
                     size = os.path.getsize(item_path)
@@ -392,23 +479,30 @@ def _clean_directory(path, label):
     except PermissionError:
         return CommandResult(
             status=CommandStatus.ERROR,
-            error=f'Permission denied accessing {path}',
-            details={'path': path},
+            error=f"Permission denied accessing {path}",
+            details={"path": path},
         )
 
     freed_mb = round(freed_bytes / (1024 * 1024), 2)
     status = CommandStatus.SUCCESS if errors == 0 else CommandStatus.WARNING
 
+    output = (
+        f"{label}: Deleted {files_deleted} files, {dirs_deleted} folders. "
+        f"Freed {freed_mb} MB. {errors} error(s)."
+    )
+    if skipped:
+        output += f" Skipped {skipped} _MEI item(s) (PyInstaller runtime)."
+
     return CommandResult(
         status=status,
-        output=f'{label}: Deleted {files_deleted} files, {dirs_deleted} folders. '
-               f'Freed {freed_mb} MB. {errors} error(s).',
+        output=output,
         details={
-            'path': path,
-            'files_deleted': files_deleted,
-            'dirs_deleted': dirs_deleted,
-            'freed_mb': freed_mb,
-            'errors': errors,
+            "path": path,
+            "files_deleted": files_deleted,
+            "dirs_deleted": dirs_deleted,
+            "freed_mb": freed_mb,
+            "errors": errors,
+            "skipped_pyinstaller": skipped,
         },
     )
 
