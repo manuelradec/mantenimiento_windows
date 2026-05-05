@@ -2,7 +2,7 @@
 
 > Última actualización: 2026-05-05
 > Versión actual: 3.0.0
-> Estado general: T-01 y T-05 cerradas. Listo para T-02 o T-03.
+> Estado general: T-01, T-05 y T-02 cerradas. Listo para T-03 o T-04.
 
 ---
 
@@ -32,11 +32,14 @@ _Vacío. T-01 y T-05 cerradas. Próximo: ver sección 5._
 - **Validación**: smoke test post-fix completo. Lanzar `dist\CleanCPU.exe` → mantenimiento (9 pasos) → click cualquier módulo → 200 OK. Cerrar → relanzar → click módulo → 200 OK. Cero tracebacks en `app.log`. Forensia preservada en `C:\ProgramData\CleanCPU.backup-pre-bug-repro-20260504-223634\` y log con bug reproducido en `app.log.repro1-20260505-080052`.
 - **No verificado**: prueba 60 min idle con navegación periódica. La hipótesis original era de tiempo, pero el bug que encontramos no es de tiempo. Si aparece otro síntoma de pérdida de CSS sin haber corrido mantenimiento, abrir tarea nueva.
 
-### [ ] T-02 — Scheduled restart manager
-- **Origen**: pendiente del backlog v3.0.0
-- **Criterio de aceptación**: UI para programar reinicios + persistencia en SQLite + ejecución por scheduled task
-- **Archivos**: `routes/restart.py` (nuevo), `templates/restart.html` (nuevo), `db.py`
-- **Notas**: usar `schtasks` de Windows, no APScheduler dentro del proceso
+### [x] T-02 — Scheduled restart manager — CERRADA 2026-05-05
+- **Resolución**: la base ya existía (`routes/scheduled_restart.py` + `templates/scheduled_restart.html` + UI funcional vía schtasks). Se cerraron los 3 gaps vs criterio del backlog en commit `9f26899`:
+  - **Governance**: `api_create` y `api_delete` ahora pasan por `execute_governed_action` con acciones `scheduled_restart.create` y `scheduled_restart.delete` registradas en `core/action_registry.py` como `DISRUPTIVE` (requires_admin + confirmation). Antes saltaban governance — violaba CLAUDE.md §6.
+  - **Persistencia SQLite (audit trail)**: nueva tabla `scheduled_restarts` + `ScheduledRestartStore` en `core/persistence.py`. schtasks de Windows sigue siendo la fuente de verdad; SQLite captura quién/cuándo/qué se intentó programar o borrar.
+  - **Servicio separado**: lógica PowerShell extraída a `services/scheduled_restart.py` (CLAUDE.md §5: separación rutas vs servicios).
+- **Tests** (`tests/test_scheduled_restart.py`, nuevo): 23 tests cubren validaciones, happy path con PowerShell mockeado, audit trail, registro de acciones, rollback strategies, routing gobernado, read-only endpoints.
+- **Suite**: 240 pass / 0 fail → **263 pass / 0 fail**.
+- **No tocado**: `templates/scheduled_restart.html`, JS embebido, UI. El cambio fue plumbing interno; el técnico ve la misma UI.
 
 ### [ ] T-03 — Dashboard de mantenimiento de 9 pasos lógicos
 - **Origen**: pendiente del backlog v3.0.0
@@ -107,8 +110,7 @@ Pendientes (no bloqueantes):
 
 ## 5. Próximo paso concreto
 
-Opciones del backlog (T-01 y T-05 cerradas):
-- **T-02**: scheduled restart manager. Requiere persistencia nueva en SQLite + UI para programar + ejecución por `schtasks` de Windows. Con T-05 cerrado, agregar tests del nuevo módulo es directo.
+Opciones del backlog (T-01, T-05 y T-02 cerradas):
 - **T-03**: dashboard 9 pasos lógicos. La lógica ya existe en `routes/maintenance.py`; el trabajo es UI (vista unificada con estado por paso). Bloque grande de frontend.
 - **T-04**: reportes a Google Sheets / Excel. Pendiente decisión Service Account vs OAuth.
 
@@ -116,6 +118,7 @@ Opciones del backlog (T-01 y T-05 cerradas):
 
 ## 6. Histórico (resumen, no detalle)
 
+- **2026-05-05 (cont. 3)**: T-02 cerrada. `routes/scheduled_restart.py` ya existía con UI funcional vía schtasks; faltaban los 3 gaps vs criterio backlog: governance, persistencia SQLite (audit trail), separación rutas/servicio. Resueltos en commit `9f26899`: lógica PowerShell movida a `services/scheduled_restart.py`, rutas mutantes pasan por `execute_governed_action` con acciones `DISRUPTIVE` registradas, tabla `scheduled_restarts` + `ScheduledRestartStore` para auditoría, 23 tests nuevos. Suite: 240 → **263 pass / 0 fail**.
 - **2026-05-05 (cont. 2)**: T-05 cerrado completo. Smoke tests añadidos para 7 blueprints sin cobertura (logs, maintenance, office, scheduled-restart, sharing, startup, windows-features). Suite final: **240 pass / 0 fail** (242 collected, 2 skipped). Commit `558986f`.
 - **2026-05-05 (cont.)**: T-05 sub-objetivo de DB testability cerrado. Suite va de 219 pass / 14 fail → 233 pass / 0 fail. Fix vía `tests/conftest.py` (autouse fixture aislando DB en tmp_path + reset de thread-local conn) + `SessionStore.create` en fixtures de `test_routes.py` y `test_smart_app_control.py` para satisfacer FK constraint en `jobs.session_id`. Commit `65cbb17`.
 - **2026-05-05**: T-01 cerrada. Build .exe ejecutado (12.13 MB), reproducción guiada del bug, traceback capturado (`TemplateNotFound: diagnostics.html`), root cause identificado (cleanup borraba `_MEIxxxxxx\`). Fix aplicado en `services/cleanup.py` (skip de `_MEI*` en %TEMP%) + fix complementario en `server.py` (quitar `logging.basicConfig` que bloqueaba el RotatingFileHandler). Smoke test post-fix: mantenimiento → click módulos → cerrar → relanzar → click módulos. Todo 200 OK. Bug primario y secundario resueltos.
