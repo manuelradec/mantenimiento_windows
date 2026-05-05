@@ -100,6 +100,34 @@ class TestReadOnlyRoutes:
         resp = client.get("/drivers/")
         assert resp.status_code == 200
 
+    def test_logs_page(self, client):
+        resp = client.get("/logs/")
+        assert resp.status_code == 200
+
+    def test_maintenance_page(self, client):
+        resp = client.get("/maintenance/")
+        assert resp.status_code == 200
+
+    def test_office_page(self, client):
+        resp = client.get("/office/")
+        assert resp.status_code == 200
+
+    def test_scheduled_restart_page(self, client):
+        resp = client.get("/scheduled-restart/")
+        assert resp.status_code == 200
+
+    def test_sharing_page(self, client):
+        resp = client.get("/sharing/")
+        assert resp.status_code == 200
+
+    def test_startup_page(self, client):
+        resp = client.get("/startup/")
+        assert resp.status_code == 200
+
+    def test_windows_features_page(self, client):
+        resp = client.get("/windows-features/")
+        assert resp.status_code == 200
+
     def test_api_system_overview(self, client):
         resp = client.get("/api/system-overview")
         assert resp.status_code == 200
