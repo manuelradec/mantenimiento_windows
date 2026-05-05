@@ -2,7 +2,7 @@
 
 > Última actualización: 2026-05-05
 > Versión actual: 3.0.0
-> Estado general: T-01 cerrada. T-05 sub-objetivo (14 fallos readonly DB) cerrado. T-05 amplio (smoke tests por blueprint) en curso.
+> Estado general: T-01 y T-05 cerradas. Listo para T-02 o T-03.
 
 ---
 
@@ -19,9 +19,7 @@ Las **reglas duras del stack** NO van aquí, van en `CLAUDE.md`.
 
 ## 1. Tareas activas (en progreso)
 
-### T-05 — Tests automatizados base (en curso, 2026-05-05)
-- **Sub-objetivo cerrado**: 14 fallos `OperationalError: readonly database` resueltos en commit `65cbb17`. La suite va de 219 pass / 14 fail → **233 pass / 0 fail**. Ver sección 4 para detalle del fix (conftest.py + SessionStore.create en fixtures).
-- **Sub-objetivo abierto**: smoke tests de cada blueprint (criterio de aceptación del backlog). Hay que inventariar `routes/*.py` vs cobertura actual e escribir tests faltantes.
+_Vacío. T-01 y T-05 cerradas. Próximo: ver sección 5._
 
 ---
 
@@ -51,11 +49,12 @@ Las **reglas duras del stack** NO van aquí, van en `CLAUDE.md`.
 - **Archivos**: `services/reports.py` (nuevo)
 - **Notas**: para Sheets, decidir si usamos Service Account o OAuth — pendiente
 
-### [ ] T-05 — Tests automatizados base
-- **Origen**: deuda técnica
-- **Criterio de aceptación**: `pytest` corre y cubre al menos rutas + capa de DB
-- **Archivos**: `tests/`
-- **Notas**: empezar con smoke tests de cada blueprint
+### [x] T-05 — Tests automatizados base — CERRADA 2026-05-05
+- **Resolución**: dos sub-objetivos resueltos.
+  - DB testability: `tests/conftest.py` (autouse fixture aislando DB en tmp_path + reset thread-local conn) + `SessionStore.create('test-session')` en fixtures `app` de `test_routes.py` y `test_smart_app_control.py`. Commit `65cbb17`.
+  - Smoke tests por blueprint: 7 tests añadidos en `TestReadOnlyRoutes` cubriendo `/logs/`, `/maintenance/`, `/office/`, `/scheduled-restart/`, `/sharing/`, `/startup/`, `/windows-features/`. Commit `558986f`.
+- **Resultado**: suite va de 219 pass / 14 fail → **240 pass / 0 fail** (242 collected, 2 skipped por platform-gate).
+- **Cobertura blueprint**: los 18 blueprints registrados en `routes/__init__.py:register_blueprints` tienen smoke test GET en `tests/test_routes.py::TestReadOnlyRoutes`.
 
 ---
 
@@ -108,17 +107,17 @@ Pendientes (no bloqueantes):
 
 ## 5. Próximo paso concreto
 
-**Continuar T-05 amplio**: smoke tests de cada blueprint. Hay que listar `routes/*.py`, cruzar con tests existentes (`test_routes.py`, `test_smart_app_control.py`, etc.) y escribir smoke tests para los blueprints sin cobertura. Cada test mínimo: `client.get('/<blueprint-prefix>/')` → 200 + verificar template renderiza.
-
-Después de T-05 amplio cerrado:
-- **T-02**: scheduled restart manager. Requiere persistencia nueva (con T-05 cerrado, agregar tests es directo).
-- **T-03**: dashboard 9 pasos lógicos. Bloque grande de UI; ya existe `routes/maintenance.py` con la lógica, falta la vista unificada.
+Opciones del backlog (T-01 y T-05 cerradas):
+- **T-02**: scheduled restart manager. Requiere persistencia nueva en SQLite + UI para programar + ejecución por `schtasks` de Windows. Con T-05 cerrado, agregar tests del nuevo módulo es directo.
+- **T-03**: dashboard 9 pasos lógicos. La lógica ya existe en `routes/maintenance.py`; el trabajo es UI (vista unificada con estado por paso). Bloque grande de frontend.
+- **T-04**: reportes a Google Sheets / Excel. Pendiente decisión Service Account vs OAuth.
 
 ---
 
 ## 6. Histórico (resumen, no detalle)
 
-- **2026-05-05 (cont.)**: T-05 sub-objetivo cerrado. Suite limpia: 233 pass / 0 fail. Fix vía `tests/conftest.py` (autouse fixture aislando DB en tmp_path + reset de thread-local conn) + `SessionStore.create` en fixtures de `test_routes.py` y `test_smart_app_control.py` para satisfacer FK constraint en `jobs.session_id`. Commit `65cbb17`.
+- **2026-05-05 (cont. 2)**: T-05 cerrado completo. Smoke tests añadidos para 7 blueprints sin cobertura (logs, maintenance, office, scheduled-restart, sharing, startup, windows-features). Suite final: **240 pass / 0 fail** (242 collected, 2 skipped). Commit `558986f`.
+- **2026-05-05 (cont.)**: T-05 sub-objetivo de DB testability cerrado. Suite va de 219 pass / 14 fail → 233 pass / 0 fail. Fix vía `tests/conftest.py` (autouse fixture aislando DB en tmp_path + reset de thread-local conn) + `SessionStore.create` en fixtures de `test_routes.py` y `test_smart_app_control.py` para satisfacer FK constraint en `jobs.session_id`. Commit `65cbb17`.
 - **2026-05-05**: T-01 cerrada. Build .exe ejecutado (12.13 MB), reproducción guiada del bug, traceback capturado (`TemplateNotFound: diagnostics.html`), root cause identificado (cleanup borraba `_MEIxxxxxx\`). Fix aplicado en `services/cleanup.py` (skip de `_MEI*` en %TEMP%) + fix complementario en `server.py` (quitar `logging.basicConfig` que bloqueaba el RotatingFileHandler). Smoke test post-fix: mantenimiento → click módulos → cerrar → relanzar → click módulos. Todo 200 OK. Bug primario y secundario resueltos.
 - **2026-05-04**: Audit higiene previo a T-01 + fixes Dudas 1/2/3/4/5 cerradas. SQL de `governance.py` migrado a `SnapshotStore.save()`. `app.py` banner: print (UX) + `app.logger.info` (cumple §5). Tests: 8 imports + 1 variable no usados eliminados. `legacy_tkinter_main.py` (Opción A): docstring de rol + try/except en subprocess + variable no usada removida. Pyflakes limpio en todo el árbol. Descubiertos 14 fallos pre-existentes de tests por `OperationalError readonly db` (deuda de testabilidad, no bloqueante).
 - **2026-03-19**: Sesión inicial de migración a v3.0.0. Bugs críticos identificados y arreglados (TemplateNotFound, UnicodeDecodeError, timeouts de NetAdapter, error JS de className).
