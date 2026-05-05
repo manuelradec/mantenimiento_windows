@@ -6,6 +6,7 @@ Tables:
 - jobs: Background job records with full lifecycle
 - audit_log: Every action executed with structured fields
 """
+
 import os
 import json
 import sqlite3
@@ -17,9 +18,9 @@ from typing import Optional
 
 from config import Config
 
-logger = logging.getLogger('cleancpu.persistence')
+logger = logging.getLogger("cleancpu.persistence")
 
-DB_FILENAME = 'cleancpu.db'
+DB_FILENAME = "cleancpu.db"
 
 
 def _get_db_path() -> str:
@@ -36,7 +37,7 @@ _local = threading.local()
 @contextmanager
 def get_db():
     """Get a thread-local database connection with auto-commit context."""
-    if not hasattr(_local, 'conn') or _local.conn is None:
+    if not hasattr(_local, "conn") or _local.conn is None:
         db_path = _get_db_path()
         _local.conn = sqlite3.connect(db_path, timeout=10)
         _local.conn.row_factory = sqlite3.Row
@@ -153,15 +154,28 @@ class SessionStore:
     """Manages session records."""
 
     @staticmethod
-    def create(session_id: str, hostname: str = '', username: str = '',
-               is_admin: bool = False, os_info: str = '', app_version: str = ''):
+    def create(
+        session_id: str,
+        hostname: str = "",
+        username: str = "",
+        is_admin: bool = False,
+        os_info: str = "",
+        app_version: str = "",
+    ):
         with get_db() as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO sessions "
                 "(session_id, started_at, hostname, username, is_admin, os_info, app_version) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (session_id, datetime.now().isoformat(), hostname, username,
-                 int(is_admin), os_info, app_version)
+                (
+                    session_id,
+                    datetime.now().isoformat(),
+                    hostname,
+                    username,
+                    int(is_admin),
+                    os_info,
+                    app_version,
+                ),
             )
 
     @staticmethod
@@ -169,7 +183,7 @@ class SessionStore:
         with get_db() as conn:
             conn.execute(
                 "UPDATE sessions SET ended_at = ? WHERE session_id = ?",
-                (datetime.now().isoformat(), session_id)
+                (datetime.now().isoformat(), session_id),
             )
 
     @staticmethod
@@ -185,40 +199,75 @@ class JobStore:
     """Manages job records."""
 
     @staticmethod
-    def create(job_id: str, session_id: str, action_id: str, action_name: str,
-               module: str, risk_class: str, hostname: str = '', username: str = '',
-               is_admin: bool = False, parameters: Optional[dict] = None):
+    def create(
+        job_id: str,
+        session_id: str,
+        action_id: str,
+        action_name: str,
+        module: str,
+        risk_class: str,
+        hostname: str = "",
+        username: str = "",
+        is_admin: bool = False,
+        parameters: Optional[dict] = None,
+    ):
         with get_db() as conn:
             conn.execute(
                 "INSERT INTO jobs "
                 "(job_id, session_id, action_id, action_name, module, risk_class, "
                 "status, queued_at, hostname, username, is_admin, parameters_json) "
                 "VALUES (?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?)",
-                (job_id, session_id, action_id, action_name, module, risk_class,
-                 datetime.now().isoformat(), hostname, username, int(is_admin),
-                 json.dumps(parameters) if parameters else None)
+                (
+                    job_id,
+                    session_id,
+                    action_id,
+                    action_name,
+                    module,
+                    risk_class,
+                    datetime.now().isoformat(),
+                    hostname,
+                    username,
+                    int(is_admin),
+                    json.dumps(parameters) if parameters else None,
+                ),
             )
 
     @staticmethod
-    def update_started(job_id: str, command: str = ''):
+    def update_started(job_id: str, command: str = ""):
         with get_db() as conn:
             conn.execute(
                 "UPDATE jobs SET status = 'running', started_at = ?, command = ? "
                 "WHERE job_id = ?",
-                (datetime.now().isoformat(), command, job_id)
+                (datetime.now().isoformat(), command, job_id),
             )
 
     @staticmethod
-    def update_completed(job_id: str, status: str, stdout: str = '', stderr: str = '',
-                         return_code: Optional[int] = None, duration_ms: int = 0,
-                         error_message: str = '', needs_reboot: bool = False):
+    def update_completed(
+        job_id: str,
+        status: str,
+        stdout: str = "",
+        stderr: str = "",
+        return_code: Optional[int] = None,
+        duration_ms: int = 0,
+        error_message: str = "",
+        needs_reboot: bool = False,
+    ):
         with get_db() as conn:
             conn.execute(
                 "UPDATE jobs SET status = ?, completed_at = ?, stdout = ?, stderr = ?, "
                 "return_code = ?, duration_ms = ?, error_message = ?, needs_reboot = ? "
                 "WHERE job_id = ?",
-                (status, datetime.now().isoformat(), stdout, stderr,
-                 return_code, duration_ms, error_message, int(needs_reboot), job_id)
+                (
+                    status,
+                    datetime.now().isoformat(),
+                    stdout,
+                    stderr,
+                    return_code,
+                    duration_ms,
+                    error_message,
+                    int(needs_reboot),
+                    job_id,
+                ),
             )
 
     @staticmethod
@@ -234,7 +283,7 @@ class JobStore:
         with get_db() as conn:
             rows = conn.execute(
                 "SELECT * FROM jobs WHERE session_id = ? ORDER BY queued_at DESC LIMIT ?",
-                (session_id, limit)
+                (session_id, limit),
             ).fetchall()
             return [dict(r) for r in rows]
 
@@ -253,7 +302,7 @@ class JobStore:
             conn.execute(
                 "UPDATE jobs SET status = 'cancelled', completed_at = ? "
                 "WHERE job_id = ? AND status IN ('queued', 'running')",
-                (datetime.now().isoformat(), job_id)
+                (datetime.now().isoformat(), job_id),
             )
 
 
@@ -261,12 +310,24 @@ class AuditStore:
     """Manages the audit log."""
 
     @staticmethod
-    def log(session_id: str, module: str, action: str, status: str,
-            job_id: str = '', action_id: str = '', risk_class: str = '',
-            hostname: str = '', username: str = '', is_admin: bool = False,
-            command: str = '', return_code: Optional[int] = None,
-            stdout_preview: str = '', stderr_preview: str = '',
-            duration_ms: int = 0, details: Optional[dict] = None):
+    def log(
+        session_id: str,
+        module: str,
+        action: str,
+        status: str,
+        job_id: str = "",
+        action_id: str = "",
+        risk_class: str = "",
+        hostname: str = "",
+        username: str = "",
+        is_admin: bool = False,
+        command: str = "",
+        return_code: Optional[int] = None,
+        stdout_preview: str = "",
+        stderr_preview: str = "",
+        duration_ms: int = 0,
+        details: Optional[dict] = None,
+    ):
         """Write an audit log entry."""
         with get_db() as conn:
             conn.execute(
@@ -275,31 +336,44 @@ class AuditStore:
                 "status, hostname, username, is_admin, command, return_code, "
                 "stdout_preview, stderr_preview, duration_ms, details_json) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (datetime.now().isoformat(), session_id, job_id, module, action,
-                 action_id, risk_class, status, hostname, username, int(is_admin),
-                 command, return_code,
-                 stdout_preview[:500] if stdout_preview else '',
-                 stderr_preview[:500] if stderr_preview else '',
-                 duration_ms,
-                 json.dumps(details) if details else None)
+                (
+                    datetime.now().isoformat(),
+                    session_id,
+                    job_id,
+                    module,
+                    action,
+                    action_id,
+                    risk_class,
+                    status,
+                    hostname,
+                    username,
+                    int(is_admin),
+                    command,
+                    return_code,
+                    stdout_preview[:500] if stdout_preview else "",
+                    stderr_preview[:500] if stderr_preview else "",
+                    duration_ms,
+                    json.dumps(details) if details else None,
+                ),
             )
 
     @staticmethod
-    def get_entries(session_id: str, module: Optional[str] = None,
-                    limit: int = 200) -> list[dict]:
+    def get_entries(
+        session_id: str, module: Optional[str] = None, limit: int = 200
+    ) -> list[dict]:
         """Get audit log entries."""
         with get_db() as conn:
             if module:
                 rows = conn.execute(
                     "SELECT * FROM audit_log WHERE session_id = ? AND module = ? "
                     "ORDER BY timestamp DESC LIMIT ?",
-                    (session_id, module, limit)
+                    (session_id, module, limit),
                 ).fetchall()
             else:
                 rows = conn.execute(
                     "SELECT * FROM audit_log WHERE session_id = ? "
                     "ORDER BY timestamp DESC LIMIT ?",
-                    (session_id, limit)
+                    (session_id, limit),
                 ).fetchall()
             return [dict(r) for r in rows]
 
@@ -309,7 +383,7 @@ class AuditStore:
         with get_db() as conn:
             rows = conn.execute(
                 "SELECT * FROM audit_log WHERE session_id = ? ORDER BY timestamp ASC LIMIT ?",
-                (session_id, limit)
+                (session_id, limit),
             ).fetchall()
             return [dict(r) for r in rows]
 
@@ -318,31 +392,30 @@ class AuditStore:
         """Get audit summary for a session."""
         with get_db() as conn:
             total = conn.execute(
-                "SELECT COUNT(*) FROM audit_log WHERE session_id = ?",
-                (session_id,)
+                "SELECT COUNT(*) FROM audit_log WHERE session_id = ?", (session_id,)
             ).fetchone()[0]
 
             by_status = {}
             for row in conn.execute(
                 "SELECT status, COUNT(*) as cnt FROM audit_log "
                 "WHERE session_id = ? GROUP BY status",
-                (session_id,)
+                (session_id,),
             ).fetchall():
-                by_status[row['status']] = row['cnt']
+                by_status[row["status"]] = row["cnt"]
 
             by_module = {}
             for row in conn.execute(
                 "SELECT module, COUNT(*) as cnt FROM audit_log "
                 "WHERE session_id = ? GROUP BY module",
-                (session_id,)
+                (session_id,),
             ).fetchall():
-                by_module[row['module']] = row['cnt']
+                by_module[row["module"]] = row["cnt"]
 
             return {
-                'session_id': session_id,
-                'total_actions': total,
-                'by_status': by_status,
-                'by_module': by_module,
+                "session_id": session_id,
+                "total_actions": total,
+                "by_status": by_status,
+                "by_module": by_module,
             }
 
 
@@ -350,11 +423,29 @@ class SnapshotStore:
     """Manages before/after snapshots."""
 
     @staticmethod
+    def save(
+        job_id: str,
+        session_id: str,
+        action_id: str,
+        snapshot_type: str,
+        captured_at: str,
+        data_json: str,
+    ):
+        """Inserta un snapshot ('before' o 'after') en la tabla snapshots."""
+        with get_db() as conn:
+            conn.execute(
+                "INSERT INTO snapshots (job_id, session_id, action_id, "
+                "snapshot_type, captured_at, data_json) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (job_id, session_id, action_id, snapshot_type, captured_at, data_json),
+            )
+
+    @staticmethod
     def get_by_job(job_id: str) -> list[dict]:
         with get_db() as conn:
             rows = conn.execute(
                 "SELECT * FROM snapshots WHERE job_id = ? ORDER BY captured_at",
-                (job_id,)
+                (job_id,),
             ).fetchall()
             return [dict(r) for r in rows]
 
@@ -363,7 +454,7 @@ class SnapshotStore:
         with get_db() as conn:
             rows = conn.execute(
                 "SELECT * FROM snapshots WHERE session_id = ? ORDER BY captured_at",
-                (session_id,)
+                (session_id,),
             ).fetchall()
             return [dict(r) for r in rows]
 
@@ -372,7 +463,7 @@ class EventViewerStore:
     """Manages cached Event Viewer entries."""
 
     @staticmethod
-    def store_events(session_id: str, events: list[dict], job_id: str = ''):
+    def store_events(session_id: str, events: list[dict], job_id: str = ""):
         with get_db() as conn:
             for evt in events:
                 conn.execute(
@@ -380,26 +471,34 @@ class EventViewerStore:
                     "(session_id, job_id, log_name, provider, event_id, level, "
                     "time_created, message, collected_at) "
                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    (session_id, job_id,
-                     evt.get('log_name', ''), evt.get('provider', ''),
-                     evt.get('event_id'), evt.get('level', ''),
-                     evt.get('time_created', ''), evt.get('message', ''),
-                     datetime.now().isoformat())
+                    (
+                        session_id,
+                        job_id,
+                        evt.get("log_name", ""),
+                        evt.get("provider", ""),
+                        evt.get("event_id"),
+                        evt.get("level", ""),
+                        evt.get("time_created", ""),
+                        evt.get("message", ""),
+                        datetime.now().isoformat(),
+                    ),
                 )
 
     @staticmethod
-    def get_by_session(session_id: str, log_name: str = '', limit: int = 200) -> list[dict]:
+    def get_by_session(
+        session_id: str, log_name: str = "", limit: int = 200
+    ) -> list[dict]:
         with get_db() as conn:
             if log_name:
                 rows = conn.execute(
                     "SELECT * FROM event_viewer_cache WHERE session_id = ? AND log_name = ? "
                     "ORDER BY time_created DESC LIMIT ?",
-                    (session_id, log_name, limit)
+                    (session_id, log_name, limit),
                 ).fetchall()
             else:
                 rows = conn.execute(
                     "SELECT * FROM event_viewer_cache WHERE session_id = ? "
                     "ORDER BY time_created DESC LIMIT ?",
-                    (session_id, limit)
+                    (session_id, limit),
                 ).fetchall()
             return [dict(r) for r in rows]

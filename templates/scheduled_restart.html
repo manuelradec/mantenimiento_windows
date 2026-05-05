@@ -41,16 +41,22 @@
 
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:16px;">
             <div>
-                <label style="display:block;font-size:13px;margin-bottom:4px;font-weight:600;">Fecha</label>
-                <input type="date" id="restart-date" class="form-input" style="width:100%;box-sizing:border-box;">
+                <label for="restart-date" style="display:block;font-size:13px;margin-bottom:4px;font-weight:600;">Fecha</label>
+                <input type="date" id="restart-date" class="form-input"
+                    title="Fecha del reinicio programado"
+                    style="width:100%;box-sizing:border-box;">
             </div>
             <div>
-                <label style="display:block;font-size:13px;margin-bottom:4px;font-weight:600;">Hora (24h)</label>
-                <input type="time" id="restart-time" class="form-input" style="width:100%;box-sizing:border-box;">
+                <label for="restart-time" style="display:block;font-size:13px;margin-bottom:4px;font-weight:600;">Hora (24h)</label>
+                <input type="time" id="restart-time" class="form-input"
+                    title="Hora del reinicio programado (formato 24h)"
+                    style="width:100%;box-sizing:border-box;">
             </div>
             <div>
-                <label style="display:block;font-size:13px;margin-bottom:4px;font-weight:600;">Recurrencia</label>
-                <select id="restart-recurrence" class="form-select" style="width:100%;box-sizing:border-box;">
+                <label for="restart-recurrence" style="display:block;font-size:13px;margin-bottom:4px;font-weight:600;">Recurrencia</label>
+                <select id="restart-recurrence" class="form-select"
+                    title="Frecuencia con la que se repite el reinicio"
+                    style="width:100%;box-sizing:border-box;">
                     <option value="Once">Una vez</option>
                     <option value="Daily">Diario</option>
                     <option value="Weekly">Semanal</option>
