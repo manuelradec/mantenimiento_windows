@@ -690,6 +690,28 @@ ROLLBACK_STRATEGIES = {
         "needs_reboot": True,
         "restore_point_recommended": True,
     },
+    # scheduled_restart
+    "scheduled_restart.create": {
+        "classification": "manually_reversible",
+        "reversible": "manual",
+        "instructions": (
+            "Cancele la tarea desde la UI /scheduled-restart/ (botón Eliminar) "
+            "o ejecute como administrador: "
+            "Unregister-ScheduledTask -TaskName 'CleanCPU_Restart' -Confirm:$false"
+        ),
+        "needs_reboot": False,
+        "restore_point_recommended": False,
+    },
+    "scheduled_restart.delete": {
+        "classification": "manually_reversible",
+        "reversible": "manual",
+        "instructions": (
+            "La tarea fue eliminada. Para reprogramar use la UI "
+            "/scheduled-restart/ con la fecha y hora deseadas."
+        ),
+        "needs_reboot": False,
+        "restore_point_recommended": False,
+    },
 }
 
 

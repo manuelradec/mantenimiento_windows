@@ -146,6 +146,22 @@ def init_db():
             );
 
             CREATE INDEX IF NOT EXISTS idx_evtcache_session ON event_viewer_cache(session_id);
+
+            CREATE TABLE IF NOT EXISTS scheduled_restarts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                operation TEXT NOT NULL,
+                scheduled_at TEXT,
+                recurrence TEXT,
+                grace_period INTEGER,
+                force INTEGER NOT NULL DEFAULT 0,
+                success INTEGER NOT NULL DEFAULT 0,
+                error TEXT,
+                session_id TEXT,
+                username TEXT
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_sched_restart_ts ON scheduled_restarts(timestamp);
         """)
     logger.info(f"Database initialized at {_get_db_path()}")
 
@@ -501,4 +517,77 @@ class EventViewerStore:
                     "ORDER BY time_created DESC LIMIT ?",
                     (session_id, limit),
                 ).fetchall()
+            return [dict(r) for r in rows]
+
+
+class ScheduledRestartStore:
+    """Audit trail de operaciones sobre la tarea de reinicio programado.
+
+    Esta tabla NO es la fuente de verdad de los reinicios programados —
+    `schtasks` de Windows lo es. Aquí guardamos quién/cuándo/qué se
+    intentó programar o borrar para tener un registro consultable desde
+    la app, independiente de que la tarea siga viva en Windows.
+    """
+
+    @staticmethod
+    def record_create(
+        scheduled_at: str,
+        recurrence: str,
+        grace_period: int,
+        force: bool,
+        success: bool,
+        error: str = "",
+        session_id: str = "",
+        username: str = "",
+    ):
+        """Registra un intento de crear/actualizar la tarea programada."""
+        with get_db() as conn:
+            conn.execute(
+                "INSERT INTO scheduled_restarts "
+                "(timestamp, operation, scheduled_at, recurrence, grace_period, "
+                "force, success, error, session_id, username) "
+                "VALUES (?, 'create', ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    datetime.now().isoformat(),
+                    scheduled_at,
+                    recurrence,
+                    int(grace_period),
+                    int(force),
+                    int(success),
+                    error,
+                    session_id,
+                    username,
+                ),
+            )
+
+    @staticmethod
+    def record_delete(
+        success: bool,
+        error: str = "",
+        session_id: str = "",
+        username: str = "",
+    ):
+        """Registra un intento de borrar la tarea programada."""
+        with get_db() as conn:
+            conn.execute(
+                "INSERT INTO scheduled_restarts "
+                "(timestamp, operation, success, error, session_id, username) "
+                "VALUES (?, 'delete', ?, ?, ?, ?)",
+                (
+                    datetime.now().isoformat(),
+                    int(success),
+                    error,
+                    session_id,
+                    username,
+                ),
+            )
+
+    @staticmethod
+    def get_recent(limit: int = 20) -> list[dict]:
+        """Devuelve el historial reciente de operaciones, ordenado descendente."""
+        with get_db() as conn:
+            rows = conn.execute(
+                "SELECT * FROM scheduled_restarts " "ORDER BY timestamp DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
             return [dict(r) for r in rows]
