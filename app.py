@@ -6,6 +6,7 @@ This module creates and configures the Flask application.
 For production execution, use server.py (Waitress).
 For development, use server.py --dev.
 """
+
 import os
 import logging
 import webbrowser
@@ -27,8 +28,8 @@ def create_app():
     """Application factory - creates and configures the Flask app."""
     # Handle PyInstaller paths
     base_path = get_base_path()
-    template_folder = os.path.join(base_path, 'templates')
-    static_folder = os.path.join(base_path, 'static')
+    template_folder = os.path.join(base_path, "templates")
+    static_folder = os.path.join(base_path, "static")
 
     app = Flask(
         __name__,
@@ -47,12 +48,12 @@ def create_app():
     @app.context_processor
     def inject_globals():
         return {
-            'elevation': get_elevation_info(),
-            'config': {
-                'APP_NAME': Config.APP_NAME,
-                'APP_VERSION': Config.APP_VERSION,
+            "elevation": get_elevation_info(),
+            "config": {
+                "APP_NAME": Config.APP_NAME,
+                "APP_VERSION": Config.APP_VERSION,
             },
-            'policy_mode': policy.mode.value,
+            "policy_mode": policy.mode.value,
         }
 
     # Register all route blueprints
@@ -70,39 +71,40 @@ def create_app():
 def _register_core_routes(app):
     """Register core API endpoints for jobs, policy, action registry, and system info."""
 
-    @app.route('/api/system-overview')
+    @app.route("/api/system-overview")
     def api_system_overview():
         from services.system_info import get_system_overview
+
         return jsonify(get_system_overview())
 
-    @app.route('/api/elevation')
+    @app.route("/api/elevation")
     def api_elevation():
         return jsonify(get_elevation_info())
 
     # === Job Management ===
 
-    @app.route('/api/jobs/<job_id>')
+    @app.route("/api/jobs/<job_id>")
     def api_get_job(job_id):
         """Poll job status."""
         job = job_runner.get_job(job_id)
         if not job:
-            return jsonify({'error': 'Job not found'}), 404
+            return jsonify({"error": "Job not found"}), 404
         return jsonify(job)
 
-    @app.route('/api/jobs')
+    @app.route("/api/jobs")
     def api_list_jobs():
         """List active jobs."""
         active = job_runner.list_active()
-        return jsonify({'jobs': active})
+        return jsonify({"jobs": active})
 
-    @app.route('/api/jobs/recent')
+    @app.route("/api/jobs/recent")
     def api_recent_jobs():
         """List recent jobs for current session."""
-        session_id = app.config.get('SESSION_ID', 'unknown')
+        session_id = app.config.get("SESSION_ID", "unknown")
         jobs = job_runner.list_recent(session_id, limit=50)
-        return jsonify({'jobs': jobs})
+        return jsonify({"jobs": jobs})
 
-    @app.route('/api/jobs/<job_id>/cancel', methods=['POST'])
+    @app.route("/api/jobs/<job_id>/cancel", methods=["POST"])
     def api_cancel_job(job_id):
         """Request cancellation of a running/queued job."""
         result = job_runner.cancel_job(job_id)
@@ -110,49 +112,52 @@ def _register_core_routes(app):
 
     # === Policy Engine ===
 
-    @app.route('/api/policy/status')
+    @app.route("/api/policy/status")
     def api_policy_status():
         """Get current policy status."""
         return jsonify(policy.get_status())
 
-    @app.route('/api/policy/mode', methods=['POST'])
+    @app.route("/api/policy/mode", methods=["POST"])
     def api_set_mode():
         """Change the operation mode."""
         data = request.get_json(silent=True) or {}
-        mode_str = data.get('mode', '')
+        mode_str = data.get("mode", "")
         try:
             mode = OperationMode(mode_str)
         except ValueError:
             valid = [m.value for m in OperationMode]
-            return jsonify({'error': f'Invalid mode. Valid: {valid}'}), 400
+            return jsonify({"error": f"Invalid mode. Valid: {valid}"}), 400
 
         from core.governance import write_jsonl_event
-        write_jsonl_event({
-            'event': 'mode_change',
-            'old_mode': policy.mode.value,
-            'new_mode': mode_str,
-        })
+
+        write_jsonl_event(
+            {
+                "event": "mode_change",
+                "old_mode": policy.mode.value,
+                "new_mode": mode_str,
+            }
+        )
         policy.set_mode(mode)
         return jsonify(policy.get_status())
 
-    @app.route('/api/policy/confirm', methods=['POST'])
+    @app.route("/api/policy/confirm", methods=["POST"])
     def api_confirm_action():
         """Register a confirmation token for a pending action."""
         data = request.get_json(silent=True) or {}
-        token = data.get('token', '')
+        token = data.get("token", "")
         if not token:
-            return jsonify({'error': 'Missing confirmation token'}), 400
+            return jsonify({"error": "Missing confirmation token"}), 400
         policy.add_confirmation(token)
-        return jsonify({'status': 'confirmed', 'token': token})
+        return jsonify({"status": "confirmed", "token": token})
 
     # === Action Registry ===
 
-    @app.route('/api/actions')
+    @app.route("/api/actions")
     def api_list_actions():
         """List all registered actions with metadata."""
         return jsonify(registry.to_dict())
 
-    @app.route('/api/actions/allowed')
+    @app.route("/api/actions/allowed")
     def api_allowed_actions():
         """List actions allowed in current mode."""
         allowed = registry.list_allowed(policy.mode)
@@ -163,15 +168,17 @@ def _setup_logging(app):
     """Configure application logging with rotating file handler (no console output)."""
     from logging.handlers import RotatingFileHandler
 
-    log_format = '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+    log_format = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 
     # File handler with rotation: 10 MB max, keep 5 backups
     file_handler = None
     try:
-        log_file = os.path.join(Config.LOG_DIR, 'app.log')
+        log_file = os.path.join(Config.LOG_DIR, "app.log")
         file_handler = RotatingFileHandler(
-            log_file, maxBytes=10 * 1024 * 1024, backupCount=5,
-            encoding='utf-8',
+            log_file,
+            maxBytes=10 * 1024 * 1024,
+            backupCount=5,
+            encoding="utf-8",
         )
         file_handler.setFormatter(logging.Formatter(log_format))
         file_handler.setLevel(logging.DEBUG)
@@ -189,7 +196,7 @@ def _setup_logging(app):
             root_logger.addHandler(logging.NullHandler())
 
     # Suppress noisy Flask/Werkzeug logs
-    logging.getLogger('werkzeug').setLevel(logging.WARNING)
+    logging.getLogger("werkzeug").setLevel(logging.WARNING)
 
     app.logger.info(f"{Config.APP_NAME} v{Config.APP_VERSION} starting...")
     app.logger.info(f"Log directory: {Config.LOG_DIR}")
@@ -198,10 +205,13 @@ def _setup_logging(app):
 
 def open_browser(port):
     """Open the default browser after a short delay."""
+
     def _open():
         import time
+
         time.sleep(1.5)
-        webbrowser.open(f'http://127.0.0.1:{port}')
+        webbrowser.open(f"http://127.0.0.1:{port}")
+
     thread = threading.Thread(target=_open, daemon=True)
     thread.start()
 
@@ -214,7 +224,11 @@ def main():
     app = create_app()
     port = Config.PORT
 
-    sep = '=' * 60
+    # Banner UX: los print() van a consola (los lee el técnico al lanzar `python app.py`).
+    # Excepción intencional a CLAUDE.md §5 ("usar logging, no print"): este es banner
+    # de arranque dev, no log estructurado. Para cumplir §5 también, los datos clave
+    # del banner se duplican vía app.logger.info (van al archivo de log).
+    sep = "=" * 60
     print(f"\n{sep}")
     print(f"  {Config.APP_NAME} v{Config.APP_VERSION}")
     print(f"  [DEV MODE] Running at: http://127.0.0.1:{port}")
@@ -222,6 +236,14 @@ def main():
     print(f"  Admin: {get_elevation_info()['is_admin']}")
     print(f"  Logs: {Config.LOG_DIR}")
     print(f"{sep}\n")
+
+    app.logger.info(
+        f"[DEV MODE] {Config.APP_NAME} v{Config.APP_VERSION} "
+        f"on http://127.0.0.1:{port}"
+    )
+    app.logger.info(
+        f"Admin: {get_elevation_info()['is_admin']} | Logs: {Config.LOG_DIR}"
+    )
 
     open_browser(port)
 
@@ -234,5 +256,5 @@ def main():
     )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
