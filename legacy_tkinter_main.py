@@ -1,3 +1,28 @@
+"""
+CleanCPU — App standalone Tkinter (v1, predecesora del Flask app actual).
+
+Rol en el proyecto:
+- Es el predecesor histórico del Flask app de `app.py` / `server.py`.
+- Se conserva como **fallback diagnóstico offline**: equipo sin Python web stack,
+  sin reverse proxy, o sin posibilidad de levantar Waitress.
+- Se ejecuta directamente con `python legacy_tkinter_main.py` (requiere admin).
+- Escribe su log en `%USERPROFILE%\\Desktop\\Optimizacion_Log_<timestamp>.log`,
+  NO en `C:\\ProgramData\\CleanCPU\\logs\\` (esa ruta es del Flask app moderno).
+
+Mantenimiento:
+- NO es runtime principal — el Flask app es el camino oficial.
+- NO usa la capa de gobernanza (`core/governance.py`) ni el `command_runner`
+  con allowlist. Sus comandos vuelan directos contra el shell.
+- Cualquier acción nueva debe ir al Flask app (`services/` + `routes/` +
+  `core/action_registry.py`), NO aquí.
+- Si este archivo deja de tener consumidores reales, evaluar borrarlo.
+
+Ámbito cubierto (replica simplificada de lo que hace el Flask app):
+limpieza de temporales, configuración de servicios, deshabilitar tareas de
+telemetría, diagnóstico RAM/disco, defrag HDD, SFC/DISM/CHKDSK, ajuste de
+pagefile si RAM<8GB, renovación IP/DNS, vaciado de papelera.
+"""
+
 import os
 import shutil
 import subprocess
@@ -9,11 +34,12 @@ from tkinter import messagebox, scrolledtext, filedialog
 import threading
 import time
 
+LOGFILE = os.path.join(
+    os.environ["USERPROFILE"],
+    "Desktop",
+    f"Optimizacion_Log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log",
+)
 
-
-
-
-LOGFILE = os.path.join(os.environ["USERPROFILE"], "Desktop", f"Optimizacion_Log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
 
 def is_admin():
     try:
@@ -21,9 +47,16 @@ def is_admin():
     except Exception:
         return False
 
+
 def run_cmd(command, timeout=None):
     try:
-        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        process = subprocess.Popen(
+            command,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
         start_time = time.time()
         output, error = "", ""
         while True:
@@ -36,31 +69,37 @@ def run_cmd(command, timeout=None):
                     process.wait(timeout=5)
                 except Exception:
                     process.kill()
-                return ("", "[TIMEOUT] El comando excedió el tiempo límite y fue cancelado.")
+                return (
+                    "",
+                    "[TIMEOUT] El comando excedió el tiempo límite y fue cancelado.",
+                )
             time.sleep(0.1)
         return (output.strip(), error.strip())
     except Exception as e:
         return ("", f"[EXCEPCIÓN] {str(e)}")
 
+
 def add_log(msg):
     with open(LOGFILE, "a", encoding="utf-8") as f:
         f.write(f"{datetime.now()} {msg}\n")
+
 
 # ----------- Diagnóstico RAM y Disco -----------
 def diagnostico_ram(callback):
     info = []
     recomendacion = ""
     try:
-        cmd = 'wmic memorychip get banklabel,capacity,manufacturer,partnumber,speed'
+        cmd = "wmic memorychip get banklabel,capacity,manufacturer,partnumber,speed"
         out, err = run_cmd(cmd)
         ram_modulos = []
         for line in out.splitlines()[1:]:
             if line.strip():
                 parts = [p.strip() for p in line.split() if p.strip()]
                 # Algunos fabricantes pueden dejar columnas vacías, entonces chequeamos
-                if len(parts) < 5: continue
+                if len(parts) < 5:
+                    continue
                 bank, cap, mfg, part, speed = parts[:5]
-                gb = int(cap) // (1024 ** 3) if cap.isdigit() else 0
+                gb = int(cap) // (1024**3) if cap.isdigit() else 0
                 ram_modulos.append((bank, gb, mfg, part, speed))
         slots = len(ram_modulos)
         total_ram = sum([mod[1] for mod in ram_modulos])
@@ -73,27 +112,31 @@ def diagnostico_ram(callback):
             recomendacion = f"RAM instalada óptima: {total_ram}GB ({slots} módulos)."
         info.append("Módulos RAM detectados:")
         for m in ram_modulos:
-            info.append(f"- Slot: {m[0]}, Tamaño: {m[1]} GB, Marca: {m[2]}, Modelo: {m[3]}, Velocidad: {m[4]}")
+            info.append(
+                f"- Slot: {m[0]}, Tamaño: {m[1]} GB, Marca: {m[2]}, Modelo: {m[3]}, Velocidad: {m[4]}"
+            )
         info.append(recomendacion)
     except Exception as e:
         info.append(f"[ERROR] Diagnóstico RAM: {e}")
     add_log("\n".join(info))
     callback("\n".join(info))
 
+
 def diagnostico_almacenamiento(callback):
     info = []
     recomendacion = ""
     try:
-        out, err = run_cmd('wmic diskdrive get model,mediaType,size')
+        out, err = run_cmd("wmic diskdrive get model,mediaType,size")
         is_hdd = False
         for line in out.splitlines()[1:]:
             if line.strip():
                 parts = [p.strip() for p in line.split() if p.strip()]
-                if len(parts) < 3: continue
+                if len(parts) < 3:
+                    continue
                 model, tipo, size = parts[:3]
-                gb = int(size) // (1024 ** 3) if size.isdigit() else 0
+                gb = int(size) // (1024**3) if size.isdigit() else 0
                 info.append(f"- Modelo: {model}, Tipo: {tipo}, Tamaño: {gb} GB")
-                if any(indicator in tipo for indicator in ('HDD', 'Hard', 'Fixed')):
+                if any(indicator in tipo for indicator in ("HDD", "Hard", "Fixed")):
                     is_hdd = True
         if is_hdd:
             recomendacion = "💡 El equipo tiene HDD. Migrar a SSD es altamente recomendable para mejorar velocidad."
@@ -105,6 +148,7 @@ def diagnostico_almacenamiento(callback):
     add_log("\n".join(info))
     callback("\n".join(info))
 
+
 # ----------- Funciones de mantenimiento ----------
 def limpiar_temporales(callback):
     temp_paths = [
@@ -112,10 +156,27 @@ def limpiar_temporales(callback):
         os.path.join(os.environ["USERPROFILE"], "AppData", "Local", "Temp"),
         os.path.join(os.environ["SystemRoot"], "Temp"),
         os.path.join(os.environ["SystemRoot"], "SoftwareDistribution", "Download"),
-        os.path.join(os.environ["SystemRoot"], "System32", "config", "systemprofile", "AppData", "Local", "Microsoft", "Windows", "INetCache"),
-        os.path.join(os.environ["USERPROFILE"], "AppData", "Local", "Microsoft", "Windows", "INetCache"),
+        os.path.join(
+            os.environ["SystemRoot"],
+            "System32",
+            "config",
+            "systemprofile",
+            "AppData",
+            "Local",
+            "Microsoft",
+            "Windows",
+            "INetCache",
+        ),
+        os.path.join(
+            os.environ["USERPROFILE"],
+            "AppData",
+            "Local",
+            "Microsoft",
+            "Windows",
+            "INetCache",
+        ),
         os.path.join(os.environ["USERPROFILE"], "AppData", "Local", "Lenovo"),
-        "C:\\ProgramData\\Lenovo"
+        "C:\\ProgramData\\Lenovo",
     ]
     for path in temp_paths:
         if path and os.path.exists(path):
@@ -131,6 +192,7 @@ def limpiar_temporales(callback):
             except Exception as e:
                 add_log(f"[ERROR] Limpieza en {path}: {e}")
 
+
 def configurar_servicios(callback):
     servicios = {
         "wuauserv": "auto",
@@ -142,7 +204,7 @@ def configurar_servicios(callback):
         "XboxNetApiSvc": "disabled",
         "WwanSvc": "disabled",
         "MapsBroker": "disabled",
-        "OneSyncSvc": "disabled"
+        "OneSyncSvc": "disabled",
     }
     for s, modo in servicios.items():
         callback(f"Configurando servicio: {s} → {modo}")
@@ -152,10 +214,11 @@ def configurar_servicios(callback):
         if err:
             add_log(f"[WARNING] Servicio {s}: {err}")
 
+
 def deshabilitar_tareas(callback):
     tareas = [
         "Microsoft\\Windows\\Customer Experience Improvement Program\\Consolidator",
-        "Microsoft\\Windows\\Application Experience\\ProgramDataUpdater"
+        "Microsoft\\Windows\\Application Experience\\ProgramDataUpdater",
     ]
     for tarea in tareas:
         callback(f"Deshabilitando tarea: {tarea}")
@@ -163,23 +226,45 @@ def deshabilitar_tareas(callback):
         if err and "no existe" not in err:
             add_log(f"[ERROR] {tarea}: {err}")
 
+
 def diagnostico_hardware(callback):
     diagnostico_ram(callback)
     diagnostico_almacenamiento(callback)
 
+
 def diagnostico_disco(callback):
-    cmd_media_type = 'wmic diskdrive get MediaType'
-    result = subprocess.run(cmd_media_type, shell=True, capture_output=True, text=True)
-    if any(indicator in result.stdout for indicator in ('Fixed hard disk', 'HDD')):
+    cmd_media_type = "wmic diskdrive get MediaType"
+    try:
+        result = subprocess.run(
+            cmd_media_type, shell=True, capture_output=True, text=True
+        )
+    except Exception as e:
+        add_log(f"[ERROR] diagnostico_disco: {e}")
+        callback("No se pudo determinar tipo de disco. Saltando desfragmentación.")
+        return
+    if any(indicator in result.stdout for indicator in ("Fixed hard disk", "HDD")):
         callback("Desfragmentando HDD...")
-        out, err = run_cmd('defrag C: /O /U /V', timeout=300)
+        out, err = run_cmd("defrag C: /O /U /V", timeout=300)
         add_log(out + "\n" + err)
     else:
         callback("No es HDD. Saltando desfragmentación.")
 
+
 def run_cmd_with_skip(app, command, callback, timeout=300):
     # Ejecuta el comando, permite terminar el proceso externo si presionas Saltar.
-    app._current_subprocess = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        app._current_subprocess = subprocess.Popen(
+            command,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+    except Exception as e:
+        callback(f"[ERROR] No se pudo iniciar el comando: {e}")
+        add_log(f"[ERROR] Popen falló para '{command}': {e}")
+        app._current_subprocess = None
+        return
     start_time = time.time()
     output, error = "", ""
     asked = False
@@ -190,8 +275,8 @@ def run_cmd_with_skip(app, command, callback, timeout=300):
                 app._current_subprocess.wait(timeout=5)
             except Exception:
                 app._current_subprocess.kill()
-            callback(f"[AVISO] Paso saltado por el usuario.")
-            add_log(f"[AVISO] Paso saltado por el usuario.")
+            callback("[AVISO] Paso saltado por el usuario.")
+            add_log("[AVISO] Paso saltado por el usuario.")
             app.skip_current = False
             break
         if app._current_subprocess.poll() is not None:
@@ -199,18 +284,22 @@ def run_cmd_with_skip(app, command, callback, timeout=300):
             add_log(output + "\n" + error)
             break
         if time.time() - start_time > timeout and not asked:
-            resp = messagebox.askyesno("Proceso lento", f"Este paso lleva más de {timeout // 60} minutos.\n¿Quieres saltar este paso?")
+            resp = messagebox.askyesno(
+                "Proceso lento",
+                f"Este paso lleva más de {timeout // 60} minutos.\n¿Quieres saltar este paso?",
+            )
             asked = True
             if resp:
                 app.skip_current = True
         time.sleep(0.3)
     app._current_subprocess = None
 
+
 def reparar_sistema(app, callback):
     for nombre, cmd in [
-        ("SFC", 'sfc /scannow'),
-        ("DISM", 'DISM /Online /Cleanup-Image /RestoreHealth'),
-        ("CHKDSK", 'echo S | chkdsk C: /f /r')
+        ("SFC", "sfc /scannow"),
+        ("DISM", "DISM /Online /Cleanup-Image /RestoreHealth"),
+        ("CHKDSK", "echo S | chkdsk C: /f /r"),
     ]:
         callback(f"Ejecutando {nombre}...")
         app.skip_current = False
@@ -221,13 +310,14 @@ def reparar_sistema(app, callback):
             time.sleep(0.2)
         # El log ya está registrado en run_cmd_with_skip
 
+
 def _parse_ram_gb(wmic_output: str) -> float:
     """Parse TotalPhysicalMemory bytes from wmic output. Returns 0.0 on failure."""
-    lines = [x for x in wmic_output.split('\n')[1:] if x.strip()]
+    lines = [x for x in wmic_output.split("\n")[1:] if x.strip()]
     if not lines:
         return 0.0
     try:
-        return int(lines[0]) / (1024 ** 3)
+        return int(lines[0]) / (1024**3)
     except ValueError:
         return 0.0
 
@@ -235,7 +325,7 @@ def _parse_ram_gb(wmic_output: str) -> float:
 def ajuste_paginacion(callback):
     try:
         output = subprocess.check_output(
-            'wmic computersystem get TotalPhysicalMemory', shell=True, text=True
+            "wmic computersystem get TotalPhysicalMemory", shell=True, text=True
         )
     except Exception as e:
         add_log(f"[ERROR] Ajustando paginación: {e}")
@@ -246,21 +336,31 @@ def ajuste_paginacion(callback):
         return
 
     callback("Ajustando archivo de paginación a 8GB por RAM baja...")
-    run_cmd('wmic computersystem where name="%computername%" set AutomaticManagedPagefile=False')
-    run_cmd('wmic pagefileset where name="C:\\\\pagefile.sys" set InitialSize=8192,MaximumSize=8192')
+    run_cmd(
+        'wmic computersystem where name="%computername%" set AutomaticManagedPagefile=False'
+    )
+    run_cmd(
+        'wmic pagefileset where name="C:\\\\pagefile.sys" set InitialSize=8192,MaximumSize=8192'
+    )
     add_log("Paginación fija 8GB aplicada.")
+
 
 def renovar_ip_dns(callback):
     callback("Renovando IP y limpiando DNS...")
-    run_cmd('ipconfig /renew')
-    run_cmd('ipconfig /flushdns')
+    run_cmd("ipconfig /renew")
+    run_cmd("ipconfig /flushdns")
+
 
 def limpiar_papelera(callback):
     callback("Vaciando papelera...")
     run_cmd('PowerShell.exe -Command "Clear-RecycleBin -Confirm:$false"')
 
+
 def advertencias(callback):
-    add_log("⚠️ Si tienes OwnCloud, OneDrive u otras apps que se inician con Windows y no usas, deshabilítalas (Administrador de tareas > Inicio o shell:startup).")
+    add_log(
+        "⚠️ Si tienes OwnCloud, OneDrive u otras apps que se inician con Windows y no usas, deshabilítalas (Administrador de tareas > Inicio o shell:startup)."
+    )
+
 
 # --------------------- Interfaz gráfica ----------------------
 class App(tk.Tk):
@@ -283,7 +383,7 @@ class App(tk.Tk):
             ("Reparación de sistema", lambda cb: reparar_sistema(self, cb)),
             ("Ajuste de paginación", ajuste_paginacion),
             ("Renovación IP/DNS", renovar_ip_dns),
-            ("Advertencias finales", advertencias)
+            ("Advertencias finales", advertencias),
         ]
         self.start_screen()
 
@@ -292,27 +392,75 @@ class App(tk.Tk):
             widget.destroy()
         f = tk.Frame(self, bg="#f6faff")
         f.place(relx=0.5, rely=0.5, anchor="center")
-        btn = tk.Button(f, text="Iniciar mantenimiento", font=("Segoe UI", 18, "bold"), bg="#3182ce", fg="white",
-                        width=22, height=2, command=self.go_to_progress)
+        btn = tk.Button(
+            f,
+            text="Iniciar mantenimiento",
+            font=("Segoe UI", 18, "bold"),
+            bg="#3182ce",
+            fg="white",
+            width=22,
+            height=2,
+            command=self.go_to_progress,
+        )
         btn.pack(pady=40)
 
     def go_to_progress(self):
         for widget in self.winfo_children():
             widget.destroy()
         self.geometry("900x550")
-        btn_log = tk.Button(self, text="Ver log", command=self.show_log, font=("Segoe UI", 10, "bold"), bg="#e2e8f0")
+        btn_log = tk.Button(
+            self,
+            text="Ver log",
+            command=self.show_log,
+            font=("Segoe UI", 10, "bold"),
+            bg="#e2e8f0",
+        )
         btn_log.place(x=10, y=10)
-        btn_download = tk.Button(self, text="Descargar log", command=self.download_log, font=("Segoe UI", 10, "bold"), bg="#e2e8f0")
+        btn_download = tk.Button(
+            self,
+            text="Descargar log",
+            command=self.download_log,
+            font=("Segoe UI", 10, "bold"),
+            bg="#e2e8f0",
+        )
         btn_download.place(x=95, y=10)
-        self.btn_skip = tk.Button(self, text="Saltar paso", command=self.skip_step, font=("Segoe UI", 10, "bold"), bg="#f6a800")
+        self.btn_skip = tk.Button(
+            self,
+            text="Saltar paso",
+            command=self.skip_step,
+            font=("Segoe UI", 10, "bold"),
+            bg="#f6a800",
+        )
         self.btn_skip.place(x=200, y=10)
-        self.btn_close = tk.Button(self, text="Cerrar programa", command=self.safe_close, font=("Segoe UI", 10, "bold"), bg="#f65c60")
+        self.btn_close = tk.Button(
+            self,
+            text="Cerrar programa",
+            command=self.safe_close,
+            font=("Segoe UI", 10, "bold"),
+            bg="#f65c60",
+        )
         self.btn_close.place(x=315, y=10)
-        self.label_status = tk.Label(self, text="Listo para iniciar...", font=("Segoe UI", 14, "bold"), anchor="w")
+        self.label_status = tk.Label(
+            self,
+            text="Listo para iniciar...",
+            font=("Segoe UI", 14, "bold"),
+            anchor="w",
+        )
         self.label_status.place(x=430, y=10)
-        self.progress = tk.Label(self, text="Esperando...", font=("Consolas", 11), anchor="w", bg="white", relief="solid", bd=1, width=115)
+        self.progress = tk.Label(
+            self,
+            text="Esperando...",
+            font=("Consolas", 11),
+            anchor="w",
+            bg="white",
+            relief="solid",
+            bd=1,
+            width=115,
+        )
         self.progress.place(x=30, y=70, height=35)
-        self.simple_log = scrolledtext.ScrolledText(self, width=130, height=19, font=("Consolas", 10))
+        self.simple_log = scrolledtext.ScrolledText(
+            self, width=130, height=19, font=("Consolas", 10)
+        )
         self.simple_log.place(x=30, y=120, relwidth=0.93, relheight=0.67)
         threading.Thread(target=self.run_maintenance, daemon=True).start()
 
@@ -320,7 +468,9 @@ class App(tk.Tk):
         win = tk.Toplevel(self)
         win.title("Log detallado de mantenimiento")
         win.geometry("950x550")
-        txt = scrolledtext.ScrolledText(win, width=120, height=32, font=("Consolas", 10))
+        txt = scrolledtext.ScrolledText(
+            win, width=120, height=32, font=("Consolas", 10)
+        )
         txt.pack(fill="both", expand=True)
         if os.path.exists(LOGFILE):
             with open(LOGFILE, encoding="utf-8") as f:
@@ -332,7 +482,11 @@ class App(tk.Tk):
         if not os.path.exists(LOGFILE):
             messagebox.showerror("Error", "El log aún no está disponible.")
             return
-        savepath = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Archivo de texto", "*.txt")], title="Guardar log como")
+        savepath = filedialog.asksaveasfilename(
+            defaultextension=".txt",
+            filetypes=[("Archivo de texto", "*.txt")],
+            title="Guardar log como",
+        )
         if savepath:
             shutil.copy(LOGFILE, savepath)
             messagebox.showinfo("Listo", f"Log guardado en:\n{savepath}")
@@ -346,12 +500,13 @@ class App(tk.Tk):
                 pass
 
     def safe_close(self):
-        if messagebox.askokcancel("Salir", "¿Deseas cerrar el programa de manera segura?"):
+        if messagebox.askokcancel(
+            "Salir", "¿Deseas cerrar el programa de manera segura?"
+        ):
             self.cancelled = True
             self.destroy()
 
     def run_maintenance(self):
-        total = len(self.pasos)
         def callback(msg):
             self.progress["text"] = msg
             self.simple_log.insert(tk.END, msg + "\n")
@@ -359,8 +514,13 @@ class App(tk.Tk):
             self.label_status["text"] = f"En proceso: {msg}"
 
         if not is_admin():
-            messagebox.showinfo("Permiso requerido", "Se requiere ejecutar como administrador. El programa se reiniciará como admin.")
-            ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
+            messagebox.showinfo(
+                "Permiso requerido",
+                "Se requiere ejecutar como administrador. El programa se reiniciará como admin.",
+            )
+            ctypes.windll.shell32.ShellExecuteW(
+                None, "runas", sys.executable, " ".join(sys.argv), None, 1
+            )
             self.destroy()
             return
 
@@ -372,7 +532,16 @@ class App(tk.Tk):
                 break
             self.skip_current = False
             callback(f"{nombre}...")
-            t = threading.Thread(target=func, args=(lambda x: callback(x) if not self.skip_current and not self.cancelled else None,))
+            t = threading.Thread(
+                target=func,
+                args=(
+                    lambda x: (
+                        callback(x)
+                        if not self.skip_current and not self.cancelled
+                        else None
+                    ),
+                ),
+            )
             t.start()
             while t.is_alive():
                 self.update()
@@ -380,8 +549,11 @@ class App(tk.Tk):
             self.progress["text"] = f"{nombre} ✔"
         fin = datetime.now()
         mins = (fin - inicio).total_seconds() / 60
-        callback(f"Proceso completado. Duración: {mins:.2f} min.\nRevisa el log completo para detalles y sugerencias.")
+        callback(
+            f"Proceso completado. Duración: {mins:.2f} min.\nRevisa el log completo para detalles y sugerencias."
+        )
         self.label_status["text"] = "¡Mantenimiento terminado!"
+
 
 if __name__ == "__main__":
     App().mainloop()
