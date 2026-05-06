@@ -2,7 +2,7 @@
 
 > Última actualización: 2026-05-05
 > Versión actual: 3.0.0
-> Estado general: T-01, T-05 y T-02 cerradas. Listo para T-03 o T-04.
+> Estado general: T-01, T-02, T-03 y T-05 cerradas. Listo para T-04 o nueva tarea.
 
 ---
 
@@ -41,10 +41,17 @@ _Vacío. T-01 y T-05 cerradas. Próximo: ver sección 5._
 - **Suite**: 240 pass / 0 fail → **263 pass / 0 fail**.
 - **No tocado**: `templates/scheduled_restart.html`, JS embebido, UI. El cambio fue plumbing interno; el técnico ve la misma UI.
 
-### [ ] T-03 — Dashboard de mantenimiento de 9 pasos lógicos
-- **Origen**: pendiente del backlog v3.0.0
-- **Criterio de aceptación**: vista única que muestra los 9 pasos con estado (pendiente/corriendo/ok/error) y permite ejecutar uno o todos
-- **Archivos**: `routes/dashboard.py`, `templates/dashboard.html`, `static/js/dashboard.js`
+### [x] T-03 — Dashboard de mantenimiento de 9 pasos lógicos — CERRADA 2026-05-05
+- **Resolución**: cerrada con scope expandido (commit `ea26a67`). El criterio del backlog ("ejecutar uno o todos") + 5 mejoras adicionales pedidas por el usuario.
+- **Pasos rebalanceados (9 → 8)**: paso 5 `temp_cleanup` eliminado por redundancia con paso 2 `ccleaner`. Paso 7 `sfc` renombrado a `dism_restorehealth` (paso 3 ya hace SFC; RestoreHealth complementa con reparación efectiva). Paso 6 `disk_cleanup` reescrito con PowerShell (`Clear-RecycleBin -Force` + `Remove-Item` por subcarpeta — WER, thumbnail cache, Delivery Optimization, memory dumps); ya no usa `cleanmgr /sagerun:1` que daba timeout 300s consistente. Servicio nuevo: `services/cleanup.py:clean_disk_extras()`.
+- **Single-step (D1=A+B)**: nuevo endpoint `POST /maintenance/api/start-step/<step_id>` con validación + lockeo 409 si hay otra sesión activa. UI: botón ▶ por step row con `runSingleStep(stepId)`. `showSummary` adapta vista para single-step.
+- **Audit trail (D3=registrar siempre)**: `_capture_flask_context()` captura SESSION_ID/HOSTNAME/USERNAME en el route handler y los pasa por el session dict para que el thread daemon los lea. `_persist_session_audit` escribe entrada por paso en `audit_log`.
+- **UI detalles**: detail panel ahora despliega TODAS las descripciones de findings (con severity + evidence + recommended_action), warnings, errors, recommendations. Antes solo mostraba conteos.
+- **Recomendaciones interactivas (post-completion)**: dialog con countdown 30s (auto-omisión si técnico ausente). Checkbox "Aplicar todas sin preguntar" persistido en sessionStorage (solo sesión actual). Dos handlers conocidos por ahora: "Reinicio pendiente" → `/scheduled-restart/api/create` con grace 5 min; "Updates urgente" → `/update/api/scan`. Recomendaciones sin handler se muestran como informativas. **Nota**: la decisión es post-completion (no per-step pause-and-wait) por simplicidad — el dialog agrega todas las recomendaciones de los 8 pasos al final. Iteración futura puede mover a per-step si se requiere.
+- **Widget dashboard (D4)**: tarjeta read-only en `/` mostrando los 8 pasos desde `/maintenance/api/steps` + botón "Ir a Mantenimiento". No duplica controles.
+- **Reportes single-step (D5=b)**: `showSummary` single-step muestra nota "registrado en audit log, reporte HTML solo en mantenimiento completo". El reporte FO-TI-19/20 sigue solo en flujo completo.
+- **Tests** (`tests/test_maintenance.py`, 16): estructura de pasos, endpoint `/api/steps`, single-step (400 inválido + 409 lockeo + happy path), handlers paso 6 y 7, `clean_disk_extras`, audit trail end-to-end.
+- **Suite**: 263 pass → **279 pass / 0 fail** (+16 collected, 2 skipped).
 
 ### [ ] T-04 — Reportes a Google Sheets / Excel
 - **Origen**: pendiente del backlog v3.0.0
@@ -110,14 +117,19 @@ Pendientes (no bloqueantes):
 
 ## 5. Próximo paso concreto
 
-Opciones del backlog (T-01, T-05 y T-02 cerradas):
-- **T-03**: dashboard 9 pasos lógicos. La lógica ya existe en `routes/maintenance.py`; el trabajo es UI (vista unificada con estado por paso). Bloque grande de frontend.
+Opciones del backlog (T-01, T-02, T-03 y T-05 cerradas):
 - **T-04**: reportes a Google Sheets / Excel. Pendiente decisión Service Account vs OAuth.
+
+Posibles iteraciones futuras sobre T-03 (no bloqueantes, registradas para no perderlas):
+- Recomendaciones interactivas **per-step** con pause-and-wait en backend (hoy es post-completion aggregate). Requiere `threading.Event` por step y endpoint `/api/recommendation-decision`. Si el técnico necesita aprobar paso a paso, abrir como T-06.
+- Más handlers en `RECOMMENDATION_HANDLERS` (hoy solo "reinicio pendiente" y "updates urgente"). Cada nueva recomendación detectada en findings/recommended_actions puede ganar un handler.
+- Dashboard widget hoy es read-only del catálogo; podría mostrar también el estado de la última corrida si se persiste sesión completa en SQLite (hoy es in-memory).
 
 ---
 
 ## 6. Histórico (resumen, no detalle)
 
+- **2026-05-05 (cont. 4)**: T-03 cerrada con scope expandido. Pasos rebalanceados de 9 a 8 (paso 5 `temp_cleanup` eliminado por redundancia con paso 2; paso 7 `sfc` repurposed a `dism_restorehealth` por redundancia con paso 3; paso 6 reescrito con PowerShell `clean_disk_extras` reemplazando `cleanmgr` que daba timeout 300s). Single-step endpoint con lockeo 409 + botón ▶ por step. Audit trail por paso en `audit_log` via `_capture_flask_context` + `_persist_session_audit`. UI: detalles completos (no truncados) + dialog post-completion con countdown 30s + checkbox auto-aplicar (sessionStorage). Dashboard widget read-only con 8 pasos. 16 tests nuevos en `tests/test_maintenance.py`. Suite: 263 → **279 pass / 0 fail**. Commit `ea26a67`.
 - **2026-05-05 (cont. 3)**: T-02 cerrada. `routes/scheduled_restart.py` ya existía con UI funcional vía schtasks; faltaban los 3 gaps vs criterio backlog: governance, persistencia SQLite (audit trail), separación rutas/servicio. Resueltos en commit `9f26899`: lógica PowerShell movida a `services/scheduled_restart.py`, rutas mutantes pasan por `execute_governed_action` con acciones `DISRUPTIVE` registradas, tabla `scheduled_restarts` + `ScheduledRestartStore` para auditoría, 23 tests nuevos. Suite: 240 → **263 pass / 0 fail**.
 - **2026-05-05 (cont. 2)**: T-05 cerrado completo. Smoke tests añadidos para 7 blueprints sin cobertura (logs, maintenance, office, scheduled-restart, sharing, startup, windows-features). Suite final: **240 pass / 0 fail** (242 collected, 2 skipped). Commit `558986f`.
 - **2026-05-05 (cont.)**: T-05 sub-objetivo de DB testability cerrado. Suite va de 219 pass / 14 fail → 233 pass / 0 fail. Fix vía `tests/conftest.py` (autouse fixture aislando DB en tmp_path + reset de thread-local conn) + `SessionStore.create` en fixtures de `test_routes.py` y `test_smart_app_control.py` para satisfacer FK constraint en `jobs.session_id`. Commit `65cbb17`.
