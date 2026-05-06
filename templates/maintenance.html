@@ -187,11 +187,21 @@ async function loadSteps() {
                     </div>
                 </div>
 
-                <!-- Elapsed time -->
-                <span id="elapsed-${step.id}"
-                      style="font-size:12px;opacity:0.6;min-width:48px;
-                             text-align:right;flex-shrink:0;padding-top:3px;">
-                </span>
+                <!-- Right-side controls: per-step run button + elapsed time -->
+                <div style="display:flex;flex-direction:column;align-items:flex-end;
+                            gap:4px;flex-shrink:0;padding-top:1px;">
+                    <button id="run-step-${step.id}"
+                            class="btn btn-sm btn-outline"
+                            onclick="runSingleStep('${step.id}')"
+                            title="Ejecutar solo este paso"
+                            style="padding:2px 10px;font-size:13px;line-height:1.4;">
+                        &#9654;
+                    </button>
+                    <span id="elapsed-${step.id}"
+                          style="font-size:12px;opacity:0.6;min-width:48px;
+                                 text-align:right;">
+                    </span>
+                </div>
             `;
             container.appendChild(div);
         });
@@ -222,6 +232,7 @@ async function startMaintenance() {
             document.getElementById('master-progress-card').style.display = 'block';
             document.getElementById('start-section').style.display        = 'none';
             document.getElementById('summary-card').style.display          = 'none';
+            disableAllRunStepButtons(true);
 
             maintenancePollInterval = setInterval(pollMaintenance, 2000);
         }
@@ -231,6 +242,56 @@ async function startMaintenance() {
         btn.textContent = 'Iniciar Mantenimiento Lógico';
     }
 }
+
+/* ── Run a single step (button per row) ──────────────────────────── */
+async function runSingleStep(stepId) {
+    if (maintenanceSessionId) {
+        // Hard-stop: ya hay sesión en curso
+        alert('Hay un mantenimiento en curso. Cancele primero o espere a que termine.');
+        return;
+    }
+    const btn = document.getElementById(`run-step-${stepId}`);
+    if (btn) { btn.disabled = true; btn.textContent = '...'; }
+
+    prevStepStatuses = {};
+    lastScrolledStep = null;
+
+    try {
+        const response = await fetch(
+            `/maintenance/api/start-step/${encodeURIComponent(stepId)}`,
+            { method: 'POST', headers: getDefaultHeaders() }
+        );
+        if (response.status === 409) {
+            alert('Ya hay un mantenimiento en curso. Cancele primero o espere a que termine.');
+            if (btn) { btn.disabled = false; btn.textContent = '▶'; }
+            return;
+        }
+        const data = await response.json();
+        if (data.session_id) {
+            maintenanceSessionId = data.session_id;
+            maintenanceStartTime = Date.now();
+            document.getElementById('master-progress-card').style.display = 'block';
+            document.getElementById('start-section').style.display        = 'none';
+            document.getElementById('summary-card').style.display          = 'none';
+            disableAllRunStepButtons(true);
+            maintenancePollInterval = setInterval(pollMaintenance, 2000);
+        } else {
+            alert(data.error || 'No se pudo iniciar el paso individual.');
+            if (btn) { btn.disabled = false; btn.textContent = '▶'; }
+        }
+    } catch (e) {
+        alert(`Error al iniciar paso: ${e.message}`);
+        if (btn) { btn.disabled = false; btn.textContent = '▶'; }
+    }
+}
+
+function disableAllRunStepButtons(disabled) {
+    document.querySelectorAll('[id^="run-step-"]').forEach(b => {
+        b.disabled = disabled;
+        b.textContent = disabled ? '...' : '▶';
+    });
+}
+
 
 /* ── Poll session status every 2 s ───────────────────────────────── */
 async function pollMaintenance() {
@@ -246,7 +307,10 @@ async function pollMaintenance() {
 
         if (session.status === 'completed') {
             clearInterval(maintenancePollInterval);
-            showSummary(session);
+            disableAllRunStepButtons(false);
+            const wasSingleStep = (session.mode === 'single_step');
+            maintenanceSessionId = null;
+            showSummary(session, wasSingleStep);
         }
     } catch (_) {
         // Keep polling on transient network errors
@@ -419,7 +483,7 @@ function updateStepsUI(session) {
             msg.innerHTML = html;
         }
 
-        /* ── Detail panel: admin notices, errors, actions ─────────── */
+        /* ── Detail panel: admin notices, findings, errors, recommendations ─── */
         if (detail && nowTerminal) {
             const dp = [];
 
@@ -428,26 +492,57 @@ function updateStepsUI(session) {
                     `<div style="color:var(--color-warning,#D6814A);">&#9888; Sin Administrador: ${escapeHtml(step.admin_skipped.join(', '))}</div>`
                 );
             }
+
+            // Findings: agrupar por severidad. Mostrar TODOS (sin truncar).
+            if (step.findings && step.findings.length) {
+                step.findings.forEach(f => {
+                    const sev = (f.severity || 'info').toLowerCase();
+                    const color = sev === 'critical' ? 'var(--color-danger,#E33B14)' :
+                                  sev === 'warning'  ? 'var(--color-warning,#D6814A)' :
+                                                       'rgba(255,255,255,0.55)';
+                    const icon = sev === 'critical' ? '&#10071;' :
+                                 sev === 'warning'  ? '&#9888;'  :
+                                                      '&#8226;';
+                    let line = `<div style="color:${color};">${icon} <strong>${escapeHtml(f.title || '')}</strong>`;
+                    if (f.evidence) line += `<br><span style="opacity:0.7;font-size:11px;margin-left:18px;">${escapeHtml(String(f.evidence))}</span>`;
+                    if (f.recommended_action) line += `<br><span style="color:var(--brand-teal,#0AAE6B);font-size:11px;margin-left:18px;">&#8594; ${escapeHtml(f.recommended_action)}</span>`;
+                    line += '</div>';
+                    dp.push(line);
+                });
+            }
+
+            // Warnings/errors/recommendations sin truncar.
             if (step.warnings && step.warnings.length) {
-                step.warnings.slice(0, 2).forEach(w => {
+                step.warnings.forEach(w => {
                     dp.push(`<div style="color:var(--color-warning,#D6814A);">&#9432; ${escapeHtml(String(w))}</div>`);
                 });
             }
             if (step.errors && step.errors.length) {
-                step.errors.slice(0, 3).forEach(e => {
+                step.errors.forEach(e => {
                     dp.push(`<div style="color:var(--color-danger,#E33B14);">&#10007; ${escapeHtml(String(e))}</div>`);
                 });
-                if (step.errors.length > 3) {
-                    dp.push(`<div style="opacity:0.55;">+ ${step.errors.length - 3} error(es) adicional(es)</div>`);
-                }
             }
             if (step.recommended_actions && step.recommended_actions.length) {
-                step.recommended_actions.slice(0, 3).forEach(a => {
+                dp.push(`<div style="margin-top:6px;font-weight:600;opacity:0.75;">Recomendaciones:</div>`);
+                step.recommended_actions.forEach(a => {
                     dp.push(`<div style="color:var(--brand-teal,#0AAE6B);">&#8594; ${escapeHtml(String(a))}</div>`);
                 });
-                if (step.recommended_actions.length > 3) {
-                    dp.push(`<div style="opacity:0.55;">+ ${step.recommended_actions.length - 3} acci&oacute;n(es) m&aacute;s (ver reporte)</div>`);
-                }
+            }
+            if (step.actions_executed && step.actions_executed.length) {
+                dp.push(`<div style="margin-top:6px;font-weight:600;opacity:0.75;">Acciones ejecutadas:</div>`);
+                step.actions_executed.forEach(a => {
+                    const label = (typeof a === 'object' ? (a.action || a.label || '') : String(a));
+                    const status = (typeof a === 'object' ? (a.status || '') : '');
+                    const detail = (typeof a === 'object' ? (a.detail || a.detalle || '') : '');
+                    const sColor = status === 'success' ? 'var(--color-success,#0AAE6B)' :
+                                   status === 'error'   ? 'var(--color-danger,#E33B14)'  :
+                                                          'rgba(255,255,255,0.7)';
+                    let line = `<div style="color:${sColor};">&#10003; ${escapeHtml(label)}`;
+                    if (status) line += ` <span style="opacity:0.6;font-size:11px;">[${escapeHtml(status)}]</span>`;
+                    if (detail) line += `<br><span style="opacity:0.65;font-size:11px;margin-left:18px;">${escapeHtml(detail)}</span>`;
+                    line += '</div>';
+                    dp.push(line);
+                });
             }
 
             if (dp.length) {
@@ -502,7 +597,7 @@ function updateStepsUI(session) {
 }
 
 /* ── Post-completion summary card ───────────────────────────────── */
-function showSummary(session) {
+function showSummary(session, isSingleStep) {
     const card        = document.getElementById('summary-card');
     const content     = document.getElementById('summary-content');
     const startSection = document.getElementById('start-section');
@@ -523,7 +618,14 @@ function showSummary(session) {
     const failed       = steps.filter(s => s.status === 'failed').length;
     const totalElapsed = steps.reduce((sum, s) => sum + (s.elapsed || 0), 0);
 
+    const titleSuffix = isSingleStep
+        ? ` — paso individual: <em>${escapeHtml(steps[0]?.name || '')}</em>`
+        : '';
+
     content.innerHTML = `
+        <div style="font-size:12px;opacity:0.7;margin-bottom:8px;">
+            Sesión ${escapeHtml(session.id)}${titleSuffix}
+        </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
                     gap:12px;margin-bottom:16px;">
             <div class="stat-box">
@@ -544,10 +646,188 @@ function showSummary(session) {
             </div>
         </div>
         <div style="text-align:center;">
-            <button class="btn btn-primary btn-sm"
-                    onclick="generateReport('${session.id}')">Generar Reporte</button>
+            ${isSingleStep
+                ? '<span style="font-size:12px;opacity:0.65;">Paso individual — registrado en audit log. Reporte HTML solo se genera en mantenimiento completo.</span>'
+                : `<button class="btn btn-primary btn-sm" onclick="generateReport('${session.id}')">Generar Reporte</button>`}
         </div>
     `;
+
+    // Disparar dialog de recomendaciones si aplica.
+    showRecommendationsDialog(session);
+}
+
+
+/* ── Recommendations dialog with 30s countdown + auto-apply checkbox ─ */
+
+const RECOMMENDATION_HANDLERS = {
+    'Reiniciar el equipo (reinicio pendiente detectado)': {
+        label: 'Programar reinicio en 5 min',
+        executable: true,
+        async run() {
+            const now = new Date();
+            const target = new Date(now.getTime() + 5 * 60 * 1000);
+            const date = target.toISOString().slice(0, 10);
+            const time = target.toTimeString().slice(0, 5);
+            const r = await fetch('/scheduled-restart/api/create', {
+                method: 'POST', headers: getDefaultHeaders(),
+                body: JSON.stringify({ date, time, recurrence: 'Once', grace_period: 5 }),
+            });
+            return await r.json();
+        },
+    },
+    'Aplicar actualizaciones de Windows Update urgente': {
+        label: 'Buscar actualizaciones ahora',
+        executable: true,
+        async run() {
+            const r = await fetch('/update/api/scan', {
+                method: 'POST', headers: getDefaultHeaders(), body: '{}',
+            });
+            return await r.json();
+        },
+    },
+};
+
+function getRecommendationsList(session) {
+    // Recolecta {step, recommendation} dedup-eados por texto exacto.
+    const seen = new Set();
+    const out = [];
+    (session.steps || []).forEach(step => {
+        (step.recommended_actions || []).forEach(rec => {
+            const key = String(rec);
+            if (seen.has(key)) return;
+            seen.add(key);
+            out.push({ stepName: step.name, text: key });
+        });
+    });
+    return out;
+}
+
+let _recDialogTimer = null;
+let _recDialogDeadline = 0;
+
+function showRecommendationsDialog(session) {
+    const recs = getRecommendationsList(session);
+    if (!recs.length) return;
+
+    // Si checkbox auto-apply persisted en sessionStorage, aplicar y omitir dialog.
+    const autoApply = sessionStorage.getItem('cleancpu_auto_apply_recommendations') === '1';
+    if (autoApply) {
+        applyAllRecommendations(recs, /*silent=*/true);
+        return;
+    }
+
+    // Construir dialog
+    const overlay = document.createElement('div');
+    overlay.id = 'rec-dialog-overlay';
+    overlay.style.cssText = (
+        'position:fixed;inset:0;background:rgba(0,0,0,0.65);' +
+        'display:flex;align-items:center;justify-content:center;z-index:9999;'
+    );
+
+    const items = recs.map((r, idx) => {
+        const handler = RECOMMENDATION_HANDLERS[r.text];
+        const applyBtn = handler && handler.executable
+            ? `<button class="btn btn-sm btn-success" onclick="applyOneRecommendation(${idx})">${escapeHtml(handler.label)}</button>`
+            : `<span style="opacity:0.6;font-size:11px;">Informativo — aplicar manualmente</span>`;
+        return `
+            <div style="padding:8px 10px;border-bottom:1px solid var(--border-subtle,#333);
+                        display:flex;justify-content:space-between;align-items:center;gap:10px;">
+                <div style="flex:1;">
+                    <div>&#8594; ${escapeHtml(r.text)}</div>
+                    <div style="font-size:11px;opacity:0.6;">${escapeHtml(r.stepName)}</div>
+                </div>
+                <div id="rec-action-${idx}">${applyBtn}</div>
+            </div>
+        `;
+    }).join('');
+
+    overlay.innerHTML = `
+        <div style="background:var(--bg-surface-2,#1d1f2a);border:1px solid var(--border-subtle,#333);
+                    border-radius:8px;max-width:680px;width:92%;max-height:80vh;
+                    display:flex;flex-direction:column;">
+            <div style="padding:12px 16px;border-bottom:1px solid var(--border-subtle,#333);">
+                <h3 style="margin:0;font-size:16px;">Recomendaciones del mantenimiento</h3>
+                <div style="font-size:12px;opacity:0.7;margin-top:4px;">
+                    ${recs.length} recomendación(es) detectadas. Auto-omisión en
+                    <span id="rec-countdown" style="color:var(--color-warning,#D6814A);font-weight:600;">30s</span>.
+                </div>
+            </div>
+            <div style="overflow-y:auto;flex:1;">
+                ${items}
+            </div>
+            <div style="padding:12px 16px;border-top:1px solid var(--border-subtle,#333);
+                        display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+                <label style="font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                    <input type="checkbox" id="rec-auto-apply">
+                    Aplicar todas sin preguntar (sesión actual)
+                </label>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn btn-sm btn-success" onclick="applyAllRecommendations(window._cleanCpuRecs)">Aplicar todas</button>
+                    <button class="btn btn-sm btn-outline" onclick="closeRecDialog()">Omitir</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+    window._cleanCpuRecs = recs;
+
+    // Listener para checkbox: persistir en sessionStorage.
+    document.getElementById('rec-auto-apply').addEventListener('change', (e) => {
+        if (e.target.checked) {
+            sessionStorage.setItem('cleancpu_auto_apply_recommendations', '1');
+        } else {
+            sessionStorage.removeItem('cleancpu_auto_apply_recommendations');
+        }
+    });
+
+    // Countdown 30s.
+    _recDialogDeadline = Date.now() + 30000;
+    _recDialogTimer = setInterval(() => {
+        const remaining = Math.max(0, Math.ceil((_recDialogDeadline - Date.now()) / 1000));
+        const el = document.getElementById('rec-countdown');
+        if (el) el.textContent = remaining + 's';
+        if (remaining <= 0) {
+            closeRecDialog(/*reason=*/'timeout');
+        }
+    }, 250);
+}
+
+async function applyOneRecommendation(idx) {
+    const rec = (window._cleanCpuRecs || [])[idx];
+    if (!rec) return;
+    const handler = RECOMMENDATION_HANDLERS[rec.text];
+    const cell = document.getElementById(`rec-action-${idx}`);
+    if (!handler || !handler.executable) return;
+    if (cell) cell.innerHTML = '<span style="opacity:0.6;">Aplicando...</span>';
+    try {
+        const result = await handler.run();
+        const ok = result && result.status !== 'error' && result.status !== 'rejected';
+        if (cell) {
+            cell.innerHTML = ok
+                ? '<span style="color:var(--color-success,#0AAE6B);">&#10003; Aplicada</span>'
+                : `<span style="color:var(--color-danger,#E33B14);">&#10007; ${escapeHtml(result?.error || 'Error')}</span>`;
+        }
+    } catch (e) {
+        if (cell) cell.innerHTML = `<span style="color:var(--color-danger,#E33B14);">&#10007; ${escapeHtml(e.message)}</span>`;
+    }
+}
+
+async function applyAllRecommendations(recs, silent) {
+    recs = recs || [];
+    for (let i = 0; i < recs.length; i++) {
+        const handler = RECOMMENDATION_HANDLERS[recs[i].text];
+        if (handler && handler.executable) {
+            try { await handler.run(); } catch (_) { /* swallow */ }
+        }
+    }
+    if (!silent) closeRecDialog('apply-all');
+}
+
+function closeRecDialog(reason) {
+    if (_recDialogTimer) { clearInterval(_recDialogTimer); _recDialogTimer = null; }
+    const ov = document.getElementById('rec-dialog-overlay');
+    if (ov) ov.remove();
 }
 
 /* ── Cancel in-progress maintenance ────────────────────────────── */

@@ -145,6 +145,147 @@ def flush_dns_cache():
     return run_cmd("ipconfig /flushdns", description="Flush DNS cache")
 
 
+def clean_disk_extras():
+    """Limpieza extendida del disco — reemplazo de cleanmgr.
+
+    cleanmgr /sagerun:1 requiere SAGESET previo y siempre da timeout.
+    Esta función limpia papelera + carpetas que el paso 2 (Limpieza
+    Interna) NO toca: Windows Error Reporting, thumbnail cache, Delivery
+    Optimization cache, memory dumps. NO duplica TEMP/Win\\Temp/Prefetch
+    porque esos los hace el paso 2.
+    """
+    if sys.platform != "win32":
+        return CommandResult(
+            status=CommandStatus.NOT_APPLICABLE, output="Not on Windows."
+        )
+
+    actions = []
+    total_freed_mb = 0.0
+    total_errors = 0
+
+    # 1. Vaciar papelera (más rápido que el cleanmgr y siempre funciona).
+    rb = run_powershell(
+        "Clear-RecycleBin -Force -ErrorAction SilentlyContinue",
+        description="Clear Recycle Bin (extras)",
+    )
+    rb_ok = rb.status in (CommandStatus.SUCCESS, CommandStatus.WARNING)
+    actions.append(
+        {
+            "action": "Vaciar papelera",
+            "status": "success" if rb_ok else "error",
+            "detail": rb.output or rb.error or "",
+        }
+    )
+    if not rb_ok:
+        total_errors += 1
+
+    # 2. Carpetas a limpiar — solo extras NO cubiertas por _step_ccleaner.
+    user_profile = os.environ.get("USERPROFILE", "")
+    system_root = os.environ.get("SystemRoot", "C:\\Windows")
+
+    extras = [
+        (
+            "Windows Error Reporting (queue)",
+            os.path.join(
+                user_profile,
+                "AppData",
+                "Local",
+                "Microsoft",
+                "Windows",
+                "WER",
+            ),
+        ),
+        (
+            "Thumbnail cache",
+            os.path.join(
+                user_profile,
+                "AppData",
+                "Local",
+                "Microsoft",
+                "Windows",
+                "Explorer",
+            ),
+        ),
+        (
+            "Delivery Optimization cache",
+            os.path.join(system_root, "SoftwareDistribution", "DeliveryOptimization"),
+        ),
+        (
+            "Memory dumps",
+            os.path.join(system_root, "Minidump"),
+        ),
+    ]
+
+    for label, path in extras:
+        if not os.path.exists(path):
+            actions.append(
+                {
+                    "action": label,
+                    "status": "skipped",
+                    "detail": f"Carpeta no presente: {path}",
+                }
+            )
+            continue
+        # Para Thumbnail cache solo borramos archivos `thumbcache_*.db` y `iconcache_*.db`,
+        # NO el directorio entero (contiene otros recursos del Explorer).
+        if label == "Thumbnail cache":
+            freed = _clean_thumbnail_cache(path)
+        else:
+            r = _clean_directory(path, label)
+            freed = (r.details or {}).get("freed_mb", 0)
+            errs = (r.details or {}).get("errors", 0)
+            total_errors += errs
+
+        total_freed_mb += freed
+        actions.append(
+            {
+                "action": label,
+                "status": "success",
+                "freed_mb": round(freed, 2),
+                "detail": f"{round(freed, 2)} MB liberados",
+            }
+        )
+
+    total_freed_mb = round(total_freed_mb, 2)
+    status = CommandStatus.SUCCESS if total_errors == 0 else CommandStatus.WARNING
+
+    return CommandResult(
+        status=status,
+        output=(
+            f"Limpieza extendida completada: {total_freed_mb} MB liberados "
+            f"en {len(actions)} operaciones."
+        ),
+        details={
+            "freed_mb": total_freed_mb,
+            "actions": actions,
+            "errors": total_errors,
+        },
+    )
+
+
+def _clean_thumbnail_cache(explorer_dir: str) -> float:
+    """Borra solo thumbcache_*.db e iconcache_*.db en el dir Explorer.
+    Retorna MB liberados. No toca otros archivos del Explorer."""
+    if not os.path.exists(explorer_dir):
+        return 0.0
+    freed_bytes = 0
+    try:
+        for entry in os.listdir(explorer_dir):
+            if entry.lower().startswith(
+                ("thumbcache_", "iconcache_")
+            ) and entry.lower().endswith(".db"):
+                p = os.path.join(explorer_dir, entry)
+                try:
+                    size = os.path.getsize(p)
+                    os.unlink(p)
+                    freed_bytes += size
+                except OSError:
+                    pass
+    except OSError:
+        pass
+    return round(freed_bytes / (1024 * 1024), 2)
+
+
 def run_cleanmgr():
     """Run Windows Disk Cleanup utility."""
     result = run_cmd(
