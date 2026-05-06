@@ -137,6 +137,23 @@ def main():
     )
     args = parser.parse_args()
 
+    # Aislar dev de producción: cuando se corre con --dev, redirigir
+    # LOG_DIR/REPORT_DIR a carpetas locales (logs-dev/, reports-dev/) en
+    # vez de C:\ProgramData\CleanCPU\. Razón: el .exe de producción corre
+    # con admin y deja archivos (cleancpu.db, app.log) con permisos que
+    # un user no-elevado de dev no puede sobreescribir → readonly DB
+    # error. Dev y prod nunca deberían compartir DB.
+    if args.dev:
+        repo_root = os.path.dirname(os.path.abspath(__file__))
+        dev_log = os.path.join(repo_root, "logs-dev")
+        dev_reports = os.path.join(repo_root, "reports-dev")
+        os.makedirs(dev_log, exist_ok=True)
+        os.makedirs(dev_reports, exist_ok=True)
+        Config.LOG_DIR = dev_log
+        Config.REPORT_DIR = dev_reports
+        print(f"[DEV] LOG_DIR={dev_log}")
+        print(f"[DEV] REPORT_DIR={dev_reports}")
+
     host = Config.HOST
     port = args.port or Config.PORT
 
