@@ -69,7 +69,10 @@
       "Bash(python -m pytest tests/test_ola3_regressions.py -q)",
       "Bash(python -m pytest tests/test_ola1_ola2_regressions.py tests/test_ola3_regressions.py -q)",
       "Bash(python -c \"import ntpath; print\\(repr\\(ntpath.basename\\(r'C:\\\\Program Files \\(x86\\)\\\\Lenovo\\\\System Update\\\\tvsu.exe'\\)\\)\\)\")",
-      "Bash(rm -f _v.txt _v2.txt)"
+      "Bash(rm -f _v.txt _v2.txt)",
+      "Read(//home/user/mantenimiento_windows/**)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
