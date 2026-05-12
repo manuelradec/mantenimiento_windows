@@ -206,6 +206,53 @@
 </div>
 
 <!-- ============================================================
+     HISTÓRICO CONSOLIDADO (.xlsx) — T-04
+     ============================================================ -->
+<div class="card" style="margin-bottom:20px;border-left:4px solid #274C9B;">
+    <div class="card-header">
+        <h3>Histórico consolidado de mantenimientos</h3>
+    </div>
+    <div class="card-body">
+        <p style="font-size:12px;opacity:0.75;margin:0 0 12px;">
+            Genera un .xlsx con todas las sesiones registradas en la DB local
+            (Sessions, Maintenance Steps, Jobs, Snapshots, ScheduledRestarts —
+            5 hojas). Filtros opcionales: rango de fechas y/o hostname exacto.
+        </p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:12px;">
+            <label style="font-size:12px;">
+                Desde
+                <input type="date" id="hist-date-from"
+                       style="width:100%;padding:6px;border-radius:4px;
+                              border:1px solid var(--border-subtle);
+                              background:var(--bg-surface-1);color:inherit;">
+            </label>
+            <label style="font-size:12px;">
+                Hasta
+                <input type="date" id="hist-date-to"
+                       style="width:100%;padding:6px;border-radius:4px;
+                              border:1px solid var(--border-subtle);
+                              background:var(--bg-surface-1);color:inherit;">
+            </label>
+            <label style="font-size:12px;">
+                Hostname (opcional)
+                <input type="text" id="hist-hostname" placeholder="ej. RADEC-PC-001"
+                       style="width:100%;padding:6px;border-radius:4px;
+                              border:1px solid var(--border-subtle);
+                              background:var(--bg-surface-1);color:inherit;">
+            </label>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+            <button class="btn btn-sm btn-primary" onclick="downloadHistorico()">
+                Descargar histórico (.xlsx)
+            </button>
+            <span style="font-size:11px;opacity:0.6;">
+                Una sola request: genera el archivo y lo descarga.
+            </span>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
      HARDWARE UPGRADES / MEJORAS
      ============================================================ -->
 <div class="card" style="margin-bottom:20px;border-left:4px solid #0AAE6B;">
@@ -663,6 +710,23 @@ function collectFormData() {
         accessories:       document.getElementById('input-accessories').value.trim(),
         drive_overrides:   getDriveOverrides(),
     };
+}
+
+// ================================================================
+// Histórico consolidado (.xlsx) — T-04
+// ================================================================
+function downloadHistorico() {
+    const params = new URLSearchParams();
+    const from = document.getElementById('hist-date-from').value;
+    const to   = document.getElementById('hist-date-to').value;
+    const host = document.getElementById('hist-hostname').value.trim();
+    if (from) params.set('date_from', from);
+    if (to)   params.set('date_to', to);
+    if (host) params.set('hostname', host);
+    const qs = params.toString();
+    const url = '/reports/api/download/historico-xlsx' + (qs ? '?' + qs : '');
+    // GET con as_attachment del backend dispara descarga directa del .xlsx.
+    window.location.href = url;
 }
 
 // ================================================================

@@ -7,6 +7,7 @@ Handles:
 - Network share file copy
 - RADEC Excel form FO-TI-19 generation (via openpyxl)
 """
+
 import os
 import re
 import sys
@@ -16,45 +17,45 @@ from datetime import datetime
 
 from config import Config
 
-logger = logging.getLogger('cleancpu.maintenance_report')
+logger = logging.getLogger("cleancpu.maintenance_report")
 
 # Target paths
-GOOGLE_SHEET_ID = '1i1v67mXuVA5Aqo2slYkrhLi_fDeUb95q'
-NETWORK_SHARE_BASE = r'\\192.168.122.215\soporte CLJ\Mantenimiento Anual'
-CREDENTIALS_PATH = os.path.join(Config.BASE_PATH, 'credentials', 'service_account.json')
+GOOGLE_SHEET_ID = "1i1v67mXuVA5Aqo2slYkrhLi_fDeUb95q"
+NETWORK_SHARE_BASE = r"\\192.168.122.215\soporte CLJ\Mantenimiento Anual"
+CREDENTIALS_PATH = os.path.join(Config.BASE_PATH, "credentials", "service_account.json")
 
 
 def generate_html_report(system_info, steps, session_data):
     """Generate an HTML maintenance report."""
-    hostname = system_info.get('hostname', 'UNKNOWN')
-    serial = system_info.get('serial', 'UNKNOWN')
-    date_str = datetime.now().strftime('%Y-%m-%d')
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    hostname = system_info.get("hostname", "UNKNOWN")
+    serial = system_info.get("serial", "UNKNOWN")
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    completed = sum(1 for s in steps if s.get('status') == 'completed')
-    skipped = sum(1 for s in steps if s.get('status') == 'skipped')
-    failed = sum(1 for s in steps if s.get('status') == 'failed')
-    total_time = sum(s.get('elapsed', 0) for s in steps)
-    status_text = 'COMPLETADO' if failed == 0 else 'PARCIAL'
+    completed = sum(1 for s in steps if s.get("status") == "completed")
+    skipped = sum(1 for s in steps if s.get("status") == "skipped")
+    failed = sum(1 for s in steps if s.get("status") == "failed")
+    total_time = sum(s.get("elapsed", 0) for s in steps)
+    status_text = "COMPLETADO" if failed == 0 else "PARCIAL"
 
-    steps_html = ''
+    steps_html = ""
     for i, step in enumerate(steps, 1):
         status_color = {
-            'completed': '#0AAE6B',
-            'skipped': '#D6814A',
-            'failed': '#E33B14',
-            'cancelled': '#888',
-        }.get(step.get('status', ''), '#666')
-        steps_html += f'''
+            "completed": "#0AAE6B",
+            "skipped": "#D6814A",
+            "failed": "#E33B14",
+            "cancelled": "#888",
+        }.get(step.get("status", ""), "#666")
+        steps_html += f"""
         <tr>
             <td style="padding:6px 10px;">{i}</td>
             <td style="padding:6px 10px;">{step.get('name', '')}</td>
             <td style="padding:6px 10px;color:{status_color};font-weight:bold;">{step.get('status', 'N/A').upper()}</td>
             <td style="padding:6px 10px;">{step.get('elapsed', 0):.1f}s</td>
             <td style="padding:6px 10px;font-size:12px;">{step.get('message', '')}</td>
-        </tr>'''
+        </tr>"""
 
-    html = f'''<!DOCTYPE html>
+    html = f"""<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -114,7 +115,7 @@ def generate_html_report(system_info, steps, session_data):
         {timestamp}
     </div>
 </body>
-</html>'''
+</html>"""
 
     return html
 
@@ -128,90 +129,104 @@ def _build_inventory_section_html(system_info: dict) -> str:
     """
     from html import escape as he
 
-    inv = system_info.get('inventory', {})
-    basic = inv.get('basic', {})
-    hardware = inv.get('hardware', {})
-    system = inv.get('system', {})
-    network = inv.get('network', {})
-    office = inv.get('office', {})
+    inv = system_info.get("inventory", {})
+    basic = inv.get("basic", {})
+    hardware = inv.get("hardware", {})
+    system = inv.get("system", {})
+    network = inv.get("network", {})
+    office = inv.get("office", {})
 
-    def g(d: dict, key: str, fallback: str = 'N/A') -> str:
+    def g(d: dict, key: str, fallback: str = "N/A") -> str:
         """Get from dict, fall back to system_info flat keys, then fallback."""
         v = d.get(key) or system_info.get(key)
         return he(str(v).strip()) if v else fallback
 
     # ---- Basic ----
     rows_basic = [
-        ('Fecha / Hora', f"{g(basic, 'date')} {g(basic, 'time')}"),
-        ('Equipo (hostname)', g(basic, 'hostname', system_info.get('hostname', 'N/A'))),
-        ('Usuario (login)', g(basic, 'username')),
-        ('Nombre completo', g(basic, 'full_name')),
+        ("Fecha / Hora", f"{g(basic, 'date')} {g(basic, 'time')}"),
+        ("Equipo (hostname)", g(basic, "hostname", system_info.get("hostname", "N/A"))),
+        ("Usuario (login)", g(basic, "username")),
+        ("Nombre completo", g(basic, "full_name")),
     ]
 
     # ---- Hardware ----
     rows_hw = [
-        ('Fabricante', g(hardware, 'manufacturer', system_info.get('manufacturer', 'N/A'))),
-        ('Modelo', g(hardware, 'model', system_info.get('model', 'N/A'))),
-        ('No. de serie', g(hardware, 'serial', system_info.get('serial', 'N/A'))),
-        ('UUID', g(hardware, 'uuid')),
-        ('Dominio/Grupo', g(hardware, 'domain')),
-        ('Tipo de union', g(hardware, 'join_type')),
+        (
+            "Fabricante",
+            g(hardware, "manufacturer", system_info.get("manufacturer", "N/A")),
+        ),
+        ("Modelo", g(hardware, "model", system_info.get("model", "N/A"))),
+        ("No. de serie", g(hardware, "serial", system_info.get("serial", "N/A"))),
+        ("UUID", g(hardware, "uuid")),
+        ("Dominio/Grupo", g(hardware, "domain")),
+        ("Tipo de union", g(hardware, "join_type")),
     ]
 
     # ---- System ----
-    ram_modules = system.get('ram_modules', [])
-    ram_mod_str = ', '.join(
-        f"{m.get('slot', '')} {m.get('capacity', '')} {m.get('type', '')} {m.get('speed', '')}"
-        for m in ram_modules
-    ) if ram_modules else ''
+    ram_modules = system.get("ram_modules", [])
+    ram_mod_str = (
+        ", ".join(
+            f"{m.get('slot', '')} {m.get('capacity', '')} {m.get('type', '')} {m.get('speed', '')}"
+            for m in ram_modules
+        )
+        if ram_modules
+        else ""
+    )
 
-    disks = system.get('disks', [])
-    disks_str = ' | '.join(
-        f"{d.get('model', '')} {d.get('capacity', '')} ({d.get('media_type', '')})"
-        for d in disks
-    ) if disks else ''
+    disks = system.get("disks", [])
+    disks_str = (
+        " | ".join(
+            f"{d.get('model', '')} {d.get('capacity', '')} ({d.get('media_type', '')})"
+            for d in disks
+        )
+        if disks
+        else ""
+    )
 
     rows_sys = [
-        ('Sistema operativo', g(system, 'os_name', system_info.get('os_version', 'N/A'))),
-        ('Version', g(system, 'os_version')),
-        ('Build', g(system, 'os_build')),
-        ('Arquitectura', g(system, 'os_arch', system_info.get('architecture', 'N/A'))),
-        ('Procesador', g(system, 'processor', system_info.get('processor', 'N/A'))),
-        ('RAM total', g(system, 'ram_total')),
-        ('Modulos RAM', he(ram_mod_str) if ram_mod_str else 'N/A'),
-        ('Discos fisicos', he(disks_str) if disks_str else 'N/A'),
+        (
+            "Sistema operativo",
+            g(system, "os_name", system_info.get("os_version", "N/A")),
+        ),
+        ("Version", g(system, "os_version")),
+        ("Build", g(system, "os_build")),
+        ("Arquitectura", g(system, "os_arch", system_info.get("architecture", "N/A"))),
+        ("Procesador", g(system, "processor", system_info.get("processor", "N/A"))),
+        ("RAM total", g(system, "ram_total")),
+        ("Modulos RAM", he(ram_mod_str) if ram_mod_str else "N/A"),
+        ("Discos fisicos", he(disks_str) if disks_str else "N/A"),
     ]
 
     # ---- Network ----
     rows_net = [
-        ('Ethernet MAC', g(network, 'ethernet_mac')),
-        ('Ethernet IPv4', g(network, 'ethernet_ip')),
-        ('WiFi MAC', g(network, 'wifi_mac')),
-        ('WiFi IPv4', g(network, 'wifi_ip')),
+        ("Ethernet MAC", g(network, "ethernet_mac")),
+        ("Ethernet IPv4", g(network, "ethernet_ip")),
+        ("WiFi MAC", g(network, "wifi_mac")),
+        ("WiFi IPv4", g(network, "wifi_ip")),
     ]
 
     # ---- Office ----
     rows_off = [
-        ('Producto', g(office, 'product_name')),
-        ('Version', g(office, 'version')),
-        ('Plataforma', g(office, 'platform')),
-        ('Canal', g(office, 'channel')),
-        ('Release IDs', g(office, 'release_ids')),
+        ("Producto", g(office, "product_name")),
+        ("Version", g(office, "version")),
+        ("Plataforma", g(office, "platform")),
+        ("Canal", g(office, "channel")),
+        ("Release IDs", g(office, "release_ids")),
     ]
 
     def _table(rows):
         return (
             '<table style="border-collapse:collapse;width:100%;margin:6px 0 14px;">'
-            + ''.join(
+            + "".join(
                 f'<tr><td style="padding:4px 10px;width:160px;font-weight:bold;'
                 f'color:#555;">{k}</td>'
                 f'<td style="padding:4px 10px;border-bottom:1px solid #eee;">{v}</td></tr>'
                 for k, v in rows
             )
-            + '</table>'
+            + "</table>"
         )
 
-    return f'''
+    return f"""
     <h2 style="color:#0E7C5A;margin-top:28px;">Inventario del equipo</h2>
 
     <h3 style="margin:10px 0 4px;font-size:13px;color:#274C9B;">Identificación</h3>
@@ -228,21 +243,21 @@ def _build_inventory_section_html(system_info: dict) -> str:
 
     <h3 style="margin:10px 0 4px;font-size:13px;color:#274C9B;">Microsoft Office</h3>
     {_table(rows_off)}
-'''
+"""
 
 
 def save_report_locally(html_content, system_info):
     """Save the HTML report to the local reports directory."""
-    hostname = system_info.get('hostname', 'UNKNOWN')
-    serial = system_info.get('serial', 'UNKNOWN')
-    date_str = datetime.now().strftime('%Y-%m-%d')
+    hostname = system_info.get("hostname", "UNKNOWN")
+    serial = system_info.get("serial", "UNKNOWN")
+    date_str = datetime.now().strftime("%Y-%m-%d")
 
-    filename = f'Mantenimiento_{hostname}_{serial}_{date_str}.html'
+    filename = f"Mantenimiento_{hostname}_{serial}_{date_str}.html"
     local_path = os.path.join(Config.REPORT_DIR, filename)
 
     try:
         os.makedirs(Config.REPORT_DIR, exist_ok=True)
-        with open(local_path, 'w', encoding='utf-8') as f:
+        with open(local_path, "w", encoding="utf-8") as f:
             f.write(html_content)
         logger.info(f"Report saved locally: {local_path}")
         return local_path
@@ -262,52 +277,53 @@ _AUTH_WINERRORS = {1326, 1327, 5}
 
 def _is_auth_error(exc: OSError) -> bool:
     """Return True when an OSError was caused by missing/bad share credentials."""
-    return getattr(exc, 'winerror', None) in _AUTH_WINERRORS
+    return getattr(exc, "winerror", None) in _AUTH_WINERRORS
 
 
 _SHARE_AUTH_HINT = (
-    'Faltan credenciales para la carpeta de red. Guarda usuario/contrasena '
-    'en Red > Credenciales de carpeta de red y reintenta. '
-    'El reporte se guardo localmente.'
+    "Faltan credenciales para la carpeta de red. Guarda usuario/contrasena "
+    "en Red > Credenciales de carpeta de red y reintenta. "
+    "El reporte se guardo localmente."
 )
 
 
 def save_to_network_share(html_content, system_info):
     """Save the report to the network share."""
-    if sys.platform != 'win32':
-        return {'status': 'skipped', 'reason': 'Only available on Windows'}
+    if sys.platform != "win32":
+        return {"status": "skipped", "reason": "Only available on Windows"}
 
-    hostname = system_info.get('hostname', 'UNKNOWN')
-    serial = system_info.get('serial', 'UNKNOWN')
-    date_str = datetime.now().strftime('%Y-%m-%d')
-    filename = f'Mantenimiento_{hostname}_{serial}_{date_str}.html'
+    hostname = system_info.get("hostname", "UNKNOWN")
+    serial = system_info.get("serial", "UNKNOWN")
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    filename = f"Mantenimiento_{hostname}_{serial}_{date_str}.html"
 
     target_dir = os.path.join(NETWORK_SHARE_BASE, date_str)
     target_path = os.path.join(target_dir, filename)
 
     try:
         os.makedirs(target_dir, exist_ok=True)
-        with open(target_path, 'w', encoding='utf-8') as f:
+        with open(target_path, "w", encoding="utf-8") as f:
             f.write(html_content)
         logger.info(f"Report saved to network share: {target_path}")
-        return {'status': 'success', 'path': target_path}
+        return {"status": "success", "path": target_path}
     except OSError as e:
         if _is_auth_error(e):
             logger.warning(
                 "Network share requires credentials (winerror=%s): %s",
-                getattr(e, 'winerror', None), target_dir,
+                getattr(e, "winerror", None),
+                target_dir,
             )
             return {
-                'status': 'skipped',
-                'reason': 'auth_required',
-                'error': _SHARE_AUTH_HINT,
-                'winerror': getattr(e, 'winerror', None),
+                "status": "skipped",
+                "reason": "auth_required",
+                "error": _SHARE_AUTH_HINT,
+                "winerror": getattr(e, "winerror", None),
             }
         logger.error(f"Failed to save to network share: {e}")
         return {
-            'status': 'error',
-            'error': f'No se pudo guardar en la carpeta de red: {e}. '
-                     'El reporte se guardo localmente.',
+            "status": "error",
+            "error": f"No se pudo guardar en la carpeta de red: {e}. "
+            "El reporte se guardo localmente.",
         }
 
 
@@ -317,53 +333,54 @@ def update_google_sheets(system_info, steps):
         import gspread
         from google.oauth2.service_account import Credentials
     except ImportError:
-        logger.warning("gspread/google-auth not installed. Skipping Google Sheets update.")
-        return {'status': 'skipped', 'reason': 'Bibliotecas de Google no instaladas.'}
+        logger.warning(
+            "gspread/google-auth not installed. Skipping Google Sheets update."
+        )
+        return {"status": "skipped", "reason": "Bibliotecas de Google no instaladas."}
 
     if not os.path.exists(CREDENTIALS_PATH):
         logger.warning(f"Google credentials not found at {CREDENTIALS_PATH}")
         return {
-            'status': 'skipped',
-            'reason': 'Credenciales de Google no configuradas. '
-                      'Coloque el archivo service_account.json en la carpeta credentials/.',
+            "status": "skipped",
+            "reason": "Credenciales de Google no configuradas. "
+            "Coloque el archivo service_account.json en la carpeta credentials/.",
         }
 
     try:
         scopes = [
-            'https://www.googleapis.com/auth/spreadsheets',
-            'https://www.googleapis.com/auth/drive',
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive",
         ]
         creds = Credentials.from_service_account_file(CREDENTIALS_PATH, scopes=scopes)
         gc = gspread.authorize(creds)
         sheet = gc.open_by_key(GOOGLE_SHEET_ID).sheet1
 
-        failed = sum(1 for s in steps if s.get('status') == 'failed')
-        status_text = 'COMPLETADO' if failed == 0 else 'PARCIAL'
+        failed = sum(1 for s in steps if s.get("status") == "failed")
+        status_text = "COMPLETADO" if failed == 0 else "PARCIAL"
 
-        details = '; '.join(
-            f"{s.get('name', '')}: {s.get('status', '')}"
-            for s in steps
+        details = "; ".join(
+            f"{s.get('name', '')}: {s.get('status', '')}" for s in steps
         )
 
         row = [
-            system_info.get('ip_address', 'N/A'),
-            system_info.get('serial', 'N/A'),
-            system_info.get('manufacturer', 'N/A'),
-            system_info.get('model', 'N/A'),
-            system_info.get('processor', 'N/A'),
-            system_info.get('ram_gb', 'N/A'),
-            system_info.get('hard_drive', 'N/A'),
+            system_info.get("ip_address", "N/A"),
+            system_info.get("serial", "N/A"),
+            system_info.get("manufacturer", "N/A"),
+            system_info.get("model", "N/A"),
+            system_info.get("processor", "N/A"),
+            system_info.get("ram_gb", "N/A"),
+            system_info.get("hard_drive", "N/A"),
             status_text,
-            datetime.now().strftime('%d/%m/%Y'),
+            datetime.now().strftime("%d/%m/%Y"),
             details[:500],
         ]
 
-        sheet.append_row(row, value_input_option='USER_ENTERED')
+        sheet.append_row(row, value_input_option="USER_ENTERED")
         logger.info("Google Sheets updated successfully")
-        return {'status': 'success'}
+        return {"status": "success"}
     except Exception as e:
         logger.error(f"Google Sheets update failed: {e}")
-        return {'status': 'error', 'error': str(e)}
+        return {"status": "error", "error": str(e)}
 
 
 def generate_radec_excel(system_info, steps):
@@ -375,28 +392,30 @@ def generate_radec_excel(system_info, steps):
         import openpyxl
     except ImportError:
         logger.warning("openpyxl not installed. Skipping Excel form generation.")
-        return {'status': 'skipped', 'reason': 'openpyxl no está instalado.'}
+        return {"status": "skipped", "reason": "openpyxl no está instalado."}
 
-    hostname = system_info.get('hostname', 'UNKNOWN')
-    date_str = datetime.now().strftime('%Y-%m-%d')
-    date_display = datetime.now().strftime('%d/%m/%Y')
+    hostname = system_info.get("hostname", "UNKNOWN")
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    date_display = datetime.now().strftime("%d/%m/%Y")
 
     # Try to load template
-    template_path = os.path.join(Config.BASE_PATH, 'templates_data', 'FO-TI-19_template.xlsx')
+    template_path = os.path.join(
+        Config.BASE_PATH, "templates_data", "FO-TI-19_template.xlsx"
+    )
     if os.path.exists(template_path):
         wb = openpyxl.load_workbook(template_path)
         ws = wb.active
     else:
         wb = openpyxl.Workbook()
         ws = wb.active
-        ws.title = 'FO-TI-19'
+        ws.title = "FO-TI-19"
         _build_form_from_scratch(ws, system_info, steps, date_display)
 
     # Fill common fields regardless of template presence
     _fill_form_fields(ws, system_info, steps, date_display)
 
     # Save
-    filename = f'FO-TI-19_{hostname}_{date_str}.xlsx'
+    filename = f"FO-TI-19_{hostname}_{date_str}.xlsx"
     local_path = os.path.join(Config.REPORT_DIR, filename)
     os.makedirs(Config.REPORT_DIR, exist_ok=True)
 
@@ -405,38 +424,38 @@ def generate_radec_excel(system_info, steps):
         logger.info(f"RADEC Excel form saved: {local_path}")
     except Exception as e:
         logger.error(f"Failed to save Excel form: {e}")
-        return {'status': 'error', 'error': str(e)}
+        return {"status": "error", "error": str(e)}
 
     # Also copy to network share
-    network_result = {'status': 'skipped'}
-    if sys.platform == 'win32':
+    network_result = {"status": "skipped"}
+    if sys.platform == "win32":
         try:
             net_dir = os.path.join(NETWORK_SHARE_BASE, date_str)
             os.makedirs(net_dir, exist_ok=True)
             net_path = os.path.join(net_dir, filename)
             shutil.copy2(local_path, net_path)
-            network_result = {'status': 'success', 'path': net_path}
+            network_result = {"status": "success", "path": net_path}
             logger.info(f"Excel form copied to network: {net_path}")
         except OSError as e:
             if _is_auth_error(e):
                 logger.warning(
                     "Excel copy: share requires credentials (winerror=%s)",
-                    getattr(e, 'winerror', None),
+                    getattr(e, "winerror", None),
                 )
                 network_result = {
-                    'status': 'skipped',
-                    'reason': 'auth_required',
-                    'error': _SHARE_AUTH_HINT,
-                    'winerror': getattr(e, 'winerror', None),
+                    "status": "skipped",
+                    "reason": "auth_required",
+                    "error": _SHARE_AUTH_HINT,
+                    "winerror": getattr(e, "winerror", None),
                 }
             else:
-                network_result = {'status': 'error', 'error': str(e)}
+                network_result = {"status": "error", "error": str(e)}
                 logger.warning(f"Failed to copy Excel to network: {e}")
 
     return {
-        'status': 'success',
-        'local_path': local_path,
-        'network': network_result,
+        "status": "success",
+        "local_path": local_path,
+        "network": network_result,
     }
 
 
@@ -445,60 +464,62 @@ def _build_form_from_scratch(ws, system_info, steps, date_display):
     from openpyxl.styles import Font, Alignment, PatternFill
 
     header_font = Font(bold=True, size=11)
-    title_font = Font(bold=True, size=14, color='274C9B')
-    fill_header = PatternFill(start_color='274C9B', end_color='274C9B', fill_type='solid')
-    font_white = Font(bold=True, color='FFFFFF', size=10)
+    title_font = Font(bold=True, size=14, color="274C9B")
+    fill_header = PatternFill(
+        start_color="274C9B", end_color="274C9B", fill_type="solid"
+    )
+    font_white = Font(bold=True, color="FFFFFF", size=10)
 
     # Title
-    ws.merge_cells('A1:H1')
-    ws['A1'] = 'HOJA DE SERVICIO MANTENIMIENTO DE EQUIPO DE CÓMPUTO'
-    ws['A1'].font = title_font
-    ws['A1'].alignment = Alignment(horizontal='center')
+    ws.merge_cells("A1:H1")
+    ws["A1"] = "HOJA DE SERVICIO MANTENIMIENTO DE EQUIPO DE CÓMPUTO"
+    ws["A1"].font = title_font
+    ws["A1"].alignment = Alignment(horizontal="center")
 
     # Header info
-    ws['A2'] = 'Código:'
-    ws['B2'] = 'FO-TI-19'
-    ws['D2'] = 'Versión: 06/07'
-    ws['F2'] = f'Fecha de Emisión: {date_display}'
+    ws["A2"] = "Código:"
+    ws["B2"] = "FO-TI-19"
+    ws["D2"] = "Versión: 06/07"
+    ws["F2"] = f"Fecha de Emisión: {date_display}"
 
     # Equipment section
     row = 4
-    ws[f'A{row}'] = 'DATOS DEL EQUIPO'
-    ws[f'A{row}'].font = header_font
+    ws[f"A{row}"] = "DATOS DEL EQUIPO"
+    ws[f"A{row}"].font = header_font
 
     labels = [
-        ('Hostname:', system_info.get('hostname', '')),
-        ('Procesador:', system_info.get('processor', '')),
-        ('RAM:', system_info.get('ram_gb', '')),
-        ('Disco Duro:', system_info.get('hard_drive', '')),
-        ('Sistema Operativo:', system_info.get('os_version', '')),
-        ('No. Serie:', system_info.get('serial', '')),
-        ('Marca:', system_info.get('manufacturer', '')),
-        ('Modelo:', system_info.get('model', '')),
-        ('IP:', system_info.get('ip_address', '')),
+        ("Hostname:", system_info.get("hostname", "")),
+        ("Procesador:", system_info.get("processor", "")),
+        ("RAM:", system_info.get("ram_gb", "")),
+        ("Disco Duro:", system_info.get("hard_drive", "")),
+        ("Sistema Operativo:", system_info.get("os_version", "")),
+        ("No. Serie:", system_info.get("serial", "")),
+        ("Marca:", system_info.get("manufacturer", "")),
+        ("Modelo:", system_info.get("model", "")),
+        ("IP:", system_info.get("ip_address", "")),
     ]
     for i, (label, value) in enumerate(labels):
         r = row + 1 + i
-        ws[f'A{r}'] = label
-        ws[f'A{r}'].font = Font(bold=True, size=10)
-        ws[f'B{r}'] = str(value)
+        ws[f"A{r}"] = label
+        ws[f"A{r}"].font = Font(bold=True, size=10)
+        ws[f"B{r}"] = str(value)
 
     # Service type
     row = 15
-    ws[f'A{row}'] = 'TIPO DE SERVICIO'
-    ws[f'A{row}'].font = header_font
-    ws[f'A{row + 1}'] = 'Preventivo'
-    ws[f'B{row + 1}'] = 'X'
-    ws[f'B{row + 1}'].font = Font(bold=True, color='0AAE6B')
+    ws[f"A{row}"] = "TIPO DE SERVICIO"
+    ws[f"A{row}"].font = header_font
+    ws[f"A{row + 1}"] = "Preventivo"
+    ws[f"B{row + 1}"] = "X"
+    ws[f"B{row + 1}"].font = Font(bold=True, color="0AAE6B")
 
     # Activities
     row = 18
-    ws[f'A{row}'] = 'ACTIVIDADES REALIZADAS'
-    ws[f'A{row}'].font = header_font
+    ws[f"A{row}"] = "ACTIVIDADES REALIZADAS"
+    ws[f"A{row}"].font = header_font
 
     # Table header
     row += 1
-    for col, header in enumerate(['#', 'Actividad', 'Estado', 'Tiempo', 'Detalle'], 1):
+    for col, header in enumerate(["#", "Actividad", "Estado", "Tiempo", "Detalle"], 1):
         cell = ws.cell(row=row, column=col, value=header)
         cell.font = font_white
         cell.fill = fill_header
@@ -507,32 +528,32 @@ def _build_form_from_scratch(ws, system_info, steps, date_display):
     for i, step in enumerate(steps, 1):
         r = row + i
         ws.cell(row=r, column=1, value=i)
-        ws.cell(row=r, column=2, value=step.get('name', ''))
-        ws.cell(row=r, column=3, value=(step.get('status', '')).upper())
+        ws.cell(row=r, column=2, value=step.get("name", ""))
+        ws.cell(row=r, column=3, value=(step.get("status", "")).upper())
         ws.cell(row=r, column=4, value=f"{step.get('elapsed', 0):.1f}s")
-        ws.cell(row=r, column=5, value=step.get('message', ''))
+        ws.cell(row=r, column=5, value=step.get("message", ""))
 
     # Observations
     obs_row = row + len(steps) + 2
-    ws[f'A{obs_row}'] = 'OBSERVACIONES DEL TÉCNICO'
-    ws[f'A{obs_row}'].font = header_font
+    ws[f"A{obs_row}"] = "OBSERVACIONES DEL TÉCNICO"
+    ws[f"A{obs_row}"].font = header_font
 
-    completed = sum(1 for s in steps if s.get('status') == 'completed')
-    failed = sum(1 for s in steps if s.get('status') == 'failed')
-    total_time = sum(s.get('elapsed', 0) for s in steps)
+    completed = sum(1 for s in steps if s.get("status") == "completed")
+    failed = sum(1 for s in steps if s.get("status") == "failed")
+    total_time = sum(s.get("elapsed", 0) for s in steps)
 
-    ws[f'A{obs_row + 1}'] = (
-        f'Mantenimiento lógico preventivo ejecutado por CleanCPU v{Config.APP_VERSION}. '
-        f'{completed}/{len(steps)} pasos completados, {failed} fallidos. '
-        f'Tiempo total: {total_time:.0f}s.'
+    ws[f"A{obs_row + 1}"] = (
+        f"Mantenimiento lógico preventivo ejecutado por CleanCPU v{Config.APP_VERSION}. "
+        f"{completed}/{len(steps)} pasos completados, {failed} fallidos. "
+        f"Tiempo total: {total_time:.0f}s."
     )
 
     # Column widths
-    ws.column_dimensions['A'].width = 20
-    ws.column_dimensions['B'].width = 30
-    ws.column_dimensions['C'].width = 14
-    ws.column_dimensions['D'].width = 12
-    ws.column_dimensions['E'].width = 50
+    ws.column_dimensions["A"].width = 20
+    ws.column_dimensions["B"].width = 30
+    ws.column_dimensions["C"].width = 14
+    ws.column_dimensions["D"].width = 12
+    ws.column_dimensions["E"].width = 50
 
 
 def _fill_form_fields(ws, system_info, steps, date_display):
@@ -540,8 +561,8 @@ def _fill_form_fields(ws, system_info, steps, date_display):
     # Simple cell-value fill for known positions
     # This is a best-effort approach that works whether or not a template was loaded
     field_map = {
-        'Fecha de Solicitud': date_display,
-        'Fecha de Emisión': date_display,
+        "Fecha de Solicitud": date_display,
+        "Fecha de Emisión": date_display,
     }
 
     for row in ws.iter_rows(max_row=min(50, ws.max_row or 50)):
@@ -554,121 +575,135 @@ def _fill_form_fields(ws, system_info, steps, date_display):
                     ws.cell(row=cell.row, column=next_col, value=field_map[val])
 
 
-def generate_fo_ti_19_html(system_info, steps, session_data,
-                           sucursal='', technician_name='',
-                           maint_type='preventivo', model_override='',
-                           tech_address='', tech_phone='', tech_email='',
-                           operator_name='', op_address='', op_phone='', op_email='',
-                           accessories_override='', drive_overrides=None,
-                           office_license=None):
+def generate_fo_ti_19_html(
+    system_info,
+    steps,
+    session_data,
+    sucursal="",
+    technician_name="",
+    maint_type="preventivo",
+    model_override="",
+    tech_address="",
+    tech_phone="",
+    tech_email="",
+    operator_name="",
+    op_address="",
+    op_phone="",
+    op_email="",
+    accessories_override="",
+    drive_overrides=None,
+    office_license=None,
+):
     """
     Generate FO-TI-19 Hoja de Servicio Mantenimiento de Equipo de Cómputo.
     Matches the official RADEC format with all fields.
     """
     from html import escape as he
 
-    date_display = datetime.now().strftime('%d/%m/%Y')
+    date_display = datetime.now().strftime("%d/%m/%Y")
 
     # Service type checkmarks (derived from maint_type)
-    _mt = (maint_type or 'preventivo').lower()
-    svc_preventivo = 'checked' if _mt == 'preventivo' else ''
-    svc_correctivo = 'checked' if _mt == 'correctivo' else ''
-    svc_revision = 'checked' if _mt == 'revision' else ''
+    _mt = (maint_type or "preventivo").lower()
+    svc_preventivo = "checked" if _mt == "preventivo" else ""
+    svc_correctivo = "checked" if _mt == "correctivo" else ""
+    svc_revision = "checked" if _mt == "revision" else ""
 
     # Determine accessories
     accessories = (
         accessories_override.strip()
         if accessories_override and accessories_override.strip()
-        else 'MOUSE, TECLADO Y NO-BREAK'
+        else "MOUSE, TECLADO Y NO-BREAK"
     )
 
     # Unidades (drives) checkmarks
-    has_cdrom = system_info.get('has_cdrom', False)
-    has_dvdrom = system_info.get('has_dvdrom', False)
-    has_usb = system_info.get('has_usb', True)
-    has_micro_sd = system_info.get('has_micro_sd', False)
+    has_cdrom = system_info.get("has_cdrom", False)
+    has_dvdrom = system_info.get("has_dvdrom", False)
+    has_usb = system_info.get("has_usb", True)
+    has_micro_sd = system_info.get("has_micro_sd", False)
 
     # Otros text
-    otros_text = ''
+    otros_text = ""
     otros_parts = []
     if has_usb:
-        otros_parts.append('USB')
+        otros_parts.append("USB")
     if has_micro_sd:
-        otros_parts.append('MICRO SD')
+        otros_parts.append("MICRO SD")
     if otros_parts:
-        otros_text = ', '.join(otros_parts)
+        otros_text = ", ".join(otros_parts)
 
     # Build drive-type override note for HD row
-    _drive_note = ''
+    _drive_note = ""
     if drive_overrides and isinstance(drive_overrides, dict):
-        _types = [str(v).strip().upper() for v in drive_overrides.values()
-                  if v and str(v).strip()]
+        _types = [
+            str(v).strip().upper()
+            for v in drive_overrides.values()
+            if v and str(v).strip()
+        ]
         if _types:
-            _drive_note = ' — Tipos confirmados: ' + ', '.join(_types)
+            _drive_note = " — Tipos confirmados: " + ", ".join(_types)
 
     # Activities text (based on maint_type)
     _activities_map = {
-        'preventivo': (
-            'SE REALIZO LA LIMPIEZA INTERNA COMO EXTERNA, ASI COMO EL '
-            'MANTENIMIENTO LOGICO, SE ENTREGA EQUIPO FUNCIONANDO CORRECTAMENTE.'
+        "preventivo": (
+            "SE REALIZO LA LIMPIEZA INTERNA COMO EXTERNA, ASI COMO EL "
+            "MANTENIMIENTO LOGICO, SE ENTREGA EQUIPO FUNCIONANDO CORRECTAMENTE."
         ),
-        'correctivo': (
-            'SE REALIZO EL DIAGNOSTICO Y CORRECCION DE FALLA REPORTADA. '
-            'SE ENTREGA EQUIPO FUNCIONANDO CORRECTAMENTE.'
+        "correctivo": (
+            "SE REALIZO EL DIAGNOSTICO Y CORRECCION DE FALLA REPORTADA. "
+            "SE ENTREGA EQUIPO FUNCIONANDO CORRECTAMENTE."
         ),
-        'revision': (
-            'SE REALIZO REVISION GENERAL DEL EQUIPO. '
-            'SE ENTREGA INFORME DE ESTADO.'
+        "revision": (
+            "SE REALIZO REVISION GENERAL DEL EQUIPO. " "SE ENTREGA INFORME DE ESTADO."
         ),
     }
-    activities = _activities_map.get(_mt, _activities_map['preventivo'])
+    activities = _activities_map.get(_mt, _activities_map["preventivo"])
 
     # Physical observations
-    observations_physical = 'EQUIPO FUNCIONAL'
+    observations_physical = "EQUIPO FUNCIONAL"
 
     # Comments (based on maint_type)
     _comments_map = {
-        'preventivo': 'MANTENIMIENTO ANUAL PREVENTIVO',
-        'correctivo': 'MANTENIMIENTO CORRECTIVO',
-        'revision': 'REVISION DE EQUIPO',
+        "preventivo": "MANTENIMIENTO ANUAL PREVENTIVO",
+        "correctivo": "MANTENIMIENTO CORRECTIVO",
+        "revision": "REVISION DE EQUIPO",
     }
-    comments = _comments_map.get(_mt, _comments_map['preventivo'])
+    comments = _comments_map.get(_mt, _comments_map["preventivo"])
 
     # Technician observations
-    tech_observations = ''
+    tech_observations = ""
     if steps:
         step_details = []
         for s in steps:
-            if s.get('status') == 'failed':
-                step_details.append(f"{s.get('name', '')}: FALLIDO - {s.get('message', '')}")
-            elif s.get('status') == 'skipped':
-                step_details.append(f"{s.get('name', '')}: OMITIDO - {s.get('message', '')}")
+            if s.get("status") == "failed":
+                step_details.append(
+                    f"{s.get('name', '')}: FALLIDO - {s.get('message', '')}"
+                )
+            elif s.get("status") == "skipped":
+                step_details.append(
+                    f"{s.get('name', '')}: OMITIDO - {s.get('message', '')}"
+                )
         if step_details:
-            tech_observations = '; '.join(step_details)
+            tech_observations = "; ".join(step_details)
         else:
-            tech_observations = 'TODOS LOS PASOS COMPLETADOS EXITOSAMENTE'
+            tech_observations = "TODOS LOS PASOS COMPLETADOS EXITOSAMENTE"
 
     # Technician contact sub-lines for signature block
-    _tech_contact = ''
+    _tech_contact = ""
     if tech_address:
-        _tech_contact += (
-            f'<br><span style="font-size:9px;font-weight:normal;">{he(tech_address)}</span>'
-        )
+        _tech_contact += f'<br><span style="font-size:9px;font-weight:normal;">{he(tech_address)}</span>'
     if tech_phone or tech_email:
-        _contact_line = ' | '.join(filter(None, [tech_phone, tech_email]))
-        _tech_contact += (
-            f'<br><span style="font-size:9px;font-weight:normal;">{he(_contact_line)}</span>'
-        )
+        _contact_line = " | ".join(filter(None, [tech_phone, tech_email]))
+        _tech_contact += f'<br><span style="font-size:9px;font-weight:normal;">{he(_contact_line)}</span>'
 
     # Upgrade opportunities / Mejoras section
-    upgrades = system_info.get('upgrade_opportunities', {})
-    cpu_obs = _check_cpu_obsolescence(system_info.get('processor', ''))
+    upgrades = system_info.get("upgrade_opportunities", {})
+    cpu_obs = _check_cpu_obsolescence(system_info.get("processor", ""))
     mejoras_html = _build_mejoras_section(upgrades, cpu_obsolescence=cpu_obs)
 
     # Office license block (from session inspection result)
     office_html = _build_office_license_section(office_license)
 
-    html = f'''<!DOCTYPE html>
+    html = f"""<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -936,11 +971,11 @@ def generate_fo_ti_19_html(system_info, steps, session_data,
     </button>
 </div>
 </body>
-</html>'''
+</html>"""
     return html
 
 
-def generate_fo_ti_20_html(entries, sucursal=''):
+def generate_fo_ti_20_html(entries, sucursal=""):
     """
     Generate FO-TI-20 Bitacora de mantenimiento de equipo de computo.
     entries: list of dicts with keys: fecha, usuario, equipo, reporte_final
@@ -948,11 +983,11 @@ def generate_fo_ti_20_html(entries, sucursal=''):
     """
     from html import escape as he
 
-    date_display = datetime.now().strftime('%d/%m/%Y')
+    date_display = datetime.now().strftime("%d/%m/%Y")
 
-    rows_html = ''
+    rows_html = ""
     for i, entry in enumerate(entries, 1):
-        rows_html += f'''
+        rows_html += f"""
         <tr>
             <td style="text-align:center;">{i}</td>
             <td style="text-align:center;">{he(str(entry.get('fecha', '')))}</td>
@@ -960,17 +995,17 @@ def generate_fo_ti_20_html(entries, sucursal=''):
             <td style="text-align:center;">{he(str(entry.get('equipo', '')).upper())}</td>
             <td style="text-align:center;">{he(str(entry.get('reporte_final', 'MANTENIMIENTO PREVENTIVO')).upper())}</td>
             <td style="text-align:center;min-width:80px;">&nbsp;</td>
-        </tr>'''
+        </tr>"""
 
     # Fill remaining empty rows to reach at least 20
     for j in range(len(entries) + 1, 21):
-        rows_html += f'''
+        rows_html += f"""
         <tr>
             <td style="text-align:center;">{j}</td>
             <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
-        </tr>'''
+        </tr>"""
 
-    html = f'''<!DOCTYPE html>
+    html = f"""<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -1054,7 +1089,7 @@ def generate_fo_ti_20_html(entries, sucursal=''):
     </button>
 </div>
 </body>
-</html>'''
+</html>"""
     return html
 
 
@@ -1081,18 +1116,20 @@ def _check_cpu_obsolescence(processor_str):
     """
     if not processor_str:
         return {
-            'generation': None, 'family': None, 'obsolete': None,
-            'label': 'Procesador no identificado',
-            'reason': 'Revisi\u00f3n manual requerida.',
+            "generation": None,
+            "family": None,
+            "obsolete": None,
+            "label": "Procesador no identificado",
+            "reason": "Revisi\u00f3n manual requerida.",
         }
 
     p = processor_str.upper()
 
     # Intel Core iX with explicit model number: iN-DDDD[suffix]
-    m = re.search(r'CORE\s+(I[3579])-(\d{4,5})', p)
+    m = re.search(r"CORE\s+(I[3579])-(\d{4,5})", p)
     if m:
-        family = m.group(1)                              # 'I3', 'I5', 'I7', 'I9'
-        fdisp = family[0].lower() + family[1:]          # 'i3', 'i5', 'i7', 'i9'
+        family = m.group(1)  # 'I3', 'I5', 'I7', 'I9'
+        fdisp = family[0].lower() + family[1:]  # 'i3', 'i5', 'i7', 'i9'
         model_num = m.group(2)
 
         if len(model_num) == 5:
@@ -1102,40 +1139,43 @@ def _check_cpu_obsolescence(processor_str):
             # Gen 1-9: first digit (4xxx → 4, 5xxx → 5, …)
             gen = int(model_num[0]) or 1
 
-        label = f'Intel Core {fdisp} \u2014 Generaci\u00f3n {gen}'
+        label = f"Intel Core {fdisp} \u2014 Generaci\u00f3n {gen}"
 
         if gen >= 6:
             obsolete = False
             reason = (
-                f'Generaci\u00f3n {gen}, dentro del umbral de soporte '
-                f'(m\u00ednimo requerido: Core i5, 5\u00aa generaci\u00f3n).'
+                f"Generaci\u00f3n {gen}, dentro del umbral de soporte "
+                f"(m\u00ednimo requerido: Core i5, 5\u00aa generaci\u00f3n)."
             )
         elif gen == 5:
-            if family == 'I3':
+            if family == "I3":
                 # i3 5th gen is below the threshold (i5 5th gen)
                 obsolete = True
                 reason = (
-                    'Core i3 de 5\u00aa generaci\u00f3n no alcanza el umbral m\u00ednimo. '
-                    'Se requiere Core i5 de 5\u00aa generaci\u00f3n o superior.'
+                    "Core i3 de 5\u00aa generaci\u00f3n no alcanza el umbral m\u00ednimo. "
+                    "Se requiere Core i5 de 5\u00aa generaci\u00f3n o superior."
                 )
             else:
                 # i5/i7/i9 on 5th gen — at or above threshold
                 obsolete = False
                 reason = (
-                    f'Core {fdisp} de 5\u00aa generaci\u00f3n, en umbral m\u00ednimo o superior '
-                    f'(m\u00ednimo requerido: Core i5, 5\u00aa generaci\u00f3n).'
+                    f"Core {fdisp} de 5\u00aa generaci\u00f3n, en umbral m\u00ednimo o superior "
+                    f"(m\u00ednimo requerido: Core i5, 5\u00aa generaci\u00f3n)."
                 )
         else:
             # gen <= 4: all Core families are below threshold
             obsolete = True
             reason = (
-                f'Generaci\u00f3n {gen}, por debajo del umbral m\u00ednimo '
-                f'(se requiere Core i5 de 5\u00aa generaci\u00f3n o superior).'
+                f"Generaci\u00f3n {gen}, por debajo del umbral m\u00ednimo "
+                f"(se requiere Core i5 de 5\u00aa generaci\u00f3n o superior)."
             )
 
         return {
-            'generation': gen, 'family': family,
-            'obsolete': obsolete, 'label': label, 'reason': reason,
+            "generation": gen,
+            "family": family,
+            "obsolete": obsolete,
+            "label": label,
+            "reason": reason,
         }
 
     # Intel Core 1st-generation — old WMI naming without hyphen:
@@ -1143,56 +1183,64 @@ def _check_cpu_obsolescence(processor_str):
     # "Intel(R) Core(TM) i5 CPU M 520 @ 2.40GHz" (mobile with letter suffix)
     # Identified by: family letter + whitespace + "CPU" keyword + 3-digit number.
     # All CPUs matching this style are definitively 1st generation → obsolete.
-    m1g = re.search(r'\b(I[3579])\s+CPU\s+(?:[A-Z]\s+)?\d{3}\b', p)
+    m1g = re.search(r"\b(I[3579])\s+CPU\s+(?:[A-Z]\s+)?\d{3}\b", p)
     if m1g:
-        family = m1g.group(1)                        # 'I3', 'I5', 'I7'
-        fdisp = family[0].lower() + family[1:]      # 'i3', 'i5', 'i7'
+        family = m1g.group(1)  # 'I3', 'I5', 'I7'
+        fdisp = family[0].lower() + family[1:]  # 'i3', 'i5', 'i7'
         return {
-            'generation': 1, 'family': family, 'obsolete': True,
-            'label': f'Intel Core {fdisp} \u2014 Generaci\u00f3n 1',
-            'reason': (
-                'Generaci\u00f3n 1 (modelo de 3 d\u00edgitos, denominaci\u00f3n '
-                'antigua sin gui\u00f3n), por debajo del umbral m\u00ednimo '
-                '(se requiere Core i5 de 5\u00aa generaci\u00f3n o superior).'
+            "generation": 1,
+            "family": family,
+            "obsolete": True,
+            "label": f"Intel Core {fdisp} \u2014 Generaci\u00f3n 1",
+            "reason": (
+                "Generaci\u00f3n 1 (modelo de 3 d\u00edgitos, denominaci\u00f3n "
+                "antigua sin gui\u00f3n), por debajo del umbral m\u00ednimo "
+                "(se requiere Core i5 de 5\u00aa generaci\u00f3n o superior)."
             ),
         }
 
     # Intel Core iX present but no model number — generation indeterminate
-    if re.search(r'CORE\s+I[3579]\b', p):
-        fm = re.search(r'CORE\s+(I[3579])\b', p)
-        fdisp = (fm.group(1)[0].lower() + fm.group(1)[1:]) if fm else 'iX'
+    if re.search(r"CORE\s+I[3579]\b", p):
+        fm = re.search(r"CORE\s+(I[3579])\b", p)
+        fdisp = (fm.group(1)[0].lower() + fm.group(1)[1:]) if fm else "iX"
         return {
-            'generation': None, 'family': fdisp, 'obsolete': None,
-            'label': f'Intel Core {fdisp} (sin n\u00famero de modelo)',
-            'reason': 'Generaci\u00f3n no determinada. Revisi\u00f3n manual requerida.',
+            "generation": None,
+            "family": fdisp,
+            "obsolete": None,
+            "label": f"Intel Core {fdisp} (sin n\u00famero de modelo)",
+            "reason": "Generaci\u00f3n no determinada. Revisi\u00f3n manual requerida.",
         }
 
     # Known non-Core-iX families — rule does not apply; manual review required
     _FAMILY_MAP = [
-        ('XEON', 'Intel Xeon'),
-        ('CELERON', 'Intel Celeron'),
-        ('PENTIUM', 'Intel Pentium'),
-        ('ATOM', 'Intel Atom'),
-        ('RYZEN', 'AMD Ryzen'),
-        ('ATHLON', 'AMD Athlon'),
-        ('EPYC', 'AMD EPYC'),
-        ('THREADRIPPER', 'AMD Threadripper'),
-        ('AMD', 'AMD'),
-        ('APPLE', 'Apple Silicon'),
+        ("XEON", "Intel Xeon"),
+        ("CELERON", "Intel Celeron"),
+        ("PENTIUM", "Intel Pentium"),
+        ("ATOM", "Intel Atom"),
+        ("RYZEN", "AMD Ryzen"),
+        ("ATHLON", "AMD Athlon"),
+        ("EPYC", "AMD EPYC"),
+        ("THREADRIPPER", "AMD Threadripper"),
+        ("AMD", "AMD"),
+        ("APPLE", "Apple Silicon"),
     ]
     for keyword, brand in _FAMILY_MAP:
         if keyword in p:
             return {
-                'generation': None, 'family': brand, 'obsolete': None,
-                'label': brand,
-                'reason': 'Familia no clasificable por esta regla. Revisi\u00f3n manual requerida.',
+                "generation": None,
+                "family": brand,
+                "obsolete": None,
+                "label": brand,
+                "reason": "Familia no clasificable por esta regla. Revisi\u00f3n manual requerida.",
             }
 
     # Completely unrecognized string
     return {
-        'generation': None, 'family': None, 'obsolete': None,
-        'label': 'Procesador no reconocido',
-        'reason': 'Familia de procesador no reconocida. Revisi\u00f3n manual requerida.',
+        "generation": None,
+        "family": None,
+        "obsolete": None,
+        "label": "Procesador no reconocido",
+        "reason": "Familia de procesador no reconocida. Revisi\u00f3n manual requerida.",
     }
 
 
@@ -1213,7 +1261,7 @@ def _build_office_license_section(office_license):
     # Always render the section so the technician can see whether inspection ran.
     # Fallback block when no inspection was performed this session.
     if not office_license or not isinstance(office_license, dict):
-        return '''
+        return """
 <div class="section-title">LICENCIA OFFICE</div>
 <div class="row">
     <div class="cell cell-value" style="color:#888;font-style:italic;padding:8px 10px;">
@@ -1221,37 +1269,38 @@ def _build_office_license_section(office_license):
         Ejecute &ldquo;Inspeccionar licencia&rdquo; en la secci&oacute;n Office
         y regenere el reporte.
     </div>
-</div>'''
+</div>"""
 
     # Extract safe fields defensively — all defaults to '' if absent or None
-    parsed = office_license.get('parsed', {}) or {}
-    product_name = he(str(parsed.get('product_name', '') or ''))
-    license_status = he(str(parsed.get('license_status', '') or ''))
-    partial_key = he(str(parsed.get('partial_key', '') or ''))
-    inspected_at_raw = str(office_license.get('inspected_at', '') or '')
-    status = str(office_license.get('status', '') or '')
-    message = he(str(office_license.get('message', '') or ''))
+    parsed = office_license.get("parsed", {}) or {}
+    product_name = he(str(parsed.get("product_name", "") or ""))
+    license_status = he(str(parsed.get("license_status", "") or ""))
+    partial_key = he(str(parsed.get("partial_key", "") or ""))
+    inspected_at_raw = str(office_license.get("inspected_at", "") or "")
+    status = str(office_license.get("status", "") or "")
+    message = he(str(office_license.get("message", "") or ""))
 
     # Format inspected_at for display (ISO → readable, best-effort)
     if inspected_at_raw:
         try:
             from datetime import datetime as _dt
+
             _ts = _dt.fromisoformat(inspected_at_raw)
-            inspected_at = _ts.strftime('%d/%m/%Y %H:%M')
+            inspected_at = _ts.strftime("%d/%m/%Y %H:%M")
         except (ValueError, TypeError):
             inspected_at = he(inspected_at_raw[:16])
     else:
-        inspected_at = ''
+        inspected_at = ""
 
     # Status badge color
     _status_colors = {
-        'success': '#006600',
-        'requires_admin': '#CC6600',
-        'ospp_not_found': '#888888',
-        'office_not_found': '#888888',
-        'error': '#CC0000',
+        "success": "#006600",
+        "requires_admin": "#CC6600",
+        "ospp_not_found": "#888888",
+        "office_not_found": "#888888",
+        "error": "#CC0000",
     }
-    status_color = _status_colors.get(status, '#333333')
+    status_color = _status_colors.get(status, "#333333")
 
     # Build display rows — only show rows that have data
     rows = []
@@ -1261,7 +1310,7 @@ def _build_office_license_section(office_license):
             f'<div class="row">'
             f'<div class="cell cell-label" style="min-width:160px;">Producto:</div>'
             f'<div class="cell cell-value">{product_name}</div>'
-            f'</div>'
+            f"</div>"
         )
 
     if license_status:
@@ -1269,18 +1318,18 @@ def _build_office_license_section(office_license):
             f'<div class="row">'
             f'<div class="cell cell-label" style="min-width:160px;">Estado de licencia:</div>'
             f'<div class="cell cell-value" style="color:{status_color};font-weight:bold;">'
-            f'{license_status}</div>'
-            f'</div>'
+            f"{license_status}</div>"
+            f"</div>"
         )
 
     if partial_key:
         rows.append(
             f'<div class="row">'
             f'<div class="cell cell-label" style="min-width:160px;">'
-            f'&Uacute;ltimos 5 caracteres:</div>'
+            f"&Uacute;ltimos 5 caracteres:</div>"
             f'<div class="cell cell-value" style="font-family:monospace;">'
-            f'XXXXX-XXXXX-XXXXX-XXXXX-{partial_key}</div>'
-            f'</div>'
+            f"XXXXX-XXXXX-XXXXX-XXXXX-{partial_key}</div>"
+            f"</div>"
         )
 
     if inspected_at:
@@ -1288,8 +1337,8 @@ def _build_office_license_section(office_license):
             f'<div class="row">'
             f'<div class="cell cell-label" style="min-width:160px;">Inspeccionado:</div>'
             f'<div class="cell cell-value" style="color:#555;font-size:10px;">'
-            f'{inspected_at}</div>'
-            f'</div>'
+            f"{inspected_at}</div>"
+            f"</div>"
         )
 
     # When ospp ran but produced no parsed fields, show the summary message
@@ -1297,22 +1346,19 @@ def _build_office_license_section(office_license):
         rows.append(
             f'<div class="row">'
             f'<div class="cell cell-value" style="color:{status_color};padding:8px 10px;">'
-            f'{message}</div>'
-            f'</div>'
+            f"{message}</div>"
+            f"</div>"
         )
 
     if not rows:
         rows.append(
             '<div class="row">'
             '<div class="cell cell-value" style="color:#888;font-style:italic;padding:8px 10px;">'
-            'Sin datos de licencia disponibles.</div>'
-            '</div>'
+            "Sin datos de licencia disponibles.</div>"
+            "</div>"
         )
 
-    return (
-        '<div class="section-title">LICENCIA OFFICE</div>\n'
-        + '\n'.join(rows)
-    )
+    return '<div class="section-title">LICENCIA OFFICE</div>\n' + "\n".join(rows)
 
 
 def _build_mejoras_section(upgrades, cpu_obsolescence=None):
@@ -1321,127 +1367,133 @@ def _build_mejoras_section(upgrades, cpu_obsolescence=None):
 
     # Skip only when there is neither hardware upgrade data nor a CPU result.
     # cpu_obsolescence is always shown (including manual-review results).
-    _has_cpu = bool(cpu_obsolescence and
-                    (cpu_obsolescence.get('label') or cpu_obsolescence.get('reason')))
+    _has_cpu = bool(
+        cpu_obsolescence
+        and (cpu_obsolescence.get("label") or cpu_obsolescence.get("reason"))
+    )
     if not upgrades and not _has_cpu:
-        return ''
+        return ""
 
-    recommendations = upgrades.get('recommendations', [])
-    ram_info = upgrades.get('ram', {})
-    storage_info = upgrades.get('storage', {})
-    expansion_info = upgrades.get('expansion', {})
+    recommendations = upgrades.get("recommendations", [])
+    ram_info = upgrades.get("ram", {})
+    storage_info = upgrades.get("storage", {})
+    expansion_info = upgrades.get("expansion", {})
 
-    items_html = ''
+    items_html = ""
 
     # RAM details
-    if ram_info.get('empty_slots', 0) > 0:
-        items_html += f'''
+    if ram_info.get("empty_slots", 0) > 0:
+        items_html += f"""
         <div class="mejora-item">
             <span class="tag">RAM</span>
             <strong>Slots disponibles:</strong> {ram_info.get('empty_slots', 0)} de
             {ram_info.get('total_slots', 0)} total.
             Capacidad actual: {ram_info.get('current_capacity_gb', 0):.0f} GB /
             M&aacute;ximo soportado: {ram_info.get('max_capacity_gb', 0)} GB.
-        </div>'''
+        </div>"""
         # Show installed modules
-        for mod in ram_info.get('modules', []):
-            cap = mod.get('CapacityGB', 0) or 0
-            mfr = mod.get('Manufacturer', 'N/A') or 'N/A'
-            speed = mod.get('ConfiguredClockSpeed', 0) or mod.get('Speed', 0) or 0
-            bank = mod.get('BankLabel', '') or mod.get('DeviceLocator', '') or ''
-            items_html += f'''
+        for mod in ram_info.get("modules", []):
+            cap = mod.get("CapacityGB", 0) or 0
+            mfr = mod.get("Manufacturer", "N/A") or "N/A"
+            speed = mod.get("ConfiguredClockSpeed", 0) or mod.get("Speed", 0) or 0
+            bank = mod.get("BankLabel", "") or mod.get("DeviceLocator", "") or ""
+            items_html += f"""
             <div class="mejora-item" style="padding-left:30px;font-size:10px;">
                 Slot {he(str(bank))}: {cap:.0f} GB - {he(str(mfr).strip())} @ {speed} MHz
-            </div>'''
-    elif ram_info.get('total_slots', 0) > 0:
-        items_html += f'''
+            </div>"""
+    elif ram_info.get("total_slots", 0) > 0:
+        items_html += f"""
         <div class="mejora-item">
             <span class="tag">RAM</span>
             Todos los slots ocupados ({ram_info.get('occupied_slots', 0)} de
             {ram_info.get('total_slots', 0)}).
             Capacidad actual: {ram_info.get('current_capacity_gb', 0):.0f} GB.
             {'Se pueden reemplazar m&oacute;dulos por unos de mayor capacidad.' if ram_info.get('current_capacity_gb', 0) < ram_info.get('max_capacity_gb', 0) else 'Capacidad m&aacute;xima alcanzada.'}
-        </div>'''
+        </div>"""
 
     # Storage details
-    if storage_info.get('has_hdd', False):
-        items_html += '''
+    if storage_info.get("has_hdd", False):
+        items_html += """
         <div class="mejora-item">
             <span class="tag storage">HDD</span>
             <strong>Disco mec&aacute;nico detectado.</strong>
             Se recomienda actualizar a SSD/NVMe para mejorar rendimiento.
-        </div>'''
+        </div>"""
 
-    for disk in storage_info.get('disks', []):
-        name = disk.get('FriendlyName', 'N/A') or 'N/A'
-        media = disk.get('MediaType', 'N/A') or 'N/A'
-        bus = disk.get('BusType', '') or ''
-        size = disk.get('SizeGB', 0) or 0
-        health = disk.get('HealthStatus', 'N/A') or 'N/A'
-        items_html += f'''
+    for disk in storage_info.get("disks", []):
+        name = disk.get("FriendlyName", "N/A") or "N/A"
+        media = disk.get("MediaType", "N/A") or "N/A"
+        bus = disk.get("BusType", "") or ""
+        size = disk.get("SizeGB", 0) or 0
+        health = disk.get("HealthStatus", "N/A") or "N/A"
+        items_html += f"""
         <div class="mejora-item" style="padding-left:30px;font-size:10px;">
             {he(str(name))} - {size:.0f} GB - Tipo: {he(str(media))}
             {f'({he(str(bus))})' if bus else ''} - Salud: {he(str(health))}
-        </div>'''
+        </div>"""
 
     # NVMe/M.2 expansion
-    if expansion_info.get('m2_slots_available', 0) > 0:
-        items_html += f'''
+    if expansion_info.get("m2_slots_available", 0) > 0:
+        items_html += f"""
         <div class="mejora-item">
             <span class="tag nvme">M.2</span>
             <strong>{expansion_info.get('m2_slots_available', 0)} slot(s) M.2 disponible(s)</strong>
             de {expansion_info.get('m2_slots_total', 0)} total.
             Se puede instalar almacenamiento NVMe adicional.
-        </div>'''
-    elif expansion_info.get('m2_slots_total', 0) == 0 and not storage_info.get('has_nvme', False):
-        items_html += '''
+        </div>"""
+    elif expansion_info.get("m2_slots_total", 0) == 0 and not storage_info.get(
+        "has_nvme", False
+    ):
+        items_html += """
         <div class="mejora-item">
             <span class="tag nvme">M.2</span>
             No se detectaron slots M.2/NVMe disponibles.
-        </div>'''
+        </div>"""
 
     # General recommendations
     for rec in recommendations:
         if rec not in items_html:  # Avoid duplicates
-            items_html += f'''
+            items_html += f"""
             <div class="mejora-item">
                 &#9679; {he(rec)}
-            </div>'''
+            </div>"""
 
     # CPU obsolescence block — rendered for all results, including manual review
     if _has_cpu:
         obs = cpu_obsolescence
-        reason_text = obs.get('reason', '')
-        if obs.get('obsolete') is True:
-            tag_class = 'obsolete'
-            msg = (f'<strong>Candidato a renovaci\u00f3n:</strong> '
-                   f'{he(obs.get("label", ""))} \u2014 {he(reason_text)}')
-        elif obs.get('obsolete') is False:
-            tag_class = ''
+        reason_text = obs.get("reason", "")
+        if obs.get("obsolete") is True:
+            tag_class = "obsolete"
+            msg = (
+                f"<strong>Candidato a renovaci\u00f3n:</strong> "
+                f'{he(obs.get("label", ""))} \u2014 {he(reason_text)}'
+            )
+        elif obs.get("obsolete") is False:
+            tag_class = ""
             msg = f'{he(obs.get("label", ""))} \u2014 {he(reason_text)}'
         else:
-            tag_class = 'manual'
-            lbl = obs.get('label', '')
-            msg = he(lbl) + (f' \u2014 {he(reason_text)}' if reason_text else '')
+            tag_class = "manual"
+            lbl = obs.get("label", "")
+            msg = he(lbl) + (f" \u2014 {he(reason_text)}" if reason_text else "")
 
-        items_html += f'''
+        items_html += f"""
         <div class="mejora-item">
             <span class="tag cpu {tag_class}">CPU</span>
             {msg}
-        </div>'''
+        </div>"""
 
     if not items_html:
-        items_html = '''
+        items_html = """
         <div class="mejora-item">
             No se detectaron oportunidades de mejora de hardware.
             El equipo est&aacute; en su capacidad &oacute;ptima.
-        </div>'''
+        </div>"""
 
-    return f'''
+    return f"""
     <div class="mejoras-section">
         <h3>MEJORAS DE HARDWARE DETECTADAS</h3>
         {items_html}
-    </div>'''
+    </div>"""
 
 
 def generate_full_report(session_data):
@@ -1450,53 +1502,300 @@ def generate_full_report(session_data):
     Returns a summary of all report generation attempts.
     """
     from routes.maintenance import _collect_system_info
+
     system_info = _collect_system_info()
-    steps = session_data.get('steps', [])
+    steps = session_data.get("steps", [])
 
     # Attach full inventory snapshot to system_info for report sections.
     # Collected independently — a failure here does not abort report generation.
     try:
         from services.system_inventory import collect_inventory
-        system_info['inventory'] = collect_inventory()
+
+        system_info["inventory"] = collect_inventory()
     except Exception as e:
         logger.warning(f"Inventory collection failed during report generation: {e}")
-        system_info['inventory'] = {}
+        system_info["inventory"] = {}
 
     results = {}
 
     # 1. HTML report
     html = generate_html_report(system_info, steps, session_data)
     local_path = save_report_locally(html, system_info)
-    results['html_local'] = (
-        {'status': 'success', 'path': local_path} if local_path
-        else {'status': 'error'}
+    results["html_local"] = (
+        {"status": "success", "path": local_path} if local_path else {"status": "error"}
     )
 
     # 2. Network share
-    results['network_share'] = save_to_network_share(html, system_info)
+    results["network_share"] = save_to_network_share(html, system_info)
 
     # 3. Google Sheets
-    results['google_sheets'] = update_google_sheets(system_info, steps)
+    results["google_sheets"] = update_google_sheets(system_info, steps)
 
     # 4. RADEC Excel form
-    results['excel_form'] = generate_radec_excel(system_info, steps)
+    results["excel_form"] = generate_radec_excel(system_info, steps)
 
     # 5. FO-TI-19 HTML (Hoja de Servicio)
     try:
-        fo_ti_19_html = generate_fo_ti_19_html(
-            system_info, steps, session_data
-        )
-        hostname = system_info.get('hostname', 'UNKNOWN')
-        date_str = datetime.now().strftime('%Y-%m-%d')
-        filename = f'FO-TI-19_{hostname}_{date_str}.html'
+        fo_ti_19_html = generate_fo_ti_19_html(system_info, steps, session_data)
+        hostname = system_info.get("hostname", "UNKNOWN")
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        filename = f"FO-TI-19_{hostname}_{date_str}.html"
         filepath = os.path.join(Config.REPORT_DIR, filename)
         os.makedirs(Config.REPORT_DIR, exist_ok=True)
-        with open(filepath, 'w', encoding='utf-8') as f:
+        with open(filepath, "w", encoding="utf-8") as f:
             f.write(fo_ti_19_html)
-        results['fo_ti_19'] = {'status': 'success', 'path': filepath}
+        results["fo_ti_19"] = {"status": "success", "path": filepath}
         logger.info(f"FO-TI-19 HTML saved: {filepath}")
     except Exception as e:
         logger.error(f"FO-TI-19 generation failed: {e}")
-        results['fo_ti_19'] = {'status': 'error', 'error': str(e)}
+        results["fo_ti_19"] = {"status": "error", "error": str(e)}
 
     return results
+
+
+# ============================================================
+# T-04 — Export histórico consolidado a Excel
+# ============================================================
+
+
+def export_history_to_xlsx(
+    date_from=None, date_to=None, hostname=None, output_path=None
+):
+    """Genera un .xlsx con el histórico consolidado de mantenimientos.
+
+    Lee 5 tablas de SQLite y produce un libro con 5 hojas:
+    - Sessions: una fila por sesión registrada.
+    - Maintenance Steps: filas de audit_log filtradas por module='maintenance'.
+    - Jobs: acciones gobernadas (jobs table).
+    - Snapshots: snapshots before/after asociados a jobs.
+    - ScheduledRestarts: operaciones de tarea programada (T-02).
+
+    Filtros opcionales:
+    - date_from / date_to: 'YYYY-MM-DD' (incluido). Aplica al timestamp
+      principal de cada tabla. Si None, sin límite.
+    - hostname: filtra Sessions/Maintenance Steps/Jobs por hostname exacto.
+      Snapshots y ScheduledRestarts no tienen columna hostname directa y
+      se mantienen sin filtrar.
+
+    output_path: si None, guarda en
+    Config.REPORT_DIR/historico_mantenimientos_<YYYYMMDD_HHMMSS>.xlsx.
+
+    Returns: dict {status, path, filename, rows, error?}.
+    """
+    try:
+        from openpyxl import Workbook
+    except ImportError:
+        return {
+            "status": "error",
+            "error": "openpyxl no está instalado. Agréguelo a requirements.txt.",
+        }
+
+    from core.persistence import get_db
+
+    # Normaliza filtros a timestamps ISO comparables con strings en SQLite.
+    df_from = (date_from or "").strip() or None
+    df_to_inclusive = None
+    if (date_to or "").strip():
+        df_to_inclusive = f"{date_to.strip()}T23:59:59"
+    host_filter = (hostname or "").strip() or None
+
+    def _apply_filters(base_sql, ts_col, with_hostname=True):
+        """Construye WHERE clause + params. base_sql debe terminar sin
+        WHERE; esta función agrega ' WHERE ... AND ... ' según filtros."""
+        clauses = []
+        params = []
+        if df_from:
+            clauses.append(f"{ts_col} >= ?")
+            params.append(df_from)
+        if df_to_inclusive:
+            clauses.append(f"{ts_col} <= ?")
+            params.append(df_to_inclusive)
+        if host_filter and with_hostname:
+            clauses.append("hostname = ?")
+            params.append(host_filter)
+        if clauses:
+            sep = " AND " if " WHERE " in base_sql else " WHERE "
+            return base_sql + sep + " AND ".join(clauses), params
+        return base_sql, params
+
+    wb = Workbook()
+    rows_count = {}
+
+    try:
+        with get_db() as conn:
+            # --- Sheet 1: Sessions ---
+            ws = wb.active
+            ws.title = "Sessions"
+            ws.append(
+                [
+                    "session_id",
+                    "started_at",
+                    "ended_at",
+                    "hostname",
+                    "username",
+                    "is_admin",
+                    "os_info",
+                    "app_version",
+                ]
+            )
+            sql = (
+                "SELECT session_id, started_at, ended_at, hostname, username, "
+                "is_admin, os_info, app_version FROM sessions"
+            )
+            sql, params = _apply_filters(sql, "started_at")
+            sql += " ORDER BY started_at DESC"
+            rows = conn.execute(sql, params).fetchall()
+            for r in rows:
+                ws.append(list(r))
+            rows_count["sessions"] = len(rows)
+
+            # --- Sheet 2: Maintenance Steps (audit_log, module='maintenance') ---
+            ws2 = wb.create_sheet("Maintenance Steps")
+            ws2.append(
+                [
+                    "timestamp",
+                    "session_id",
+                    "job_id",
+                    "action",
+                    "action_id",
+                    "status",
+                    "duration_ms",
+                    "hostname",
+                    "username",
+                    "stdout_preview",
+                    "details_json",
+                ]
+            )
+            sql = (
+                "SELECT timestamp, session_id, job_id, action, action_id, "
+                "status, duration_ms, hostname, username, stdout_preview, "
+                "details_json FROM audit_log WHERE module = 'maintenance'"
+            )
+            sql, params = _apply_filters(sql, "timestamp")
+            sql += " ORDER BY timestamp DESC"
+            rows = conn.execute(sql, params).fetchall()
+            for r in rows:
+                ws2.append(list(r))
+            rows_count["maintenance_steps"] = len(rows)
+
+            # --- Sheet 3: Jobs ---
+            ws3 = wb.create_sheet("Jobs")
+            ws3.append(
+                [
+                    "job_id",
+                    "session_id",
+                    "action_id",
+                    "action_name",
+                    "module",
+                    "risk_class",
+                    "status",
+                    "queued_at",
+                    "started_at",
+                    "completed_at",
+                    "duration_ms",
+                    "hostname",
+                    "username",
+                    "return_code",
+                    "error_message",
+                ]
+            )
+            sql = (
+                "SELECT job_id, session_id, action_id, action_name, module, "
+                "risk_class, status, queued_at, started_at, completed_at, "
+                "duration_ms, hostname, username, return_code, error_message "
+                "FROM jobs"
+            )
+            sql, params = _apply_filters(sql, "queued_at")
+            sql += " ORDER BY queued_at DESC"
+            rows = conn.execute(sql, params).fetchall()
+            for r in rows:
+                ws3.append(list(r))
+            rows_count["jobs"] = len(rows)
+
+            # --- Sheet 4: Snapshots (sin filtro hostname directo) ---
+            ws4 = wb.create_sheet("Snapshots")
+            ws4.append(
+                [
+                    "id",
+                    "job_id",
+                    "session_id",
+                    "action_id",
+                    "snapshot_type",
+                    "captured_at",
+                    "data_json",
+                ]
+            )
+            sql = (
+                "SELECT id, job_id, session_id, action_id, snapshot_type, "
+                "captured_at, data_json FROM snapshots"
+            )
+            sql, params = _apply_filters(sql, "captured_at", with_hostname=False)
+            sql += " ORDER BY captured_at DESC"
+            rows = conn.execute(sql, params).fetchall()
+            for r in rows:
+                row = list(r)
+                # Truncate data_json para que el xlsx no se vuelva impráctico.
+                if row[6] and len(str(row[6])) > 1000:
+                    row[6] = str(row[6])[:1000] + "... (truncated)"
+                ws4.append(row)
+            rows_count["snapshots"] = len(rows)
+
+            # --- Sheet 5: ScheduledRestarts (T-02, sin hostname directo) ---
+            ws5 = wb.create_sheet("ScheduledRestarts")
+            ws5.append(
+                [
+                    "id",
+                    "timestamp",
+                    "operation",
+                    "scheduled_at",
+                    "recurrence",
+                    "grace_period",
+                    "force",
+                    "success",
+                    "error",
+                    "session_id",
+                    "username",
+                ]
+            )
+            sql = (
+                "SELECT id, timestamp, operation, scheduled_at, recurrence, "
+                "grace_period, force, success, error, session_id, username "
+                "FROM scheduled_restarts"
+            )
+            sql, params = _apply_filters(sql, "timestamp", with_hostname=False)
+            sql += " ORDER BY timestamp DESC"
+            rows = conn.execute(sql, params).fetchall()
+            for r in rows:
+                ws5.append(list(r))
+            rows_count["scheduled_restarts"] = len(rows)
+    except Exception as e:
+        logger.error(f"export_history_to_xlsx DB query failed: {e}")
+        return {"status": "error", "error": f"Error leyendo DB: {e}"}
+
+    if output_path is None:
+        date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_path = os.path.join(
+            Config.REPORT_DIR, f"historico_mantenimientos_{date_str}.xlsx"
+        )
+
+    try:
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        wb.save(output_path)
+    except OSError as e:
+        logger.error(f"export_history_to_xlsx save failed: {e}")
+        return {"status": "error", "error": f"No se pudo guardar el archivo: {e}"}
+
+    logger.info(
+        f"Historico xlsx generado: {output_path} "
+        f"(sessions={rows_count['sessions']}, "
+        f"steps={rows_count['maintenance_steps']}, jobs={rows_count['jobs']}, "
+        f"snapshots={rows_count['snapshots']}, "
+        f"scheduled_restarts={rows_count['scheduled_restarts']})"
+    )
+
+    return {
+        "status": "success",
+        "path": output_path,
+        "filename": os.path.basename(output_path),
+        "rows": rows_count,
+    }
