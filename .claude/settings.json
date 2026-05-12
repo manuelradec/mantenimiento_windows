@@ -113,7 +113,12 @@
       "Bash(./venv/Scripts/python.exe -m pytest tests/test_governance.py::TestPersistenceExtended::test_snapshot_persistence -v)",
       "Bash(./venv/Scripts/python.exe -m pytest tests/ --tb=line)",
       "Bash(./venv/Scripts/python.exe -m pyflakes legacy_tkinter_main.py)",
-      "Bash(./venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('legacy_tkinter_main.py', encoding='utf-8'\\).read\\(\\)\\); print\\('SYNTAX OK'\\)\")"
+      "Bash(./venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('legacy_tkinter_main.py', encoding='utf-8'\\).read\\(\\)\\); print\\('SYNTAX OK'\\)\")",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git fetch *)",
+      "Bash(git ls-tree *)",
+      "Bash(gh pr *)"
     ],
     "deny": [
       "Bash(rm -rf:*)",
