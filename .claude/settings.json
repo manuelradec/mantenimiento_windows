@@ -114,7 +114,9 @@
       "Bash(./venv/Scripts/python.exe -m pytest tests/ --tb=line)",
       "Bash(./venv/Scripts/python.exe -m pyflakes legacy_tkinter_main.py)",
       "Bash(./venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('legacy_tkinter_main.py', encoding='utf-8'\\).read\\(\\)\\); print\\('SYNTAX OK'\\)\")",
-      "Bash(gh pr create --base main --title 'feat: cierre backlog v3.0.0 \\(T-01..T-05\\) + dev isolation fix' --body ' *)"
+      "Bash(gh pr create --base main --title 'feat: cierre backlog v3.0.0 \\(T-01..T-05\\) + dev isolation fix' --body ' *)",
+      "Bash(rm \"d:/MANUEL SEDANO LUNA/Desarrollos/MANTENIMIENTO/mantenimiento_windows/pytest_race_fix.log\" \"d:/MANUEL SEDANO LUNA/Desarrollos/MANTENIMIENTO/mantenimiento_windows/pytest_race_full.log\" 2>&1; cd \"d:/MANUEL SEDANO LUNA/Desarrollos/MANTENIMIENTO/mantenimiento_windows\" && git status --short)",
+      "Bash(git commit -m ' *)"
     ],
     "deny": [
       "Bash(rm -rf:*)",
