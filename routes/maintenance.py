@@ -326,13 +326,18 @@ def _run_maintenance(session_id):
         step_info["elapsed"] = round(time.time() - start_time, 1)
         step_info["completed_at"] = datetime.now().isoformat()
 
+    # Audit trail PRIMERO, luego marcar la sesión completed. Si invertimos
+    # el orden, hay race condition: cualquier consumidor que polleara
+    # `status == 'completed'` podría leer audit_log antes de que esta
+    # función termine de insertar las filas. Pasaba localmente por suerte
+    # de scheduler; CI (test_audit_entry_per_step) lo expuso.
+    # NO generamos reporte HTML para single-step (decisión Duda 5 = b);
+    # solo entrada en audit_log + JSONL.
+    _persist_session_audit(session)
+
     session["status"] = "completed"
     session["completed_at"] = datetime.now().isoformat()
     logger.info(f"Maintenance session {session_id} completed")
-
-    # Audit trail por cada paso ejecutado. NO generamos reporte HTML para
-    # single-step (decisión Duda 5 = b); solo entrada en audit_log + JSONL.
-    _persist_session_audit(session)
 
 
 def _persist_session_audit(session: dict):
