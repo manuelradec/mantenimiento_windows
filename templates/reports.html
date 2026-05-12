@@ -23,7 +23,7 @@
 
         <!-- ── MAINTENANCE TYPE ─────────────────────────────── -->
         <div style="margin-bottom:18px;">
-            <label class="field-label">Tipo de mantenimiento <span style="color:var(--brand-red);">*</span></label>
+            <label for="input-maint-type" class="field-label">Tipo de mantenimiento <span style="color:var(--brand-red);">*</span></label>
             <select id="input-maint-type" class="field-input" style="max-width:280px;" required>
                 <option value="preventivo" selected>Mantenimiento preventivo</option>
                 <option value="correctivo">Mantenimiento correctivo</option>
@@ -593,6 +593,7 @@ async function loadDriveOverrides() {
                     ${sizeGB ? `<span style="opacity:0.6;font-size:11px;margin-left:6px;">${sizeGB}</span>` : ''}
                 </div>
                 <select class="field-input drive-type-select" data-disk-index="${i}"
+                        aria-label="Tipo de unidad para ${escapeHtml(name)}"
                         style="font-size:12px;padding:5px 8px;">
                     <option value="SSD"     ${detected === 'SSD'      ? 'selected' : ''}>SSD</option>
                     <option value="HDD"     ${detected === 'HDD'      ? 'selected' : ''}>HDD</option>
