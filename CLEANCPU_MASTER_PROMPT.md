@@ -1,8 +1,8 @@
 # CleanCPU v3.0.0 — Master Prompt / Estado del Proyecto
 
-> Última actualización: 2026-05-05
+> Última actualización: 2026-05-06
 > Versión actual: 3.0.0
-> Estado general: T-01, T-02, T-03 y T-05 cerradas. Listo para T-04 o nueva tarea.
+> Estado general: T-01, T-02, T-03, T-04 y T-05 cerradas. Backlog v3.0.0 completo.
 
 ---
 
@@ -53,11 +53,14 @@ _Vacío. T-01 y T-05 cerradas. Próximo: ver sección 5._
 - **Tests** (`tests/test_maintenance.py`, 16): estructura de pasos, endpoint `/api/steps`, single-step (400 inválido + 409 lockeo + happy path), handlers paso 6 y 7, `clean_disk_extras`, audit trail end-to-end.
 - **Suite**: 263 pass → **279 pass / 0 fail** (+16 collected, 2 skipped).
 
-### [ ] T-04 — Reportes a Google Sheets / Excel
-- **Origen**: pendiente del backlog v3.0.0
-- **Criterio de aceptación**: exportación del histórico de mantenimientos a Sheets (vía API) y a `.xlsx` local
-- **Archivos**: `services/reports.py` (nuevo)
-- **Notas**: para Sheets, decidir si usamos Service Account o OAuth — pendiente
+### [x] T-04 — Reportes a Google Sheets / Excel — CERRADA 2026-05-06
+- **Resolución**: la mayor parte ya existía. `services/maintenance_report.py:update_google_sheets()` usa gspread + Service Account (decisión OAuth resuelta a favor de Service Account; lee `credentials/service_account.json`) y agrega 1 fila al sheet `1i1v67mXuVA5Aqo2slYkrhLi_fDeUb95q` en cada `generate_full_report()` — el histórico Sheets se acumula natural. `generate_radec_excel()` ya genera FO-TI-19 por sesión con openpyxl.
+- **Gap real cerrado (commit `ae06499`)**: export del histórico consolidado a `.xlsx` local. Nueva `export_history_to_xlsx(date_from, date_to, hostname, output_path)` que lee SQLite y produce libro con 5 hojas — Sessions, Maintenance Steps (audit_log con `module='maintenance'`), Jobs, Snapshots (con `data_json` truncado a 1000 chars), ScheduledRestarts (T-02). Filtros opcionales: rango fechas inclusivo + hostname exacto. Sale a `Config.REPORT_DIR/historico_mantenimientos_<YYYYMMDD_HHMMSS>.xlsx`.
+- **Endpoint** (`routes/reports.py`): `GET /reports/api/download/historico-xlsx` con query params `date_from`, `date_to`, `hostname`. Una sola request — genera + stream con `Content-Disposition: attachment` y mimetype xlsx. Read-only de DB, sin governance.
+- **UI** (`templates/reports.html`): tarjeta nueva con 3 inputs (fecha desde/hasta, hostname opcional) y botón "Descargar histórico (.xlsx)". Handler JS `downloadHistorico()` arma `URLSearchParams` y dispara `window.location.href` para descarga directa.
+- **Tests** (`tests/test_reports.py`, nuevo): 8 tests cubriendo empty DB (5 hojas con headers), seeded data (counts + ruido filtrado por module), filtros hostname/date, endpoint smoke + Content-Disposition.
+- **Suite**: 279 → **287 pass / 0 fail** (+8 tests).
+- **No tocado**: `update_google_sheets` (ya funciona), `services/reports.py` (es log-manager por sesión, no históricos), template FO-TI-19.
 
 ### [x] T-05 — Tests automatizados base — CERRADA 2026-05-05
 - **Resolución**: dos sub-objetivos resueltos.
@@ -117,18 +120,20 @@ Pendientes (no bloqueantes):
 
 ## 5. Próximo paso concreto
 
-Opciones del backlog (T-01, T-02, T-03 y T-05 cerradas):
-- **T-04**: reportes a Google Sheets / Excel. Pendiente decisión Service Account vs OAuth.
+**Backlog v3.0.0 completo.** Todas las tareas (T-01 a T-05) cerradas.
 
-Posibles iteraciones futuras sobre T-03 (no bloqueantes, registradas para no perderlas):
-- Recomendaciones interactivas **per-step** con pause-and-wait en backend (hoy es post-completion aggregate). Requiere `threading.Event` por step y endpoint `/api/recommendation-decision`. Si el técnico necesita aprobar paso a paso, abrir como T-06.
-- Más handlers en `RECOMMENDATION_HANDLERS` (hoy solo "reinicio pendiente" y "updates urgente"). Cada nueva recomendación detectada en findings/recommended_actions puede ganar un handler.
-- Dashboard widget hoy es read-only del catálogo; podría mostrar también el estado de la última corrida si se persiste sesión completa en SQLite (hoy es in-memory).
+Posibles tareas nuevas (no en backlog, candidatas si surgen necesidades):
+- **Recomendaciones interactivas per-step** (originalmente discutido en T-03): pause-and-wait en backend con `threading.Event` por step + endpoint `/api/recommendation-decision`. Hoy es post-completion aggregate. Abrir como T-06 si el técnico necesita aprobar paso a paso.
+- **Más handlers en `RECOMMENDATION_HANDLERS`**: hoy solo "reinicio pendiente" y "updates urgente". Cada nueva recomendación detectada en findings/recommended_actions puede ganar un handler.
+- **Dashboard widget con estado de última corrida**: hoy es read-only del catálogo. Podría mostrar el estado real de la última corrida si se persiste sesión completa de mantenimiento en SQLite (hoy es in-memory en `routes/maintenance.py:_sessions`).
+- **Resync de Google Sheets desde SQLite**: endpoint idempotente para rehidratar el sheet si se borra accidentalmente (descartado en D4 de T-04 como fuera de scope).
+- **Histórico Excel: filtros adicionales**: por status (solo `failed`), por step_id, por sucursal. Hoy solo date + hostname.
 
 ---
 
 ## 6. Histórico (resumen, no detalle)
 
+- **2026-05-06**: T-04 cerrada. Google Sheets ya funcionaba (Service Account + gspread, fila por sesión vía `generate_full_report`); el gap real era export consolidado a `.xlsx` local. Implementada `export_history_to_xlsx()` con 5 hojas (Sessions, Maintenance Steps, Jobs, Snapshots, ScheduledRestarts), filtros opcionales date/hostname. Endpoint `GET /reports/api/download/historico-xlsx` genera + stream en una sola request. UI nueva con 3 inputs. 8 tests. Suite: 279 → **287 pass / 0 fail**. Backlog v3.0.0 completo. Commit `ae06499`.
 - **2026-05-05 (cont. 4)**: T-03 cerrada con scope expandido. Pasos rebalanceados de 9 a 8 (paso 5 `temp_cleanup` eliminado por redundancia con paso 2; paso 7 `sfc` repurposed a `dism_restorehealth` por redundancia con paso 3; paso 6 reescrito con PowerShell `clean_disk_extras` reemplazando `cleanmgr` que daba timeout 300s). Single-step endpoint con lockeo 409 + botón ▶ por step. Audit trail por paso en `audit_log` via `_capture_flask_context` + `_persist_session_audit`. UI: detalles completos (no truncados) + dialog post-completion con countdown 30s + checkbox auto-aplicar (sessionStorage). Dashboard widget read-only con 8 pasos. 16 tests nuevos en `tests/test_maintenance.py`. Suite: 263 → **279 pass / 0 fail**. Commit `ea26a67`.
 - **2026-05-05 (cont. 3)**: T-02 cerrada. `routes/scheduled_restart.py` ya existía con UI funcional vía schtasks; faltaban los 3 gaps vs criterio backlog: governance, persistencia SQLite (audit trail), separación rutas/servicio. Resueltos en commit `9f26899`: lógica PowerShell movida a `services/scheduled_restart.py`, rutas mutantes pasan por `execute_governed_action` con acciones `DISRUPTIVE` registradas, tabla `scheduled_restarts` + `ScheduledRestartStore` para auditoría, 23 tests nuevos. Suite: 240 → **263 pass / 0 fail**.
 - **2026-05-05 (cont. 2)**: T-05 cerrado completo. Smoke tests añadidos para 7 blueprints sin cobertura (logs, maintenance, office, scheduled-restart, sharing, startup, windows-features). Suite final: **240 pass / 0 fail** (242 collected, 2 skipped). Commit `558986f`.
