@@ -4,7 +4,7 @@ Herramienta profesional de mantenimiento lógico para Windows 10/11.
 Aplicación web local basada en Flask con arquitectura de gobernanza completa,
 empaquetable como `.exe` para distribución interna en sucursales RADEC.
 
-> **Tema oscuro corporativo RADEC** | **Interfaz 100% en español (LATAM)** | **204 tests automatizados**
+> **Tema oscuro corporativo RADEC** | **Interfaz 100% en español (LATAM)** | **287 tests automatizados**
 
 ---
 
@@ -42,7 +42,7 @@ y genera reportes profesionales con el formato oficial RADEC.
 | **Energía** | Planes de energía, reporte de batería, hibernación, contadores de procesador |
 | **Controladores** | Listar drivers, dispositivos con problemas, drivers de terceros, drivers de video, errores en Event Log |
 | **Seguridad** | Estado de Defender, escaneo rápido/completo, actualizar firmas, Smart App Control, detección de antivirus de terceros |
-| **Mantenimiento Lógico** | Secuencia automatizada de 9 pasos: MalwareBytes, CCleaner, ASC, Defrag, Temp, cleanmgr, SFC, Windows Update, Lenovo Update |
+| **Mantenimiento Lógico** | Secuencia automatizada de 8 pasos (ejecutables completos o uno a uno desde el dashboard): Auditoría de seguridad, Limpieza interna, Salud del sistema (DISM CheckHealth + SFC), Desfragmentación, Limpieza extendida de disco, Reparación profunda (DISM RestoreHealth), Windows Update, Lenovo Update. Audit trail por paso en SQLite + diálogo de recomendaciones post-ejecución con countdown 30s. |
 | **Reinicio Programado** | Programar reinicio único o recurrente (Una vez, Diario, Semanal, Mensual) vía Tareas Programadas de Windows |
 | **Reportes RADEC** | Generación de **FO-TI-19** (Hoja de Servicio) y **FO-TI-20** (Bitácora) en HTML imprimible |
 | **Registros** | Visor en tiempo real del log rotativo con filtros por nivel y búsqueda |
@@ -139,7 +139,7 @@ pip install -r requirements-dev.txt      # + dependencias de desarrollo (tests, 
 python -m pytest tests/ -v
 ```
 
-Deberías ver **204 tests passed** al final.
+Deberías ver **287 tests passed** al final.
 
 ---
 
@@ -188,7 +188,7 @@ python server.py --help             # Ver todas las opciones
 ### Ejecutar tests y verificar calidad de código
 
 ```bash
-python -m pytest tests/ -v                                # Tests (204 tests)
+python -m pytest tests/ -v                                # Tests (287 tests)
 python -m pytest tests/ -v --cov=core --cov=services      # Tests + cobertura
 flake8 core/ services/ routes/ app.py config.py           # Linting
 mypy core/                                                 # Type checking
@@ -558,7 +558,7 @@ mantenimiento_windows/
 │   ├── advanced.py                 # 1 endpoint gobernado
 │   ├── drivers.py                  # Solo lectura
 │   ├── reports.py                  # Exports: HTML/TXT/JSON + FO-TI-19/20 + hardware upgrades
-│   ├── maintenance.py              # Mantenimiento Lógico (9 pasos secuenciales)
+│   ├── maintenance.py              # Mantenimiento Lógico (8 pasos secuenciales + single-step + audit)
 │   ├── scheduled_restart.py        # CRUD de Tareas Programadas de Windows
 │   └── logs.py                     # Visor en tiempo real del log rotativo
 │
@@ -566,7 +566,7 @@ mantenimiento_windows/
 │   ├── base.html                   # Layout con sidebar, search bar, job status bar
 │   ├── dashboard.html              # Panel principal
 │   ├── reports.html                # FO-TI-19/20 + escaneo de mejoras
-│   ├── maintenance.html            # UI del mantenimiento lógico 9-pasos
+│   ├── maintenance.html            # UI del mantenimiento lógico 8-pasos (con botón ▶ por paso)
 │   ├── scheduled_restart.html      # Form de programación de reinicio
 │   ├── logs.html                   # Visor de logs con filtros
 │   └── *.html                      # Una plantilla por sección
@@ -581,13 +581,17 @@ mantenimiento_windows/
 ├── templates_data/                 # Plantillas Excel para FO-TI-19 (opcional)
 │   └── .gitkeep
 │
-├── tests/                          # 204 tests
+├── tests/                          # 287 tests (240 hist. + 23 scheduled_restart + 16 maintenance + 8 reports)
+│   ├── conftest.py                 # Fixture autouse: aísla DB en tmp_path, resetea thread-local conn
 │   ├── test_routes.py              # Rutas, CSRF, Origin, Host, headers, endpoints gobernados
 │   ├── test_governance.py          # Comandos, sanitización, rollback, registry, policy, DB
 │   ├── test_policy_engine.py       # Policy engine, registry, persistence
 │   ├── test_hardening.py           # Seguridad y hardening
 │   ├── test_snapshots.py           # Snapshots before/after
-│   └── test_smart_app_control.py   # Smart App Control
+│   ├── test_smart_app_control.py   # Smart App Control
+│   ├── test_maintenance.py         # 8 pasos, single-step (400/409/happy), audit trail (T-03)
+│   ├── test_scheduled_restart.py   # Governance, audit trail SQLite, rollback (T-02)
+│   └── test_reports.py             # Export xlsx histórico, filtros date/hostname (T-04)
 │
 └── .github/workflows/ci.yml       # CI: flake8 + pytest + mypy (Python 3.10/3.11/3.12)
 ```
