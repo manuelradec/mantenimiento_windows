@@ -1,8 +1,8 @@
 # CleanCPU v3.0.0 — Master Prompt / Estado del Proyecto
 
-> Última actualización: 2026-05-06
-> Versión actual: 3.0.0
-> Estado general: T-01, T-02, T-03, T-04 y T-05 cerradas. Backlog v3.0.0 completo.
+> Última actualización: 2026-05-12
+> Versión actual: 3.0.0 — **RELEASE PUBLICADO** (tag `v3.0.0` en GitHub, asset `CleanCPU.exe` 18.1 MB)
+> Estado general: T-01, T-02, T-03, T-04 y T-05 cerradas. Backlog v3.0.0 completo. Rama paralela `claude/...architect-wQdME` archivada como `archive/claude-architect-pre-v3`. Fix de UI scheduled-restart (PR #27) incluido en el release.
 
 ---
 
@@ -133,6 +133,7 @@ Posibles tareas nuevas (no en backlog, candidatas si surgen necesidades):
 
 ## 6. Histórico (resumen, no detalle)
 
+- **2026-05-12**: **Release v3.0.0 publicado en GitHub** (tag `v3.0.0` sobre commit `cfe653e`, asset `CleanCPU.exe` 18.1 MB). Sesión de unificación de ramas + release. Hallazgos: (1) rama paralela `claude/windows-automation-architect-wQdME` solo tenía 2 commits útiles vs `origin/main` (rewrite del README + `actualizacion 2.1`); el resto eran archivos atrás de main porque PR #26 ya estaba mergeado. README rewrite incorporado vía cherry-pick + fix-up (`0f67b08` + `8f48348`: 9→8 pasos, 204→287 tests, alineación T-01..T-05). Allowlist expandido con 5 patrones (`2fb6705`). Rama renombrada a `archive/claude-architect-pre-v3` como histórico. (2) Validación manual del .exe detectó bug de UI en `/scheduled-restart/`: `apiPost` directo no manejaba `status=needs_confirmation` de governance (`scheduled_restart.create/.delete` son DISRUPTIVE + requires_confirmation desde T-02). Fix vía PR #27 (`cfe653e`): helper `attemptGoverned(url, payload)` en `templates/scheduled_restart.html` que registra el token vía `/api/policy/confirm` y reintenta — sin modal extra porque la UI ya tiene `confirm()` específicos. Suite: **288 pass / 2 skipped**.
 - **2026-05-06**: T-04 cerrada. Google Sheets ya funcionaba (Service Account + gspread, fila por sesión vía `generate_full_report`); el gap real era export consolidado a `.xlsx` local. Implementada `export_history_to_xlsx()` con 5 hojas (Sessions, Maintenance Steps, Jobs, Snapshots, ScheduledRestarts), filtros opcionales date/hostname. Endpoint `GET /reports/api/download/historico-xlsx` genera + stream en una sola request. UI nueva con 3 inputs. 8 tests. Suite: 279 → **287 pass / 0 fail**. Backlog v3.0.0 completo. Commit `ae06499`.
 - **2026-05-05 (cont. 4)**: T-03 cerrada con scope expandido. Pasos rebalanceados de 9 a 8 (paso 5 `temp_cleanup` eliminado por redundancia con paso 2; paso 7 `sfc` repurposed a `dism_restorehealth` por redundancia con paso 3; paso 6 reescrito con PowerShell `clean_disk_extras` reemplazando `cleanmgr` que daba timeout 300s). Single-step endpoint con lockeo 409 + botón ▶ por step. Audit trail por paso en `audit_log` via `_capture_flask_context` + `_persist_session_audit`. UI: detalles completos (no truncados) + dialog post-completion con countdown 30s + checkbox auto-aplicar (sessionStorage). Dashboard widget read-only con 8 pasos. 16 tests nuevos en `tests/test_maintenance.py`. Suite: 263 → **279 pass / 0 fail**. Commit `ea26a67`.
 - **2026-05-05 (cont. 3)**: T-02 cerrada. `routes/scheduled_restart.py` ya existía con UI funcional vía schtasks; faltaban los 3 gaps vs criterio backlog: governance, persistencia SQLite (audit trail), separación rutas/servicio. Resueltos en commit `9f26899`: lógica PowerShell movida a `services/scheduled_restart.py`, rutas mutantes pasan por `execute_governed_action` con acciones `DISRUPTIVE` registradas, tabla `scheduled_restarts` + `ScheduledRestartStore` para auditoría, 23 tests nuevos. Suite: 240 → **263 pass / 0 fail**.
