@@ -162,6 +162,50 @@
 
 <div class="card">
     <div class="card-header">
+        <h3>Utilidades avanzadas (Fase A)</h3>
+    </div>
+    <div class="card-body">
+
+        <div class="pa-block">
+            <h4 style="margin:0 0 6px 0;">Reparador de accesos directos rotos</h4>
+            <p style="margin:0 0 8px 0;opacity:.75;">Busca .lnk en Escritorio y Menú Inicio (usuario + sistema) cuyo destino ya no existe. Eliminar manda a la papelera.</p>
+            <button class="btn btn-sm btn-primary" onclick="paScanShortcuts()">Buscar accesos directos rotos</button>
+            <div id="pa-shortcuts-results" style="margin-top:10px;"></div>
+        </div>
+
+        <hr style="margin:18px 0;opacity:.3;">
+
+        <div class="pa-block">
+            <h4 style="margin:0 0 6px 0;">Buscador de carpetas vacías</h4>
+            <p style="margin:0 0 8px 0;opacity:.75;">Escanea una raíz del perfil de usuario. Excluye paths del sistema (AppData, Windows, Program Files, OneDrive, etc.).</p>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <label style="font-size:13px;">Raíz:</label>
+                <input id="pa-empty-root" type="text" placeholder="Vacío = perfil del usuario" class="form-input" style="flex:1;min-width:220px;">
+                <label style="font-size:13px;">Profundidad:</label>
+                <input id="pa-empty-depth" type="number" value="8" min="1" max="16" class="form-input" style="width:70px;" aria-label="Profundidad de escaneo" placeholder="8">
+                <button class="btn btn-sm btn-primary" onclick="paScanEmptyFolders()">Buscar</button>
+            </div>
+            <div id="pa-empty-results" style="margin-top:10px;"></div>
+        </div>
+
+        <hr style="margin:18px 0;opacity:.3;">
+
+        <div class="pa-block">
+            <h4 style="margin:0 0 6px 0;">Duplicados (con selección)</h4>
+            <p style="margin:0 0 8px 0;opacity:.75;">Escanea por archivos duplicados (hash SHA-256). Marque los que quiera mandar a la papelera.</p>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <label style="font-size:13px;">Directorio:</label>
+                <input id="pa-dup-dir" type="text" placeholder="Vacío = Descargas" class="form-input" style="flex:1;min-width:220px;">
+                <button class="btn btn-sm btn-primary" onclick="paScanDuplicates()">Buscar duplicados</button>
+            </div>
+            <div id="pa-dup-results" style="margin-top:10px;"></div>
+        </div>
+
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
         <h3>Salida</h3>
         <button class="btn btn-sm btn-outline" onclick="document.getElementById('output-console').innerHTML = ''">Limpiar</button>
     </div>
@@ -169,4 +213,173 @@
         <div id="output-console" class="console" style="min-height: 150px;">Listo. Haga clic en una acción para ver la salida aquí.</div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function paIsOk(data) {
+    if (!data) return false;
+    const s = data.status;
+    return s === 'success' || s === 'completed';
+}
+
+function paGetDetails(data) {
+    return (data && data.details && typeof data.details === 'object') ? data.details : {};
+}
+
+function paShowError(targetId, data) {
+    const msg = (data && (data.error || data.output)) || 'Error en la operación.';
+    document.getElementById(targetId).innerHTML =
+        `<div class="alert alert-danger">${escapeHtml(msg)}</div>`;
+}
+
+// === M1: Broken shortcuts ===
+async function paScanShortcuts() {
+    const out = document.getElementById('pa-shortcuts-results');
+    out.innerHTML = '<div style="opacity:.7;">Escaneando…</div>';
+    const data = await apiPost('/cleanup/api/shortcuts/scan', {});
+    if (!paIsOk(data)) { paShowError('pa-shortcuts-results', data); return; }
+    const d = paGetDetails(data);
+    const items = (d.broken || []);
+    if (!items.length) {
+        out.innerHTML = '<div class="alert alert-info">No se encontraron accesos directos rotos.</div>';
+        return;
+    }
+    let html = `<div style="margin-bottom:6px;">Encontrados <b>${items.length}</b> accesos directos rotos.</div>`;
+    html += '<table class="data-table" style="width:100%;font-size:12px;">';
+    html += '<thead><tr><th style="width:30px;"><input type="checkbox" onchange="paToggleAll(this,\'pa-sc-cb\')"></th><th>Ubicación</th><th>Nombre</th><th>Target faltante</th></tr></thead><tbody>';
+    items.forEach((it, i) => {
+        html += `<tr>
+            <td><input type="checkbox" class="pa-sc-cb" data-path="${escapeHtml(it.lnk_path || '')}"></td>
+            <td>${escapeHtml(it.location || '')}</td>
+            <td>${escapeHtml(it.lnk_name || '')}</td>
+            <td style="font-family:monospace;">${escapeHtml(it.target || '')}</td>
+        </tr>`;
+    });
+    html += '</tbody></table>';
+    html += '<div style="margin-top:10px;">';
+    html += '<button class="btn btn-sm btn-danger" onclick="paDeleteShortcuts()">Eliminar seleccionados (a la papelera)</button>';
+    html += '</div>';
+    out.innerHTML = html;
+}
+
+async function paDeleteShortcuts() {
+    const checked = document.querySelectorAll('.pa-sc-cb:checked');
+    if (!checked.length) { showToast && showToast('Seleccione al menos uno.', 'warning'); return; }
+    const paths = Array.from(checked).map(cb => cb.dataset.path).filter(Boolean);
+    if (!confirm(`¿Mandar ${paths.length} acceso(s) directo(s) a la papelera?`)) return;
+    const out = document.getElementById('pa-shortcuts-results');
+    out.innerHTML = '<div style="opacity:.7;">Eliminando…</div>';
+    const data = await apiPost('/cleanup/api/shortcuts/delete', { paths: paths });
+    if (!paIsOk(data)) { paShowError('pa-shortcuts-results', data); return; }
+    const d = paGetDetails(data);
+    showToast && showToast(data.output || `Eliminados ${d.deleted_count || 0}.`, 'success');
+    paScanShortcuts(); // re-scan to refresh
+}
+
+// === M2: Empty folders ===
+async function paScanEmptyFolders() {
+    const out = document.getElementById('pa-empty-results');
+    const root = document.getElementById('pa-empty-root').value.trim();
+    const depth = parseInt(document.getElementById('pa-empty-depth').value, 10) || 8;
+    out.innerHTML = '<div style="opacity:.7;">Escaneando…</div>';
+    const data = await apiPost('/cleanup/api/empty-folders/scan', { root: root, max_depth: depth });
+    if (!paIsOk(data)) { paShowError('pa-empty-results', data); return; }
+    const d = paGetDetails(data);
+    const items = (d.items || []);
+    if (!items.length) {
+        out.innerHTML = '<div class="alert alert-info">No se encontraron carpetas vacías.</div>';
+        return;
+    }
+    let html = `<div style="margin-bottom:6px;">Encontradas <b>${items.length}</b> carpeta(s) vacía(s) bajo <code>${escapeHtml(d.root || root)}</code>.</div>`;
+    html += '<table class="data-table" style="width:100%;font-size:12px;">';
+    html += '<thead><tr><th style="width:30px;"><input type="checkbox" onchange="paToggleAll(this,\'pa-ef-cb\')"></th><th>Carpeta</th></tr></thead><tbody>';
+    items.forEach(it => {
+        html += `<tr>
+            <td><input type="checkbox" class="pa-ef-cb" data-path="${escapeHtml(it.path || '')}"></td>
+            <td style="font-family:monospace;">${escapeHtml(it.path || '')}</td>
+        </tr>`;
+    });
+    html += '</tbody></table>';
+    html += '<div style="margin-top:10px;">';
+    html += '<button class="btn btn-sm btn-danger" onclick="paDeleteEmptyFolders()">Eliminar seleccionadas (a la papelera)</button>';
+    html += '</div>';
+    out.innerHTML = html;
+}
+
+async function paDeleteEmptyFolders() {
+    const checked = document.querySelectorAll('.pa-ef-cb:checked');
+    if (!checked.length) { showToast && showToast('Seleccione al menos una.', 'warning'); return; }
+    const paths = Array.from(checked).map(cb => cb.dataset.path).filter(Boolean);
+    if (!confirm(`¿Mandar ${paths.length} carpeta(s) vacía(s) a la papelera?`)) return;
+    const out = document.getElementById('pa-empty-results');
+    out.innerHTML = '<div style="opacity:.7;">Eliminando…</div>';
+    const data = await apiPost('/cleanup/api/empty-folders/delete', { paths: paths });
+    if (!paIsOk(data)) { paShowError('pa-empty-results', data); return; }
+    const d = paGetDetails(data);
+    showToast && showToast(data.output || `Eliminadas ${d.deleted_count || 0}.`, 'success');
+    paScanEmptyFolders();
+}
+
+// === M7: Duplicates with selection ===
+async function paScanDuplicates() {
+    const out = document.getElementById('pa-dup-results');
+    const dir = document.getElementById('pa-dup-dir').value.trim();
+    out.innerHTML = '<div style="opacity:.7;">Escaneando (puede tardar)…</div>';
+    const data = await apiPost('/cleanup/api/scan-duplicates', { directory: dir || null });
+    if (!paIsOk(data)) { paShowError('pa-dup-results', data); return; }
+    const d = paGetDetails(data);
+    const groups = d.duplicates || {};
+    const hashKeys = Object.keys(groups);
+    if (!hashKeys.length) {
+        out.innerHTML = `<div class="alert alert-info">No se encontraron duplicados en <code>${escapeHtml(d.directory || dir || 'Descargas')}</code>.</div>`;
+        return;
+    }
+    let html = `<div style="margin-bottom:6px;">Escaneados <b>${d.total_files || 0}</b> archivos. Encontrados <b>${d.duplicate_files || 0}</b> duplicados en <b>${d.duplicate_groups || hashKeys.length}</b> grupos.</div>`;
+    html += '<table class="data-table" style="width:100%;font-size:12px;">';
+    html += '<thead><tr><th style="width:30px;"></th><th>Archivo</th><th>Tamaño</th></tr></thead><tbody>';
+    hashKeys.forEach((h, gIdx) => {
+        const files = groups[h] || [];
+        if (files.length < 2) return;
+        html += `<tr style="background:rgba(255,255,255,0.04);"><td colspan="3" style="font-size:11px;opacity:.7;">Grupo ${gIdx + 1} — ${files.length} copias</td></tr>`;
+        files.forEach((f, i) => {
+            // Pre-check all but the first copy: typical "keep first, delete rest"
+            const checked = i > 0 ? 'checked' : '';
+            html += `<tr>
+                <td><input type="checkbox" class="pa-dup-cb" data-path="${escapeHtml(f.path || '')}" ${checked}></td>
+                <td style="font-family:monospace;">${escapeHtml(f.path || '')}</td>
+                <td>${(f.size || 0).toLocaleString()} B</td>
+            </tr>`;
+        });
+    });
+    html += '</tbody></table>';
+    html += '<div style="margin-top:10px;">';
+    html += '<button class="btn btn-sm btn-danger" onclick="paDeleteDuplicates()">Eliminar seleccionados (a la papelera)</button>';
+    html += '<span style="font-size:11px;opacity:.6;margin-left:8px;">Por defecto se marca todo menos la primera copia de cada grupo.</span>';
+    html += '</div>';
+    out.innerHTML = html;
+}
+
+async function paDeleteDuplicates() {
+    const checked = document.querySelectorAll('.pa-dup-cb:checked');
+    if (!checked.length) { showToast && showToast('Seleccione al menos uno.', 'warning'); return; }
+    const paths = Array.from(checked).map(cb => cb.dataset.path).filter(Boolean);
+    if (!confirm(`¿Mandar ${paths.length} archivo(s) duplicado(s) a la papelera?`)) return;
+    const out = document.getElementById('pa-dup-results');
+    out.innerHTML = '<div style="opacity:.7;">Eliminando…</div>';
+    let deleted = 0;
+    let failed = 0;
+    for (const p of paths) {
+        const data = await apiPost('/cleanup/api/duplicates/delete', { path: p });
+        if (paIsOk(data)) { deleted++; } else { failed++; }
+    }
+    showToast && showToast(`Eliminados ${deleted}, fallidos ${failed}.`, deleted ? 'success' : 'error');
+    paScanDuplicates();
+}
+
+// Shared helper
+function paToggleAll(masterCb, cbClass) {
+    document.querySelectorAll('.' + cbClass).forEach(cb => { cb.checked = masterCb.checked; });
+}
+</script>
 {% endblock %}

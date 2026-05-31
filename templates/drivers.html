@@ -56,6 +56,28 @@
 
 <div class="card">
     <div class="card-header">
+        <h3>Respaldo de controladores</h3>
+    </div>
+    <div class="card-body">
+        <p style="margin:0 0 8px 0;opacity:.75;">
+            Exporta todos los controladores de terceros instalados con
+            <code>pnputil /export-driver</code> a una carpeta. Útil antes de reinstalar
+            Windows o cambiar disco. No actualiza ni elimina nada.
+        </p>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <label style="font-size:13px;" for="drv-backup-dest">Destino:</label>
+            <input id="drv-backup-dest" type="text" placeholder="C:\backup\drivers"
+                   class="form-input" style="flex:1;min-width:260px;"
+                   aria-label="Carpeta de destino para respaldo de controladores">
+            <span class="badge badge-admin">Admin</span>
+            <button type="button" class="btn btn-sm btn-primary" onclick="drvBackup()">Generar respaldo</button>
+        </div>
+        <div id="drv-backup-result" style="margin-top:10px;"></div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
         <h3>Salida</h3>
         <button class="btn btn-sm btn-outline" onclick="document.getElementById('output-area').innerHTML = ''">Limpiar</button>
     </div>
@@ -63,4 +85,31 @@
         <div id="output-area" class="console" style="min-height: 200px;">Haga clic en un botón de diagnóstico para ver los resultados aquí.</div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function drvBackup() {
+    const dest = document.getElementById('drv-backup-dest').value.trim();
+    const out = document.getElementById('drv-backup-result');
+    if (!dest) {
+        out.innerHTML = '<div class="alert alert-warning">Indique una carpeta destino (p.ej. C:\\backup\\drivers).</div>';
+        return;
+    }
+    if (!confirm(`¿Generar respaldo de controladores en "${dest}"?`)) return;
+    out.innerHTML = '<div style="opacity:.7;">Exportando…</div>';
+    const data = await apiPost('/drivers/api/backup', { dest_path: dest });
+    const isOk = data && (data.status === 'success' || data.status === 'completed');
+    if (!isOk) {
+        const msg = (data && (data.error || data.output)) || 'Error en el respaldo.';
+        out.innerHTML = `<div class="alert alert-danger">${escapeHtml(msg)}</div>`;
+        return;
+    }
+    const d = (data.details && typeof data.details === 'object') ? data.details : {};
+    const tgt = d.target_dir || dest;
+    const cnt = (d.exported_count !== null && d.exported_count !== undefined) ? ` (${d.exported_count} controladores)` : '';
+    out.innerHTML = `<div class="alert alert-success">Respaldo creado en <code>${escapeHtml(tgt)}</code>${escapeHtml(cnt)}.</div>`;
+    showToast && showToast('Respaldo de controladores OK.', 'success');
+}
+</script>
 {% endblock %}

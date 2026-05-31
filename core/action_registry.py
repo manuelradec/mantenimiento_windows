@@ -277,6 +277,41 @@ def _register_all_actions():
             "Scan Downloads for duplicates (read-only)",
             120,
         ),
+        (
+            "cleanup.scan_broken_shortcuts",
+            "Scan Broken Shortcuts",
+            "cleanup",
+            "Find .lnk shortcuts whose target no longer exists (read-only)",
+            120,
+        ),
+        (
+            "cleanup.delete_broken_shortcuts",
+            "Delete Broken Shortcuts",
+            "cleanup",
+            "Send broken .lnk shortcuts to Recycle Bin",
+            120,
+        ),
+        (
+            "cleanup.scan_empty_folders",
+            "Scan Empty Folders",
+            "cleanup",
+            "Find empty folders under a user-writable root (read-only)",
+            300,
+        ),
+        (
+            "cleanup.delete_empty_folders",
+            "Delete Empty Folders",
+            "cleanup",
+            "Send empty folders to Recycle Bin (re-verified each)",
+            300,
+        ),
+        (
+            "cleanup.delete_duplicate",
+            "Delete Duplicate File",
+            "cleanup",
+            "Send a single duplicate file to Recycle Bin",
+            60,
+        ),
         ("network.flush_dns", "Flush DNS", "network", "Flush DNS resolver cache", 30),
         (
             "network.purge_netbios",
@@ -354,6 +389,19 @@ def _register_all_actions():
                 default_timeout=timeout,
             )
         )
+
+    # SAFE_MUTATION but requires admin (special case)
+    registry.register(
+        ActionDef(
+            action_id="drivers.backup",
+            name="Backup Drivers",
+            module="drivers",
+            risk_class=RiskClass.SAFE_MUTATION,
+            description="Export installed third-party drivers via pnputil /export-driver",
+            default_timeout=600,
+            requires_admin=True,
+        )
+    )
 
     # === DISRUPTIVE ===
     for aid, name, module, desc, timeout, confirm_msg in [

@@ -490,6 +490,65 @@ def scan_duplicate_files(directory=None):
     )
 
 
+def delete_duplicate(path):
+    """Delete one duplicate file (sends to Recycle Bin).
+
+    Refuses to delete:
+      - Anything outside the user profile.
+      - Anything matching the cleanup PROTECTED_TOKENS in services.empty_folders
+        (system paths).
+      - Anything that doesn't exist or isn't a regular file.
+
+    Why: scan_duplicate_files returns user-selected paths; the technician picks
+    which copy to keep. We never auto-pick; we only delete what the UI sent.
+    """
+    from services.empty_folders import _is_protected
+
+    if not isinstance(path, str) or not path.strip():
+        return CommandResult(
+            status=CommandStatus.ERROR,
+            output="No path provided.",
+        )
+    abs_path = os.path.abspath(path)
+    if _is_protected(abs_path):
+        return CommandResult(
+            status=CommandStatus.ERROR,
+            output=f"Refused to delete protected path: {abs_path}",
+        )
+    if not os.path.exists(abs_path):
+        return CommandResult(
+            status=CommandStatus.NOT_APPLICABLE,
+            output="File not found.",
+        )
+    if not os.path.isfile(abs_path):
+        return CommandResult(
+            status=CommandStatus.ERROR,
+            output="Path is not a regular file.",
+        )
+
+    ps_path = "'" + abs_path.replace("'", "''") + "'"
+    ps = (
+        "Add-Type -AssemblyName Microsoft.VisualBasic;"
+        f"$p = {ps_path};"
+        "try {"
+        "  [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile("
+        "    $p,"
+        "    [Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs,"
+        "    [Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin);"
+        "  Write-Output 'deleted';"
+        "} catch { Write-Error $_.Exception.Message; exit 1 }"
+    )
+    result = run_powershell(
+        ps,
+        timeout=60,
+        description=f"Delete duplicate {os.path.basename(abs_path)}",
+    )
+    if result.status == CommandStatus.SUCCESS:
+        result.output = f"Deleted: {abs_path}"
+        result.details = {"path": abs_path}
+    return result
+
+
 def restart_sysmain():
     """
     Restart SysMain (Superfetch) service to clear its cache.
