@@ -295,6 +295,19 @@ function getGracePeriod() {
     return checked ? parseInt(checked.value, 10) : 5;
 }
 
+// ── Helper: 2-step governance confirmation ────────────────────────────────
+// La UI ya recoge la confirmación del técnico vía confirm() antes de llamar a
+// este helper, así que registramos el token y reintentamos sin abrir otro modal.
+async function attemptGoverned(url, payload) {
+    payload = payload || {};
+    let data = await apiPost(url, payload);
+    if (data && data.status === 'needs_confirmation' && data.action_id) {
+        await apiPost('/api/policy/confirm', { token: data.action_id });
+        data = await apiPost(url, { ...payload, confirmation_token: data.action_id });
+    }
+    return data;
+}
+
 // ── Normal restart ─────────────────────────────────────────────────────────
 
 async function saveTask() {
@@ -320,7 +333,7 @@ async function saveTask() {
     btn.disabled    = true;
     btn.textContent = 'Guardando…';
 
-    const data = await apiPost('/scheduled-restart/api/create', {
+    const data = await attemptGoverned('/scheduled-restart/api/create', {
         date, time, recurrence, grace_period: grace, force: false,
     });
     const console_ = document.getElementById('output-console');
@@ -375,7 +388,7 @@ async function saveForceTask() {
     btn.disabled    = true;
     btn.textContent = 'Programando reinicio forzado…';
 
-    const data = await apiPost('/scheduled-restart/api/create', {
+    const data = await attemptGoverned('/scheduled-restart/api/create', {
         date, time, recurrence, force: true, force_confirmed: true,
     });
     const console_ = document.getElementById('output-console');
@@ -402,7 +415,7 @@ async function deleteTask() {
     const confirmed = confirm('¿Eliminar la tarea de reinicio programado?');
     if (!confirmed) return;
 
-    const data = await apiPost('/scheduled-restart/api/delete');
+    const data = await attemptGoverned('/scheduled-restart/api/delete');
     const console_ = document.getElementById('output-console');
     if (data.status === 'success') {
         if (console_) console_.textContent = data.message;
