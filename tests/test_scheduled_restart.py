@@ -363,6 +363,27 @@ class TestRoutesGovernance:
             "not_applicable",
         )
 
+    def test_create_returns_action_id_on_needs_confirmation(self, client, app):
+        """Cuando governance pide confirmación, la respuesta DEBE incluir
+        action_id para que la UI pueda completar el 2-step automáticamente.
+        Regresión: la UI rompía con 'Error al programar' cuando llegaba este
+        status sin manejarlo (templates/scheduled_restart.html).
+        """
+        from core.policy_engine import policy, OperationMode
+
+        with app.app_context():
+            policy.set_mode(OperationMode.EXPERT)
+        csrf = self._get_csrf(client)
+        resp = client.post(
+            "/scheduled-restart/api/create",
+            headers={"X-CSRF-Token": csrf, "Origin": "http://127.0.0.1:5000"},
+            content_type="application/json",
+            data='{"date":"2099-12-31","time":"23:00","recurrence":"Once","grace_period":15}',
+        )
+        data = resp.get_json()
+        if data.get("status") == "needs_confirmation":
+            assert data.get("action_id") == "scheduled_restart.create"
+
 
 # ============================================================
 # Read-only endpoints (sin governance)
