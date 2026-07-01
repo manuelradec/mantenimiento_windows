@@ -72,6 +72,7 @@ a = Analysis(
         'services.security_audit',
         'services.system_inventory',
         'services.office_tools',
+        'services.reporting_agent',
         # Routes
         'routes.office',
         # Route modules
