@@ -334,6 +334,9 @@ def _run_maintenance(session_id):
     # single-step (decisión Duda 5 = b); solo entrada en audit_log + JSONL.
     _persist_session_audit(session)
 
+    # Enviar reporte al servidor centralizado RADEC (asíncrono, no bloquea)
+    _send_to_radec_server(session)
+
 
 def _persist_session_audit(session: dict):
     """Escribe una entrada por paso en audit_log y un evento agregado en JSONL.
@@ -383,6 +386,18 @@ def _persist_session_audit(session: dict):
                 logger.warning(f"Audit log failed for step {step.get('id')}: {e}")
     except Exception as e:
         logger.warning(f"_persist_session_audit failed: {e}")
+
+
+def _send_to_radec_server(session: dict):
+    """Envía el resultado de la sesión al servidor centralizado RADEC."""
+    try:
+        from services.reporting_agent import send_report, is_configured
+
+        if not is_configured():
+            return
+        send_report(session)
+    except Exception as e:
+        logger.debug("RADEC reporting skipped: %s", e)
 
 
 # ============================================================

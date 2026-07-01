@@ -207,6 +207,14 @@ def main():
         def open_browser(host, port, delay=0):  # noqa: F811
             pass
 
+    # Enviar heartbeat al servidor centralizado RADEC (asíncrono)
+    try:
+        from services.reporting_agent import send_heartbeat
+
+        send_heartbeat()
+    except Exception:
+        pass
+
     if args.dev:
         run_development(app, host, port)
     else:
