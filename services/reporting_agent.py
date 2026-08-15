@@ -27,9 +27,11 @@ from config import Config
 
 logger = logging.getLogger('cleancpu.reporting_agent')
 
-SERVER_URL = os.environ.get('CLEANCPU_SERVER_URL', '').rstrip('/')
-AGENT_TOKEN = os.environ.get('CLEANCPU_AGENT_TOKEN', '')
-SUCURSAL = os.environ.get('CLEANCPU_SUCURSAL', '')
+# Se resuelve en agent_config, que ademas lee el `.env` de al lado del .exe y
+# acepta los nombres heredados. Antes esto eran tres `os.environ.get` en tiempo
+# de import: si el proceso no traia las variables ya puestas -- que es el caso
+# normal de un .exe abierto con doble clic -- quedaban vacias para siempre.
+from services import agent_config
 
 MAX_RETRIES = 3
 RETRY_DELAYS = [5, 15, 30]
@@ -38,30 +40,25 @@ QUEUE_DB = os.path.join(Config.LOG_DIR, 'report_queue.db')
 _lock = threading.Lock()
 
 
-def _get_ssl_context() -> ssl.SSLContext:
-    """Contexto SSL permisivo para certificados internos mkcert."""
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    return ctx
-
-
 def _post_json(endpoint: str, payload: dict, timeout: int = 30) -> dict:
     """Envía POST JSON al servidor RADEC."""
-    url = f'{SERVER_URL}{endpoint}'
+    url = f'{agent_config.server_url()}{endpoint}'
     data = json.dumps(payload, ensure_ascii=False).encode('utf-8')
     req = Request(url, data=data, method='POST')
     req.add_header('Content-Type', 'application/json')
-    req.add_header('Authorization', f'Bearer {AGENT_TOKEN}')
+    req.add_header('Authorization', f'Bearer {agent_config.agent_token()}')
     req.add_header('User-Agent', f'CleanCPU-Agent/{Config.APP_VERSION}')
 
-    ctx = _get_ssl_context() if url.startswith('https') else None
-    with urlopen(req, timeout=timeout, context=ctx) as resp:
+    # Validacion TLS delegada en agent_config: valida por omision. Aqui habia
+    # un contexto fijo con `check_hostname = False` + `CERT_NONE` "para
+    # certificados internos mkcert", pero el servidor sirve un comodin publico
+    # de Sectigo. Ver agent_config.tls_inseguro().
+    with urlopen(req, timeout=timeout, context=agent_config.contexto_ssl(url)) as resp:
         return json.loads(resp.read().decode('utf-8'))
 
 
 def is_configured() -> bool:
-    return bool(SERVER_URL and AGENT_TOKEN)
+    return agent_config.esta_configurado()
 
 
 # ---------------------------------------------------------------------------
@@ -311,7 +308,7 @@ def send_report(
             'schema_version': '2.0',
             'agent_version': Config.APP_VERSION,
             'hostname': hostname,
-            'sucursal': SUCURSAL,
+            'sucursal': agent_config.sucursal(),
             'system_info': info,
             'hardware_inventory': hw_inventory,
             'software_inventory': sw_inventory,
@@ -368,7 +365,7 @@ def send_heartbeat():
             'agent_version': Config.APP_VERSION,
             'hostname': hostname,
             'system_info': info,
-            'sucursal': SUCURSAL,
+            'sucursal': agent_config.sucursal(),
             'upgrade_opportunities': upgrade_opportunities,
         }
 

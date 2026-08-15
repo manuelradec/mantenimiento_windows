@@ -17,6 +17,7 @@ from flask import Flask, jsonify, request
 from config import Config, get_base_path
 from routes import register_blueprints
 from services.permissions import get_elevation_info
+from services.agent_sync import start_sync_worker
 from core.security import init_security
 from core.persistence import init_db
 from core.policy_engine import policy
@@ -43,6 +44,9 @@ def create_app():
 
     # Initialize database
     init_db()
+
+    # Start OCS Inventory Agent Sync Worker Thread
+    start_sync_worker()
 
     # Make elevation info and config available to all templates
     @app.context_processor
