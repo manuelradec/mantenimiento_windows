@@ -192,6 +192,27 @@ def _espera_inicial(interval: int) -> float:
     return random.uniform(0, min(interval, 300))
 
 
+#: Cada cuantos ciclos se mira si hay version nueva. Con el intervalo por
+#: omision (300 s) sale una comprobacion cada media hora: suficiente para que
+#: una correccion llegue el mismo dia, y sin pedirle la version al servidor mil
+#: veces por equipo.
+CICLOS_ENTRE_COMPROBACIONES_DE_VERSION = 6
+
+
+def _tocan_actualizaciones(ciclo: int) -> bool:
+    """Reparte tambien las comprobaciones de version entre la flota.
+
+    Sin el desfase por equipo, los mil agentes preguntarian por la version en el
+    mismo ciclo -- y peor, DESCARGARIAN los 18 MB a la vez. Es el mismo problema
+    de manada que resuelve el jitter de arranque, y aqui pesa mas porque no son
+    dos peticiones sino una descarga entera.
+    """
+    return (ciclo + _DESFASE_VERSION) % CICLOS_ENTRE_COMPROBACIONES_DE_VERSION == 0
+
+
+_DESFASE_VERSION = random.randrange(CICLOS_ENTRE_COMPROBACIONES_DE_VERSION)
+
+
 def _worker_loop(server_url: str, interval: int):
     espera = _espera_inicial(interval)
     logger.info("Worker de sincronizacion apuntando a %s (cada %ss, "
@@ -201,11 +222,21 @@ def _worker_loop(server_url: str, interval: int):
     # tiene que salir en el momento, no al terminar el retardo.
     if _stop_event.wait(espera):
         return
+    ciclo = 0
     while not _stop_event.is_set():
         try:
             run_sync_cycle(server_url)
         except Exception as exc:
             logger.error("Sync cycle error: %s", exc)
+        if _tocan_actualizaciones(ciclo):
+            try:
+                from services import agent_update
+                agent_update.comprobar_y_preparar()
+            except Exception as exc:
+                # Falla suave a proposito: que no se pueda actualizar nunca debe
+                # impedir que el equipo siga reportando, que es su trabajo.
+                logger.warning("No se pudo comprobar actualizaciones: %s", exc)
+        ciclo += 1
         # Jitter tambien entre ciclos: sin esto la flota se re-sincroniza sola
         # con el tiempo, porque todos esperan exactamente lo mismo.
         _stop_event.wait(interval + random.uniform(0, interval * 0.1))
