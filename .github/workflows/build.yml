@@ -1,0 +1,124 @@
+name: Construir agente
+
+# Compila el ejecutable del agente CleanCPU.
+#
+# POR QUE VIVE EN ESTE REPOSITORIO Y NO EN APPS-RADEC: el agente es un repo
+# propio (manuelradec/mantenimiento_windows). En APPS-RADEC la carpeta
+# `Mantenimiento/cleancpu/` esta en .gitignore, asi que un checkout limpio de
+# aquella no la contiene y un workflow que apunte ahi falla con "The directory
+# name is invalid" -- que es exactamente lo que paso al intentarlo.
+#
+# POR QUE EN WINDOWS: PyInstaller no compila cruzado. Un runner ubuntu sirve
+# para pruebas y lint, pero no puede producir un .exe. Antes de esto el binario
+# salia solo de que alguien corriera build.bat en su maquina, con la version de
+# Python y las dependencias que tuviera ese dia.
+#
+# QUE PRODUCE: `CleanCPU.exe` y `CleanCPU.exe.json` con su SHA-256. Ese
+# manifiesto es lo que compara services/agent_update.py antes de reemplazarse:
+# sin el, la auto-actualizacion seria un canal de ejecucion remota sin
+# verificar en cada equipo de la flota.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  construir:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar dependencias
+        run: |
+          pip install -r requirements-build.txt
+          pip install -r requirements-dev.txt
+
+      - name: Pruebas del agente
+        # Antes de compilar, a proposito: fallar aqui cuesta segundos, fallar
+        # despues de PyInstaller cuesta minutos.
+        run: python -m pytest tests/ -q
+
+      - name: Compilar el ejecutable
+        run: pyinstaller mantenimiento_windows.spec --clean --noconfirm
+
+      - name: Leer la version
+        id: version
+        shell: pwsh
+        run: |
+          $v = (Select-String -Path config.py -Pattern 'APP_VERSION\s*=\s*"([^"]+)"').Matches.Groups[1].Value
+          "version=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "Version del agente: $v"
+
+      - name: Generar el manifiesto con el hash
+        id: hash
+        shell: pwsh
+        run: |
+          $h = (Get-FileHash dist\CleanCPU.exe -Algorithm SHA256).Hash.ToLower()
+          "sha256=$h" >> $env:GITHUB_OUTPUT
+          @{
+            version = "${{ steps.version.outputs.version }}"
+            sha256  = $h
+            tamano  = (Get-Item dist\CleanCPU.exe).Length
+            fecha   = (Get-Date -Format 'o')
+          } | ConvertTo-Json | Set-Content dist\CleanCPU.exe.json -Encoding utf8
+          Get-Content dist\CleanCPU.exe.json
+
+      - name: Comprobar que arranca
+        # Un .exe que compila pero no levanta es peor que no tenerlo: se
+        # despliega a la flota y falla en cientos de maquinas a la vez.
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath dist\CleanCPU.exe -ArgumentList '--no-browser' -PassThru
+          $ok = $false
+          foreach ($i in 1..30) {
+            Start-Sleep -Seconds 2
+            try {
+              $r = Invoke-WebRequest 'http://127.0.0.1:5000/' -UseBasicParsing -TimeoutSec 5
+              if ($r.StatusCode -eq 200) { $ok = $true; break }
+            } catch { }
+          }
+          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          if (-not $ok) { throw "el agente no respondio en 60 s" }
+          Write-Host "[OK] el agente levanta y responde"
+
+      - name: Publicar el artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: CleanCPU-${{ steps.version.outputs.version }}
+          path: |
+            dist/CleanCPU.exe
+            dist/CleanCPU.exe.json
+          retention-days: 90
+
+      - name: Publicar release en un tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/CleanCPU.exe
+            dist/CleanCPU.exe.json
+          body: |
+            Agente CleanCPU ${{ steps.version.outputs.version }}
+
+            SHA-256: `${{ steps.hash.outputs.sha256 }}`
+
+            Para desplegar: copiar los DOS archivos a la carpeta de distribucion
+            del servidor de Mantenimiento (`RADEC_AGENTE_DIST_DIR`, por omision
+            `Mantenimiento/dist_agente/`). El .json es obligatorio: sin el, el
+            servidor no ofrece la actualizacion.
+
+            Instalacion en un equipo nuevo:
+            `scripts\Instalar-Agente-Mantenimiento.ps1 -Token '<token>' -Sucursal '<clave>'`
