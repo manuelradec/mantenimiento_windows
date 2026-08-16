@@ -15,13 +15,11 @@ import json
 import logging
 import os
 import sqlite3
-import ssl
 import threading
 import time
 from datetime import datetime
 from typing import Optional
 from urllib.request import Request, urlopen
-from urllib.error import URLError
 
 from config import Config
 

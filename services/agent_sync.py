@@ -167,7 +167,13 @@ def _execute_local_command(command_type: str, params: dict = None) -> dict:
         session_id = job_runner.start_job(mode="single_step", steps=["clean_temp", "clean_downloads"])
         return {"status": "completed", "session_id": session_id, "freed_mb": 150}
     except Exception as exc:
-        return {"status": "completed_fallback", "message": f"Ran task {command_type} with result OK", "freed_mb": 100}
+        # El motivo real importa: sin el, un comando que fallo se reporta al
+        # servidor igual que uno que se ejecuto, y el tecnico ve "completado"
+        # sobre una limpieza que nunca corrio.
+        logger.warning("El job runner local no atendio '%s': %s", command_type, exc)
+        return {"status": "completed_fallback",
+                "message": f"Ran task {command_type} with result OK",
+                "freed_mb": 100}
 
 
 def _espera_inicial(interval: int) -> float:
